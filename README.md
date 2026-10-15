@@ -195,6 +195,9 @@ Migrando uma instalação que já usava SQLite (a base antiga continua no volume
 só: se falhar (por exemplo, uma coleta gravando ao mesmo tempo), nada muda e basta repetir.
 O `--force` descarta só o que o serviço novo gravou desde a subida.
 
+Em produção o servidor MCP começa desligado (`VAGAS_MCP_ENABLED=false`): o serviço só
+faz a coleta agendada. Para ligar, defina `VAGAS_MCP_ENABLED=true` e faça novo deploy.
+
 MCP e noVNC não têm senha e ficam só no `127.0.0.1` do servidor. Para entrar no LinkedIn
 (fonte `post`), faça `ssh -L 6081:127.0.0.1:6081 servidor`, abra
 http://localhost:6081/vnc.html e conclua o login. Depois ligue `VAGAS_POSTS_ENABLED=true`.

@@ -449,6 +449,12 @@ async def main() -> None:
     load_dotenv(ROOT / ".env")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     service = Service()
+    scheduler = asyncio.create_task(service.scheduler())
+    # VAGAS_MCP_ENABLED=false: só a coleta agendada, sem servidor MCP (ex.: produção).
+    if not _env_bool("VAGAS_MCP_ENABLED", True):
+        log.info("MCP desligado (VAGAS_MCP_ENABLED=false): só a coleta agendada")
+        await scheduler
+        return
     mcp = build_server(service)
     host = os.getenv("MCP_HOST", "127.0.0.1")
     port = int(os.getenv("MCP_PORT", 8000))
@@ -456,7 +462,6 @@ async def main() -> None:
         allowed_hosts=["localhost:*", "127.0.0.1:*"],
         allowed_origins=["http://localhost:*", "http://127.0.0.1:*"],
     )
-    scheduler = asyncio.create_task(service.scheduler())
     log.info("MCP em http://%s:%d/mcp", host, port)
     try:
         await mcp.run_streamable_http_async(host=host, port=port, transport_security=security)

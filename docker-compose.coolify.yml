@@ -5,7 +5,8 @@
 #     (obrigatória; senha com caracteres especiais vai codificada, ex.: @ -> %40);
 #   - volumes nomeados no lugar de ./data e ../linkedin/.session;
 #   - o site não publica porta: o domínio vai no serviço "web", porta 8000;
-#   - MCP e noVNC (sem senha!) ficam só no 127.0.0.1 do servidor: use túnel SSH.
+#   - MCP desligado por padrão (VAGAS_MCP_ENABLED=false); ligado, ele e o noVNC (sem
+#     senha!) ficam só no 127.0.0.1 do servidor: use túnel SSH.
 services:
   vagas-php:
     build: .
@@ -15,6 +16,7 @@ services:
     shm_size: 1gb
     environment:
       TZ: America/Sao_Paulo
+      VAGAS_MCP_ENABLED: ${VAGAS_MCP_ENABLED:-false}   # true liga o servidor MCP (porta 8766)
       MCP_HOST: 0.0.0.0
       MCP_PORT: "8000"
       LINKEDIN_HEADLESS: "false"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Comandos:
 #   web          -> site com a lista de vagas (sem navegador)
-#   serve        -> serviço contínuo (MCP + coleta agendada)
+#   serve        -> serviço contínuo (coleta agendada + MCP, se VAGAS_MCP_ENABLED)
 #   outros args  -> CLI (python -m vagas_php ...), ex.: collect all
 # Para serve/CLI sobe display virtual + VNC + noVNC, para acompanhar o navegador e
 # concluir verificações do LinkedIn (2FA/captcha).
