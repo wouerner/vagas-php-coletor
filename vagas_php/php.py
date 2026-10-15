@@ -230,50 +230,6 @@ RECRUITING = re.compile(
     r"buscamos|contratamos|estamos contratando|apply here|we'?re hiring)", re.I)
 
 
-def is_php_job_seeker(text: str | None, headline: str | None = None,
-                      open_to_work: bool | None = False) -> bool:
-    """Post de alguém com perfil PHP procurando emprego: selo "buscando emprego" na foto
-    ou texto de quem procura (JOB_SEEKER, e não de recrutamento), e PHP no título do
-    perfil ou no texto (hashtags e links não contam)."""
-    body = HASHTAG_OR_URL.sub(" ", text or "")
-    php_profile = PHP_CORE.search(headline or "") or PHP_CORE.search(body)
-    seeking = JOB_SEEKER.search(text or "") and not RECRUITING.search(text or "")
-    return bool(php_profile and (open_to_work or seeking))
-
-
-# Posts em português (o foco é o mercado brasileiro). Palavras que não existem em inglês
-# nem em espanhol; o local do perfil, lido na visita, é que confirma se é do Brasil.
-PORTUGUESE = re.compile(
-    r"\b(n[ãa]o|voc[êe]|estou|s[ãa]o|tamb[ée]m|com|meu|minha|est[áa]|ol[áa]|experi[êe]ncia|"
-    r"desenvolvedora?|vagas?|procurando|recoloca[çc][ãa]o|oportunidade|ent[ãa]o|agrade[çc]o|"
-    r"pessoal|[áa]rea|conhecimentos?|atua[çc][ãa]o|trabalhar|busco|aberto|aberta)\b", re.I)
-# Estados e capitais, para locais sem país ("São Paulo e Região", "Grande Curitiba").
-BR_PLACES = re.compile(
-    r"\b(brasil|brazil|acre|alagoas|amap[áa]|bahia|cear[áa]|distrito federal|esp[íi]rito santo|"
-    r"goi[áa]s|maranh[ãa]o|mato grosso|minas gerais|par[áa]|para[íi]ba|paran[áa]|pernambuco|"
-    r"piau[íi]|rio de janeiro|rio grande do (norte|sul)|rond[ôo]nia|roraima|santa catarina|"
-    r"s[ãa]o paulo|sergipe|tocantins|bras[íi]lia|belo horizonte|curitiba|porto alegre|"
-    r"florian[óo]polis|salvador|fortaleza|recife|manaus|bel[ée]m|goi[âa]nia|campinas|vit[óo]ria|"
-    r"natal|jo[ãa]o pessoa|macei[óo]|aracaju|teresina|s[ãa]o lu[íi]s|cuiab[áa]|campo grande|"
-    r"porto velho|boa vista|macap[áa]|palmas|rio branco)\b", re.I)
-
-
-def looks_portuguese(text: str | None) -> bool:
-    words = {w.lower() for w in PORTUGUESE.findall(HASHTAG_OR_URL.sub(" ", text or ""))}
-    return len(words) >= 3
-
-
-def is_brazil(location: str | None) -> bool | None:
-    """Local do perfil no Brasil? None se não há local. O LinkedIn mostra "Cidade, Estado,
-    País"; regiões metropolitanas vêm sem o país ("São Paulo e Região")."""
-    if not location:
-        return None
-    if re.search(r"\b(brasil|brazil)\b", location, re.I):
-        return True
-    # Com vírgula, a última parte é o país ("Cairo, Egito") ou, sem país, o estado.
-    return bool(BR_PLACES.search(location.rsplit(",", 1)[-1]))
-
-
 def details(title: str | None, *texts: str | None) -> dict:
     """Modalidade, senioridade, contratação e stack, priorizando o título."""
     return {
@@ -336,7 +292,7 @@ RULES = [
     {"group": "posts", "id": "job_seeker", "effect": "recusa",
      "title": "Pessoa procurando emprego",
      "text": "Posts de quem procura vaga (#opentowork, \"estou em busca de oportunidade\"...) "
-             "não são anúncios. Eles entram na contagem de candidatos do dashboard. Texto de "
+             "não são anúncios. Texto de "
              "recrutador (\"estou em busca de pessoas\", \"candidate-se\"...) não conta como "
              "procura de emprego.",
      "patterns": _patterns(JOB_SEEKER)},
@@ -365,22 +321,4 @@ RULES = [
     {"group": "posts", "id": "no_hiring", "effect": "recusa",
      "title": "Sem sinal de contratação",
      "text": "Fala de PHP, mas não anuncia vaga.", "patterns": []},
-
-    {"group": "candidatos", "id": "seeker", "effect": "aceita",
-     "title": "Perfil PHP procurando emprego",
-     "text": "Selo \"buscando emprego\" na foto ou texto de quem procura, e PHP no título do "
-             "perfil ou no texto. Conta como procurando enquanto tiver o selo, ou por 30 dias "
-             "depois do post.", "patterns": _patterns(JOB_SEEKER)},
-    {"group": "candidatos", "id": "recruiting", "effect": "recusa",
-     "title": "Recrutador procurando pessoas",
-     "text": "\"Estou em busca de pessoas\", \"candidate-se\"... é anúncio de vaga, não "
-             "alguém procurando emprego.", "patterns": _patterns(RECRUITING)},
-    {"group": "candidatos", "id": "portuguese", "effect": "recusa",
-     "title": "Post fora do português",
-     "text": "O foco é o Brasil: só entram posts em português (3 ou mais palavras típicas).",
-     "patterns": _patterns(PORTUGUESE)},
-    {"group": "candidatos", "id": "brazil", "effect": "recusa",
-     "title": "Local do perfil fora do Brasil",
-     "text": "Depois da visita ao perfil, o local decide. Quem é de fora fica guardado mas não "
-             "entra nas contagens nem é visitado de novo.", "patterns": _patterns(BR_PLACES)},
 ]

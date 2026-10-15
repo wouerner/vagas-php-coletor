@@ -57,36 +57,13 @@ Tudo vai para o MySQL (`DATABASE_URL`), mas só aparece no site o que passa no f
 O que ainda escapar pode ser descartado à mão com a ferramenta MCP `dismiss_job` (id, URL
 ou número do post): a vaga sai do site, da API e do MCP e não volta em novas coletas.
 
-**Transparência**: a página `/regras` do site mostra todas as regras de filtro (vagas,
-publicações e candidatos), na ordem em que são aplicadas, com as expressões usadas, quantos
+**Transparência**: a página `/regras` do site mostra todas as regras de filtro (vagas e
+publicações), na ordem em que são aplicadas, com as expressões usadas, quantos
 itens da base cada uma decidiu e a lista do que foi descartado à mão, com o motivo. Ela é
 gerada de `php.RULES` (`GET /api/rules`), que lê as mesmas constantes do filtro: ao mudar
 uma regra, atualize o texto dela em `RULES`.
 
 Issues fechadas no GitHub ficam marcadas como encerradas e saem do site.
-
-## Pessoas procurando emprego
-
-A fonte `seekers` (LinkedIn logado, a cada 12 h das 9 às 21 h) acompanha **pessoas com
-perfil PHP procurando emprego no Brasil**:
-
-1. **Descoberta**: busca publicações em português (`#opentowork desenvolvedor php`,
-   "desenvolvedor php procurando oportunidade", "programador php procurando emprego"...)
-   e fica com as escritas em português (`looks_portuguese` em `php.py`) de quem tem PHP
-   no título do perfil ou no texto e está procurando: selo "buscando emprego" na foto
-   (lido do texto alternativo da imagem) ou texto de quem procura (`JOB_SEEKER`).
-2. **Checagem do selo**: visita até 20 perfis por coleta (os nunca vistos primeiro, depois
-   os não vistos há 72 h), devagar, e lê o bloco "Buscando emprego", o local e os cargos
-   procurados. O local decide se a pessoa é do Brasil (`is_brazil`): quem é de fora fica
-   na base mas sai das contagens e não é mais visitado. Quem tinha o selo e tirou conta como **saída**; quem volta a usá-lo ou
-   publica de novo depois de sair conta como nova **entrada**.
-
-Conta como procurando quem está com o selo, ou quem nunca usou o selo mas publicou que
-procura nos últimos 30 dias (`VAGAS_SEEKERS_ACTIVE_DAYS`). Os dados das pessoas ficam na
-base sem prazo (tabelas `people`, `people_posts`, `people_events`, `people_daily`) e só
-saem pelo MCP (`list_seekers`, só Brasil por padrão); o site mostra **só quantidades, só
-do Brasil**: procurando agora, entradas e saídas hoje / 7 / 30 dias e séries por dia, semana e mês
-(dashboard e `/api/seekers`).
 
 ## Configuração
 
@@ -130,12 +107,10 @@ claude mcp add --transport http vagas-php http://localhost:8766/mcp   # ou use o
 | Ferramenta | |
 |---|---|
 | `list_jobs(q, source, workplace, seniority, stack, hours, include_closed, limit, offset)` | consulta a base local (máx. 72 h) |
-| `collect_now(source)` | coleta agora `linkedin`, `gupy`, `remotar`, `programathor`, `catho`, `solides`, `inhire`, `coodesh`, `nerdin`, `recrutei`, `upvagas`, `github`, `post` ou `seekers` |
+| `collect_now(source)` | coleta agora `linkedin`, `gupy`, `remotar`, `programathor`, `catho`, `solides`, `inhire`, `coodesh`, `nerdin`, `recrutei`, `upvagas`, `github` ou `post` |
 | `check_post(url)` | confere um post do LinkedIn pelo link (inclusive `lnkd.in`): qual regra decidiu e se aparece no site; guarda na base se falar de PHP |
 | `get_status()` | configuração, próximas coletas, totais, últimas execuções |
 | `configure_scheduler(source, enabled, interval_hours, active_hours)` | ajusta a coleta de uma fonte |
-| `list_seekers(q, status, brazil, limit, offset)` | pessoas com perfil PHP procurando emprego (status: active, left, all) |
-| `seekers_stats()` | volumes de quem procura: agora, entradas e saídas por dia/semana/mês |
 | `dismiss_job(ref, reason, undo)` | marca uma vaga/publicação como "não é vaga" (id, URL ou número do post) |
 
 ## Post diário no LinkedIn
@@ -170,7 +145,7 @@ por dia** (colunas empilhadas por fonte, 7/14/30 dias, dia de Brasília); modali
 senioridade, contratação, frameworks e empresas com mais vagas; e a saúde da coleta
 de cada fonte. Os números vêm de `GET /api/dashboard?days=14`.
 
-Para mostrar a defasagem dos dados, o topo do dashboard e a seção de candidatos trazem a
+Para mostrar a defasagem dos dados, o topo do dashboard traz a
 **última e a próxima captura**, e a tabela de saúde mostra a próxima coleta de cada fonte,
 já ajustada à janela de horário. O coletor grava a agenda em `data/schedule.json` a cada
 minuto. Se o arquivo ficar mais de 5 min sem atualizar, o dashboard avisa que o coletor
@@ -178,7 +153,7 @@ parece parado.
 
 ## Base de dados (MySQL 8)
 
-As vagas, pessoas e execuções ficam num MySQL 8.0.19+ apontado por
+As vagas e as execuções ficam num MySQL 8.0.19+ apontado por
 `DATABASE_URL=mysql://usuario:senha@host:3306/base` (senha com caracteres especiais vai
 codificada, ex.: `@` -> `%40`). Bancos gerenciados (Vultr, RDS...) exigem TLS: acrescente
 `?ssl-mode=REQUIRED` (cifra a conexão) ou `?ssl-mode=VERIFY_CA&ssl-ca=/caminho/ca.pem`
@@ -236,7 +211,7 @@ docker compose run --rm vagas-php list --q laravel --hours 24
 - `.env`, `.session/` e `data/` estão no `.gitignore`; trate-os como senhas.
 - Automação viola os Termos de Uso do LinkedIn. A fonte `post` usa a sua conta:
   mantenha intervalos longos (mínimo 2 h) ou desligue com `VAGAS_POSTS_ENABLED=false`.
-  Só `post` e `seekers` usam a conta; as demais fontes não usam login.
+  Só `post` usa a conta; as demais fontes não usam login.
 - Portais avaliados e deixados de fora: **Indeed** (sem API nem RSS, bloqueia acesso
   automático com checagem anti-robô), **InfoJobs** e **GeekHunter** (o robots.txt proíbe
   a coleta das vagas).

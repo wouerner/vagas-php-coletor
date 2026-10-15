@@ -18,9 +18,6 @@
     /* fontes além das 8 cores da paleta: juntas em "Outros", em cinza */
     --s-outros: #898781; --s-inhire: var(--s-outros); --s-coodesh: var(--s-outros);
     --s-nerdin: var(--s-outros); --s-recrutei: var(--s-outros); --s-upvagas: var(--s-outros);
-    --s-seekers: #898781;
-    /* pessoas procurando emprego: entradas x saídas (par validado para daltonismo) */
-    --s-in: #2a78d6; --s-out: #eb6834;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -30,7 +27,6 @@
       --good-text: #0ca30c;
       --s-linkedin: #3987e5; --s-gupy: #d95926; --s-post: #199e70; --s-github: #c98500;
       --s-remotar: #d55181; --s-programathor: #008300; --s-catho: #9085e9; --s-solides: #e66767;
-      --s-in: #3987e5; --s-out: #d95926;
     }
   }
   * { box-sizing: border-box; }
@@ -105,8 +101,6 @@
   #tip .row span:first-child { display: flex; gap: 6px; align-items: center; }
   footer { color: var(--muted); font-size: 12px; padding: 20px 0; text-align: center; }
   h2.section { font-size: 19px; margin: 34px 0 2px; letter-spacing: -0.01em; }
-  .kpi .split { display: flex; gap: 18px; margin-top: 6px; font-size: 13px; color: var(--muted); }
-  .kpi .split b { color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -149,36 +143,6 @@
     <section class="card span-4"><h2>Contratação</h2><p class="note">Vagas abertas (72 h)</p><div class="bars" id="b-contract"></div></section>
     <section class="card span-6"><h2>Frameworks e plataformas</h2><p class="note">Vagas abertas (72 h) que citam cada um; uma vaga pode citar vários</p><div class="bars" id="b-stack"></div></section>
     <section class="card span-6"><h2>Empresas com mais vagas</h2><p class="note">Vagas abertas (72 h); publicações de recrutadores não informam a empresa</p><div class="bars" id="b-companies"></div></section>
-
-  </div>
-
-  <h2 class="section" id="seekers">Pessoas com perfil PHP procurando emprego no Brasil</h2>
-  <p class="sub" id="seek-sub">Só o Brasil (LinkedIn): quem usa o selo "buscando emprego" ou publicou que está procurando. Só quantidades.</p>
-  <p class="sub fresh" id="seek-fresh"></p>
-  <div class="grid">
-    <div class="card kpi span-4"><div class="label">Procurando emprego agora no Brasil</div><div class="value" id="s-active">–</div><div class="delta" id="s-active-note"></div></div>
-    <div class="card kpi span-4"><div class="label">Entraram hoje</div><div class="value" id="s-in-today">–</div>
-      <div class="split"><span>7 dias <b id="s-in-week">–</b></span><span>30 dias <b id="s-in-month">–</b></span></div></div>
-    <div class="card kpi span-4"><div class="label">Deixaram o selo hoje</div><div class="value" id="s-out-today">–</div>
-      <div class="split"><span>7 dias <b id="s-out-week">–</b></span><span>30 dias <b id="s-out-month">–</b></span></div></div>
-
-    <section class="card span-7" aria-labelledby="t-flow">
-      <div class="card-head">
-        <div><h2 id="t-flow">Entradas e saídas</h2>
-        <p class="note">Entraram: começaram (ou voltaram) a procurar · Saíram: tiraram o selo</p></div>
-        <select id="gran" aria-label="Agrupar por">
-          <option value="daily">Por dia (30 dias)</option><option value="weekly">Por semana (12)</option><option value="monthly">Por mês (12)</option>
-        </select>
-      </div>
-      <ul class="legend inline"><li><span class="sw" style="background:var(--s-in)"></span>Entraram</li><li><span class="sw" style="background:var(--s-out)"></span>Deixaram o selo</li></ul>
-      <svg id="flow" role="img" aria-labelledby="t-flow" style="width:100%;display:block"></svg>
-      <details class="table"><summary>Ver tabela</summary><div class="scroll"><table id="flow-table"></table></div></details>
-    </section>
-    <section class="card span-5" aria-labelledby="t-active">
-      <h2 id="t-active">Procurando emprego ao longo do tempo</h2>
-      <p class="note" id="active-note">Pessoas procurando no fim de cada período</p>
-      <svg id="active" role="img" aria-labelledby="t-active" style="width:100%;display:block"></svg>
-    </section>
 
     <section class="card span-12" aria-labelledby="t-runs">
       <h2 id="t-runs">Saúde da coleta</h2>
@@ -413,7 +377,7 @@ function runs(data) {
   table.replaceChildren(el("tr", {}, el("th", {}, "Fonte"), el("th", {}, "Última coleta"), el("th", {}, "Próxima coleta"), el("th", {}, "Status"),
     el("th", { className: "num" }, "Lidas"), el("th", { className: "num" }, "Novas PHP"),
     el("th", { className: "num" }, "Coletas 24 h"), el("th", { className: "num" }, "Falhas 24 h")));
-  for (const [s, n] of [...SOURCES, ["seekers", "Candidatos LinkedIn"]]) {
+  for (const [s, n] of SOURCES) {
     const { last, last_24h: day } = data[s] || {};
     let status = el("span", { className: "status muted" }, "— sem coleta");
     if (last && last.ok === null) status = el("span", { className: "status muted" }, "⟳ coletando");
@@ -431,141 +395,7 @@ function runs(data) {
   }
 }
 
-// --- pessoas procurando emprego -------------------------------------------
-const P_DAY = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit" });
-const P_MONTH = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", month: "short", year: "2-digit" });
-const periodDate = p => new Date((p.length === 7 ? p + "-01" : p) + "T00:00:00Z");
-function periodLabel(p, gran, long = false) {
-  const d = periodDate(p);
-  if (gran === "monthly") return P_MONTH.format(d).replace(". de ", "/").replace(".", "");
-  if (gran === "weekly") return (long ? "Semana de " : "") + P_DAY.format(d);
-  return long ? `${BR_WEEKDAY.format(d).replace(".", "")}, ${P_DAY.format(d)}` : P_DAY.format(d);
-}
-const niceTop = max => { const step = max <= 8 ? 2 : max <= 20 ? 5 : max <= 50 ? 10 : max <= 200 ? 50 : 100;
-                         return [Math.ceil(max / step) * step, step]; };
-function frame(box, H) {
-  box.replaceChildren();
-  const W = Math.max(280, box.parentElement.clientWidth - 2);
-  box.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  box.setAttribute("height", H);
-  return W;
-}
-function yAxis(box, top, step, y, L, W, R) {
-  for (let v = 0; v <= top; v += step) {
-    box.append(svg("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: v ? "var(--grid)" : "var(--axis)", "stroke-width": 1 }));
-    const t = svg("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }); t.textContent = v; box.append(t);
-  }
-}
-
-// Colunas agrupadas: entradas x saídas por período (uma escala só).
-function flow(rows, gran) {
-  const box = document.getElementById("flow");
-  const H = 230, L = 30, R = 6, T = 14, B = 30, W = frame(box, H);
-  const [top, step] = niceTop(Math.max(4, ...rows.flatMap(r => [r.entered, r.left])));
-  const y = v => T + (H - T - B) * (1 - v / top);
-  yAxis(box, top, step, y, L, W, R);
-  const slot = (W - L - R) / rows.length;
-  const bw = Math.max(2, Math.min(16, (slot * 0.72 - 2) / 2));
-  const every = Math.max(1, Math.ceil(rows.length / Math.floor((W - L - R) / 46)));
-  rows.forEach((r, i) => {
-    const x0 = L + i * slot + (slot - (2 * bw + 2)) / 2;
-    [[r.entered, "in"], [r.left, "out"]].forEach(([v, s], j) => {
-      if (!v) return;
-      const x = x0 + j * (bw + 2), y0 = y(0), h = y0 - y(v), rad = Math.min(4, h, bw / 2);
-      box.append(svg("path", { fill: COLOR(s), d:
-        `M${x},${y0} V${y0 - h + rad} Q${x},${y0 - h} ${x + rad},${y0 - h} H${x + bw - rad} Q${x + bw},${y0 - h} ${x + bw},${y0 - h + rad} V${y0} Z` }));
-    });
-    if ((rows.length - 1 - i) % every === 0) {
-      const t = svg("text", { x: L + i * slot + slot / 2, y: H - B + 16, "text-anchor": "middle" });
-      t.textContent = periodLabel(r.period, gran); box.append(t);
-    }
-    const hit = svg("rect", { class: "hit", x: L + i * slot, y: T, width: slot, height: H - T - B });
-    hover(hit, e => showTip(e, periodLabel(r.period, gran, true),
-      [["Entraram", r.entered, "in"], ["Deixaram o selo", r.left, "out"]]));
-    box.append(hit);
-  });
-  document.getElementById("flow-table").replaceChildren(
-    el("tr", {}, el("th", {}, "Período"), el("th", { className: "num" }, "Entraram"),
-       el("th", { className: "num" }, "Deixaram o selo"), el("th", { className: "num" }, "Procurando")),
-    ...rows.slice().reverse().map(r => el("tr", {}, el("td", {}, periodLabel(r.period, gran, true)),
-      el("td", { className: "num" }, String(r.entered)), el("td", { className: "num" }, String(r.left)),
-      el("td", { className: "num" }, r.active == null ? "—" : String(r.active)))));
-}
-
-// Linha: quantas pessoas procuravam no fim de cada período (sem registro = falha na linha).
-function activeLine(rows, gran) {
-  const box = document.getElementById("active");
-  const H = 230, L = 34, R = 26, T = 18, B = 30, W = frame(box, H);
-  const [top, step] = niceTop(Math.max(4, ...rows.map(r => r.active || 0)));
-  const y = v => T + (H - T - B) * (1 - v / top);
-  yAxis(box, top, step, y, L, W, R);
-  const slot = (W - L - R) / rows.length, cx = i => L + i * slot + slot / 2;
-  let d = "", pen = false;
-  rows.forEach((r, i) => {
-    if (r.active == null) { pen = false; return; }
-    d += `${pen ? "L" : "M"}${cx(i)},${y(r.active)} `; pen = true;
-  });
-  if (d) box.append(svg("path", { d, fill: "none", stroke: "var(--accent)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
-  const lastI = rows.map(r => r.active != null).lastIndexOf(true);
-  if (lastI >= 0) {
-    box.append(svg("circle", { cx: cx(lastI), cy: y(rows[lastI].active), r: 4, fill: "var(--accent)", stroke: "var(--surface)", "stroke-width": 2 }));
-    const t = svg("text", { x: cx(lastI), y: y(rows[lastI].active) - 9, "text-anchor": "middle", class: "value-label" });
-    t.textContent = rows[lastI].active; box.append(t);
-  }
-  const every = Math.max(1, Math.ceil(rows.length / Math.floor((W - L - R) / 46)));
-  const cross = svg("line", { y1: T, y2: H - B, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden" });
-  box.append(cross);
-  rows.forEach((r, i) => {
-    if ((rows.length - 1 - i) % every === 0) {
-      const t = svg("text", { x: cx(i), y: H - B + 16, "text-anchor": "middle" });
-      t.textContent = periodLabel(r.period, gran); box.append(t);
-    }
-    const hit = svg("rect", { class: "hit", x: L + i * slot, y: T, width: slot, height: H - T - B });
-    hit.addEventListener("pointermove", e => {
-      cross.setAttribute("x1", cx(i)); cross.setAttribute("x2", cx(i)); cross.setAttribute("visibility", "visible");
-      showTip(e, periodLabel(r.period, gran, true), [["Procurando", r.active == null ? "sem registro" : r.active]]);
-    });
-    hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); hideTip(); });
-    box.append(hit);
-  });
-}
-
-let lastSeekers = null;
-function drawSeekers() {
-  if (!lastSeekers) return;
-  const gran = document.getElementById("gran").value;
-  flow(lastSeekers[gran], gran);
-  activeLine(lastSeekers[gran], gran);
-}
-
-async function loadSeekers() {
-  try {
-    const res = await fetch("api/seekers");
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || res.status);
-    const k = d.kpis;
-    document.getElementById("s-active").textContent = k.active;
-    document.getElementById("s-active-note").textContent =
-      `${k.badge} com o selo` + (k.pending ? ` · ${k.pending} aguardando confirmar o local` : "");
-    for (const [kind, id] of [["entered", "in"], ["left", "out"]]) {
-      document.getElementById(`s-${id}-today`).textContent = k[kind].today;
-      document.getElementById(`s-${id}-week`).textContent = k[kind].week;
-      document.getElementById(`s-${id}-month`).textContent = k[kind].month;
-    }
-    lastSeekers = d;
-    drawSeekers();
-    const since = d.collecting_since ? BR_TIME.format(new Date(d.collecting_since)).split(",")[0] : null;
-    document.getElementById("seek-sub").textContent =
-      `Só o Brasil (local do perfil no LinkedIn): quem usa o selo "buscando emprego" ou publicou que está procurando (vale por ${d.active_days} dias após o post). ` +
-      `${k.tracked} pessoas acompanhadas. Só quantidades.` +
-      (since ? ` Coleta desde ${since}: nas primeiras semanas, "entraram" inclui quem já procurava antes.` : " A primeira coleta ainda não rodou.");
-  } catch (e) {
-    document.getElementById("seek-sub").textContent = "Não foi possível carregar os dados de candidatos: " + e.message;
-  }
-}
-
 async function load() {
-  loadSeekers();
   const days = document.getElementById("days").value;
   try {
     const res = await fetch("api/dashboard?days=" + days);
@@ -583,7 +413,6 @@ async function load() {
     schedule = d.schedule;
     runs(d.runs);
     freshness("fresh", SOURCES.map(([s]) => s), d.runs, "Vagas");
-    freshness("seek-fresh", ["seekers"], d.runs, "Candidatos");
     document.getElementById("sub").textContent =
       `Vagas de engenharia de software com PHP publicadas nas últimas ${d.max_age_hours} h · atualizado ${BR_TIME.format(new Date())} (Brasília)`;
   } catch (e) {
@@ -593,10 +422,9 @@ async function load() {
 let lastDaily = null, resizeTimer;
 addEventListener("resize", () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => { if (lastDaily) daily(...lastDaily); drawSeekers(); }, 150);
+  resizeTimer = setTimeout(() => { if (lastDaily) daily(...lastDaily); }, 150);
 });
 document.getElementById("days").addEventListener("change", load);
-document.getElementById("gran").addEventListener("change", drawSeekers);
 load();
 setInterval(load, 5 * 60 * 1000);
 </script>

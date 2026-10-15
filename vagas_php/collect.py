@@ -6,12 +6,9 @@ import hashlib
 import math
 import logging
 import os
-import random
 import re
 import time
 from datetime import datetime, timedelta
-
-from playwright.sync_api import Error as PlaywrightError
 
 from . import (catho_jobs, coodesh_jobs, dates, github_jobs, gupy_jobs, inhire_jobs, jobposting,
                nerdin_jobs, php, programathor_jobs, public_jobs, recrutei_jobs, remotar_jobs,
@@ -373,7 +370,7 @@ def search_hiring_posts(bot: LinkedInBot, date_posted: str) -> list[Post]:
         verdict = php.post_verdict(p.text or p.raw_text)
         # Recusados que falam de PHP também são guardados (fora do site): a página
         # /regras conta quantos cada regra barrou, e mudanças no filtro valem para eles
-        # (reclassify). Posts de quem procura emprego não: vão para os candidatos.
+        # (reclassify). Posts de quem procura emprego não.
         if verdict not in php.POST_OK and verdict not in ("post_no_php", "job_seeker"):
             rejected.setdefault(key(p), p)
         return verdict in php.POST_OK
@@ -433,77 +430,6 @@ def save_posts(store: Store, posts: list[Post]) -> dict:
     return {"found": len(jobs), "relevant": sum(j["relevant"] for j in jobs), "new": new}
 
 
-# --- LinkedIn: pessoas com perfil PHP procurando emprego (logado) -----------------
-
-PROFILE_URL = re.compile(r"https://[a-z]+\.linkedin\.com/in/([^/?#]+)")
-
-
-def profile_url(url: str | None) -> str | None:
-    m = PROFILE_URL.match(url or "")
-    return f"https://www.linkedin.com/in/{m.group(1)}/" if m else None
-
-
-def search_seeker_posts(bot: LinkedInBot, date_posted: str) -> list[Post]:
-    """Busca posts de quem procura emprego (#opentowork, "procuro oportunidade"...) e
-    fica com os de perfil PHP (php.is_php_job_seeker) escritos em português: o foco é o
-    Brasil, confirmado depois pelo local do perfil (check_profiles)."""
-    keywords = _env_list("VAGAS_SEEKERS_KEYWORDS",
-                         "#opentowork desenvolvedor php,#opentowork laravel brasil,desenvolvedor php procurando oportunidade,"
-                         "desenvolvedor php em busca de oportunidade,desenvolvedor laravel recolocação,"
-                         "programador php procurando emprego,estou em busca de oportunidade php")
-    limit = int(os.getenv("VAGAS_SEEKERS_PER_QUERY", 20))
-
-    def keep(p: Post) -> bool:
-        text = p.text or p.raw_text
-        return bool(profile_url(p.author_url) and php.looks_portuguese(text)
-                    and php.is_php_job_seeker(text, p.headline, p.open_to_work))
-
-    posts: dict[str, Post] = {}
-    for kw in keywords:
-        for p in bot.search_posts(kw, limit=limit, date_posted=date_posted, keep=keep):
-            posts.setdefault(p.urn or f"{p.author_url}|{(p.text or '')[:200]}", p)
-        bot.page.wait_for_timeout(3000)
-    return list(posts.values())
-
-
-def check_profiles(store: Store, bot: LinkedInBot) -> dict:
-    """Visita perfis de quem está procurando para ver se ainda tem o selo (quem tirou
-    conta como saída). Poucos por coleta e devagar: cada visita usa a sua conta."""
-    limit = int(os.getenv("VAGAS_SEEKERS_CHECKS_PER_RUN", 20))
-    recheck = float(os.getenv("VAGAS_SEEKERS_RECHECK_HOURS", 72))
-    result = {"checked": 0, "left": 0, "returned": 0}
-    for url in store.profiles_to_check(limit, recheck):
-        try:
-            info = bot.check_profile(url)
-        except PlaywrightError as e:
-            log.warning("Perfil %s: %s", url, e)
-            info = None
-        change = store.record_check(url, info)
-        result["checked"] += 1
-        result["left"] += change == "left"
-        result["returned"] += change == "entered"
-        bot.page.wait_for_timeout(random.uniform(5000, 12000))
-    return result
-
-
-def collect_seekers(store: Store, bot: LinkedInBot, date_posted: str) -> dict:
-    posts = search_seeker_posts(bot, date_posted)
-    new = 0
-    for p in posts:
-        text = p.text or p.raw_text or ""
-        info = php.details(p.headline, text)
-        person = {"profile_url": profile_url(p.author_url), "name": p.author,
-                  "headline": p.headline, "open_to_work": p.open_to_work,
-                  "stack": info["stack"], "seniority": info["seniority"]}
-        pid = f"post:{p.urn}" if p.urn else \
-            "post:h:" + hashlib.sha1(f"{p.author_url}|{text[:300]}".encode()).hexdigest()[:20]
-        post = {"id": pid, "url": p.url, "text": text, "posted_at": dates.from_relative(p.time)}
-        new += store.save_seeker(person, post)
-    checks = check_profiles(store, bot)
-    store.snapshot_seekers()
-    return {"found": len(posts), "relevant": len(posts), "new": new, **checks}
-
-
 # --- janelas de tempo ---------------------------------------------------------------
 
 def since_last_run(store: Store, source: str) -> datetime:
@@ -557,10 +483,6 @@ def run(store: Store, source: str, headless: bool = True) -> dict:
                 bot.login()
                 posts = search_hiring_posts(bot, date_posted_filter(since))
             result = save_posts(store, posts)
-        elif source == "seekers":
-            with LinkedInBot(headless=headless) as bot:
-                bot.login()
-                result = collect_seekers(store, bot, date_posted_filter(since))
         else:
             raise ValueError(f"fonte desconhecida: {source}")
     except Exception as e:

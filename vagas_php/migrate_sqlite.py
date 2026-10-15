@@ -11,11 +11,6 @@ TABLES = {
     "jobs": ("seq", "id", "source", "relevant", "title", "company", "location", "workplace",
              "seniority", "contract", "stack", "salary", "url", "author", "author_url",
              "description", "posted_at", "first_seen", "last_seen", "closed_at", "dismissed"),
-    "people": ("profile_url", "name", "headline", "location", "brazil", "seeking_roles", "stack",
-               "seniority", "open_to_work", "first_seen", "last_seen", "checked_at", "left_at"),
-    "people_posts": ("id", "profile_url", "url", "text", "posted_at", "first_seen"),
-    "people_events": ("id", "profile_url", "kind", "at"),
-    "people_daily": ("day", "active", "brazil"),
     "runs": ("id", "source", "started_at", "finished_at", "ok", "found", "new_jobs", "error"),
 }
 BATCH = 500

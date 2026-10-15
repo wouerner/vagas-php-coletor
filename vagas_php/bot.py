@@ -160,43 +160,6 @@ EXTRACT_POSTS_JS = r"""
 }
 """
 
-# Topo do perfil (/in/<slug>): nome, título, local e o selo "buscando emprego", que
-# aparece como um bloco "Buscando emprego" com os cargos procurados e no texto
-# alternativo da foto ("Ver perfil de Fulano, que está buscando emprego").
-PROFILE_JS = r"""
-() => {
-  const SEEKING = /buscando emprego|open to work|looking for a job/i;
-  if (/Esta página não existe|This page doesn.t exist|perfil não está disponível|profile is not available/i
-      .test(document.body.innerText.slice(0, 3000))) return { missing: true };
-  const main = document.querySelector('main');
-  if (!main) return null;
-  const lines = main.innerText.split('\n').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
-  const stop = lines.findIndex(l =>
-    /^(Sobre|About|Atividades?|Activity|Experiência|Experience|Destaques|Featured)$/i.test(l));
-  const top = stop > 0 ? lines.slice(0, stop) : lines.slice(0, 30);
-  const name = top[0] || null;
-  // Pula o grau de conexão ("· 3º"), os pronomes ("He/Him", "Ela/Dela") e o nome repetido
-  // (o primeiro nome aparece de novo no topo de alguns perfis), que vêm antes do título.
-  const rest = top.slice(1).filter(l => !/^[·•]/.test(l) && !/^[A-Za-zÀ-ú]{2,5}\/[A-Za-zÀ-ú]{2,6}$/.test(l)
-                                      && !(name && name.startsWith(l)));
-  const contact = top.findIndex(l => /^(Dados de contato|Contact info)$/i.test(l));
-  let location = null;
-  if (contact > 1) location = top[contact - 1] === '·' ? top[contact - 2] : top[contact - 1];
-  const badge = top.findIndex(l => /^(Buscando emprego|Open to work|Disponível para trabalhar)$/i.test(l));
-  const photo = !!name && [...main.querySelectorAll('img[alt]')].some(i => {
-    const alt = i.getAttribute('alt');
-    return alt.includes(name) && SEEKING.test(alt);
-  });
-  return {
-    name, headline: rest[0] || null,
-    location: location && location !== rest[0] ? location : null,
-    open_to_work: badge >= 0 || photo,
-    seeking_roles: badge >= 0 && /^(Cargos|Roles)\b/i.test(top[badge + 1] || '') ? top[badge + 1] : null,
-  };
-}
-"""
-
-
 @dataclass
 class Post:
     author: str | None
@@ -398,20 +361,6 @@ class LinkedInBot:
             if stale >= 5:
                 break
         return list(posts.values())[:limit]
-
-    def check_profile(self, url: str) -> dict | None:
-        """Abre um perfil e lê nome, título, local e o selo "buscando emprego".
-        Devolve {"missing": True} se o perfil não existe mais e None se não carregou."""
-        self.page.goto(url, wait_until="domcontentloaded")
-        if "/login" in self.page.url or "/checkpoint" in self.page.url or "/authwall" in self.page.url:
-            raise LoginError(f"Sessão do LinkedIn expirou (redirecionado para {self.page.url})")
-        try:
-            self.page.wait_for_function(
-                "() => (document.querySelector('main')?.innerText || '').length > 300", timeout=20000)
-        except PlaywrightError:
-            pass
-        self.page.wait_for_timeout(2500)  # o bloco "Buscando emprego" pode vir depois
-        return self.page.evaluate(PROFILE_JS)
 
     def _fill_link(self, key: str, post: Post) -> None:
         card = self.page.locator(f'[componentkey="{key}"]')

@@ -6,7 +6,6 @@ Rotas: /             página (static/index.html)
        /api/stats    totais por fonte e últimas coletas
        /dashboard    dashboard (static/dashboard.html)
        /api/dashboard  números do dashboard (days: dias da série diária, 3-90) e próximas coletas
-       /api/seekers  pessoas com perfil PHP procurando emprego: só quantidades
        /regras       regras de filtro (static/regras.html)
        /api/rules    as regras (de php.RULES), quantas vagas cada uma decidiu e as
                      descartadas à mão
@@ -93,14 +92,6 @@ async def dashboard(request: Request):
         return JSONResponse({"error": "base ainda vazia"}, status_code=503)
 
 
-async def seekers(request: Request):
-    # Só agregados: nomes e perfis ficam fora do site (ver list_seekers no MCP).
-    try:
-        return JSONResponse({**store().seekers_dashboard(), "schedule": schedule()})
-    except ProgrammingError:
-        return JSONResponse({"error": "base ainda sem dados de candidatos"}, status_code=503)
-
-
 async def rules_page(request: Request):
     return FileResponse(STATIC / "regras.html")
 
@@ -126,7 +117,6 @@ app = Starlette(routes=[
     Route("/api/stats", stats),
     Route("/dashboard", dashboard_page),
     Route("/api/dashboard", dashboard),
-    Route("/api/seekers", seekers),
     Route("/regras", rules_page),
     Route("/api/rules", rules),
 ])

@@ -37,12 +37,12 @@ RETRY_AFTER_ERROR = timedelta(minutes=30)
 # Post diário no LinkedIn (print do dashboard): tentativas dentro desta janela após o horário.
 DAILY_POST_WINDOW = timedelta(hours=3)
 DAILY_POST_MAX_TRIES = 3
-# Coletas agendadas: as fontes de vagas e "seekers" (pessoas procurando emprego).
-COLLECTORS = (*SOURCES, "seekers")
-# Usam o navegador logado (sempre na mesma thread).
-BROWSER = ("post", "seekers")
+# Coletas agendadas: as fontes de vagas.
+COLLECTORS = SOURCES
+# Usa o navegador logado (sempre na mesma thread).
+BROWSER = ("post",)
 # Intervalo mínimo por fonte: a busca logada usa a sua conta do LinkedIn.
-MIN_INTERVAL = {"linkedin": 0.5, "gupy": 0.5, "github": 0.25, "post": 2, "seekers": 4,
+MIN_INTERVAL = {"linkedin": 0.5, "gupy": 0.5, "github": 0.25, "post": 2,
                 "inhire": 1, "solides": 0.5, "catho": 1, "remotar": 0.5, "programathor": 1,
                 "coodesh": 1, "nerdin": 1, "recrutei": 1, "upvagas": 0.5}
 
@@ -153,10 +153,6 @@ class Config:
                 enabled=_env_bool("VAGAS_POSTS_ENABLED", True),
                 interval_hours=float(env("VAGAS_POSTS_INTERVAL_HOURS", 8)),
                 active_hours=os.getenv("VAGAS_POSTS_ACTIVE_HOURS", "8-22")),
-            "seekers": SourceConfig(
-                enabled=_env_bool("VAGAS_SEEKERS_ENABLED", True),
-                interval_hours=float(env("VAGAS_SEEKERS_INTERVAL_HOURS", 12)),
-                active_hours=os.getenv("VAGAS_SEEKERS_ACTIVE_HOURS", "9-21")),
         })
         # Ajustes feitos via MCP (configure_scheduler) têm precedência sobre o .env.
         if CONFIG_PATH.exists():
@@ -207,7 +203,7 @@ class Service:
             self.running.add(source)
             self._write_schedule()
             log.info("Coleta %s (%s): iniciando", source, origin)
-            # "post" e "seekers" usam o navegador: sempre na mesma thread. As outras são só HTTP.
+            # "post" usa o navegador: sempre na mesma thread. As outras são só HTTP.
             executor = self.browser if source in BROWSER else None
             try:
                 result = await asyncio.get_running_loop().run_in_executor(
@@ -259,7 +255,6 @@ class Service:
             except TimeoutError:
                 pass
             self._wake.clear()
-            self.store.snapshot_seekers()  # quantos procuram emprego hoje (série diária)
             self._write_schedule()
             now = datetime.now().astimezone()
             for source, cfg in self.config.sources.items():
@@ -296,7 +291,7 @@ class Service:
         self.daily_post_running = True
         log.info("Post diário no LinkedIn: iniciando")
         try:
-            # Usa o navegador logado: mesma thread das coletas "post" e "seekers".
+            # Usa o navegador logado: mesma thread da coleta "post".
             entry = await asyncio.get_running_loop().run_in_executor(
                 self.browser, linkedin_post.run, DATA_DIR, self.headless)
             log.info("Post diário no LinkedIn: publicado %s", entry.get("numbers"))
@@ -395,9 +390,7 @@ def build_server(service: Service) -> MCPServer:
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
     async def collect_now(source: str) -> dict:
         """Coleta agora uma fonte: "linkedin" (vagas, sem login), "gupy" (sem login),
-        "remotar", "programathor", "catho", "solides", "coodesh", "nerdin", "recrutei", "upvagas" (portais, sem login), "inhire" (páginas de carreira das empresas, sem login), "github" (issues), "post" (publicações, usa o navegador logado: mais lento) ou
-        "seekers" (pessoas com perfil PHP procurando emprego: busca posts e visita perfis
-        para ver o selo "buscando emprego"; usa o navegador logado, o mais lento)."""
+        "remotar", "programathor", "catho", "solides", "coodesh", "nerdin", "recrutei", "upvagas" (portais, sem login), "inhire" (páginas de carreira das empresas, sem login), "github" (issues) ou "post" (publicações, usa o navegador logado: mais lento)."""
         try:
             return await service.collect(source, "mcp")
         except ValueError as e:
@@ -427,7 +420,7 @@ def build_server(service: Service) -> MCPServer:
                                   active_hours: str | None = None) -> dict:
         """Altera a coleta agendada de uma fonte ("linkedin", "gupy", "remotar", "programathor",
         "catho", "solides", "inhire", "coodesh", "nerdin", "recrutei", "upvagas",
-        "github", "post" ou "seekers"),
+        "github" ou "post"),
         persistente. interval_hours: horas entre coletas; active_hours: janela "HH-HH"
         (ex. "8-22"), "" para o dia todo; enabled: liga/desliga."""
         changes = {k: v for k, v in dict(enabled=enabled, interval_hours=interval_hours,
@@ -437,27 +430,6 @@ def build_server(service: Service) -> MCPServer:
         except ValueError as e:
             raise ToolError(str(e)) from e
         return service.status()
-
-    @mcp.tool(annotations=local_read)
-    async def list_seekers(q: str | None = None, status: str = "active",
-                           brazil: bool | None = True, limit: int = 50,
-                           offset: int = 0) -> dict:
-        """Pessoas com perfil PHP procurando emprego no LinkedIn (nome, perfil, título,
-        local, selo, cargos procurados, último post). status: "active" (procurando),
-        "left" (tiraram o selo) ou "all"; brazil: true (padrão) só do Brasil, false só
-        de fora, null todas (inclusive as que ainda não tiveram o perfil visitado);
-        q: palavras no nome, título, local ou cargos."""
-        if status not in ("active", "left", "all"):
-            raise ToolError('status deve ser "active", "left" ou "all"')
-        people = service.store.query_seekers(q, status, brazil, min(limit, 200), offset)
-        return {"count": len(people), "people": people}
-
-    @mcp.tool(annotations=local_read)
-    async def seekers_stats() -> dict:
-        """Volumes de pessoas com perfil PHP procurando emprego: procurando agora,
-        entradas e saídas (tiraram o selo) hoje / 7 / 30 dias e séries por dia, semana
-        e mês. As mesmas quantidades do dashboard."""
-        return service.store.seekers_dashboard()
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True,
                                           openWorldHint=False))

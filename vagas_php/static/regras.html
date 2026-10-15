@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Regras · Vagas PHP</title>
-<meta name="description" content="Regras de filtro que decidem quais vagas, publicações e candidatos aparecem no site.">
+<meta name="description" content="Regras de filtro que decidem quais vagas e publicações aparecem no site.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='48' ry='26' fill='%23777BB4'/><text x='50' y='60' font-size='30' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>php</text></svg>">
 <style>
   :root {
@@ -135,7 +135,6 @@
 const GROUPS = [
   ["vagas", "Vagas de portais", "LinkedIn Vagas, Gupy, Sólides, Catho, Remotar, Programathor, Coodesh, Nerdin, Recrutei, UpVagas, páginas de carreira de empresas na InHire e issues dos repositórios de vagas no GitHub."],
   ["posts", "Publicações do LinkedIn", "Posts que anunciam vagas. Precisam falar de PHP, anunciar uma vaga e não ser outra coisa."],
-  ["candidatos", "Candidatos (dashboard)", "Quem conta como pessoa com perfil PHP procurando emprego no Brasil. O site mostra só quantidades."],
 ];
 const BR_TIME = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 const NUM = new Intl.NumberFormat("pt-BR");
