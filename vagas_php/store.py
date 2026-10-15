@@ -2,19 +2,20 @@
 Programathor, Catho, Sólides, InHire e Coodesh) e o histórico
 de execuções de cada coletor. O site usa a mesma base, só para leitura.
 
-Conexão: DATABASE_URL=mysql://usuario:senha@host:3306/base (senha com caracteres
-especiais vai codificada, ex.: @ -> %40)."""
+Conexão: DATABASE_URL=mysql://usuario:senha@host:3306/base[?ssl-mode=REQUIRED] (senha
+com caracteres especiais vai codificada, ex.: @ -> %40)."""
 
 import logging
 import os
 import re
+import ssl
 import threading
 import time
 from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import pymysql
 
@@ -136,12 +137,31 @@ def connect_args(url: str | None = None) -> dict:
     u = urlparse(url)
     if u.scheme not in ("mysql", "mysql+pymysql") or not u.path.strip("/"):
         raise RuntimeError("DATABASE_URL deve ser mysql://usuario:senha@host:3306/base")
-    return {"host": u.hostname or "localhost", "port": u.port or 3306,
+    # TLS como no cliente mysql: ?ssl-mode=REQUIRED (cifra, sem validar o certificado),
+    # VERIFY_CA ou VERIFY_IDENTITY (validam pela CA de ?ssl-ca=/caminho.pem ou do sistema).
+    params = {k.lower(): v[-1] for k, v in parse_qs(u.query).items()}
+    mode = params.get("ssl-mode", "DISABLED").upper()
+    tls = {}
+    if mode == "REQUIRED":
+        ctx = ssl.create_default_context()
+        ctx.check_hostname, ctx.verify_mode = False, ssl.CERT_NONE
+        tls = {"ssl": ctx}
+    elif mode in ("VERIFY_CA", "VERIFY_IDENTITY"):
+        ctx = ssl.create_default_context(cafile=params.get("ssl-ca"))
+        ctx.check_hostname = mode == "VERIFY_IDENTITY"
+        tls = {"ssl": ctx}
+    elif mode not in ("DISABLED", "PREFERRED"):
+        raise RuntimeError(f"ssl-mode inválido: {mode}")
+    return {**tls, "host": u.hostname or "localhost", "port": u.port or 3306,
             "user": unquote(u.username or ""), "password": unquote(u.password or ""),
             "database": unquote(u.path.strip("/")), "charset": "utf8mb4", "autocommit": True,
             "connect_timeout": 10,
+            # sql_mode padrão do MySQL 8 (bancos gerenciados podem vir com ANSI_QUOTES etc.);
             # group_concat (classificação de pessoas) corta em 1024 bytes por padrão.
-            "init_command": "SET SESSION group_concat_max_len = 1048576, time_zone = '+00:00'"}
+            "init_command": "SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,"
+                            "NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,"
+                            "NO_ENGINE_SUBSTITUTION', group_concat_max_len = 1048576, "
+                            "time_zone = '+00:00'"}
 
 
 class Row(tuple):

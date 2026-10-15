@@ -180,7 +180,9 @@ parece parado.
 
 As vagas, pessoas e execuções ficam num MySQL 8.0.19+ apontado por
 `DATABASE_URL=mysql://usuario:senha@host:3306/base` (senha com caracteres especiais vai
-codificada, ex.: `@` -> `%40`). O coletor cria as tabelas na subida e espera até 2 min o
+codificada, ex.: `@` -> `%40`). Bancos gerenciados (Vultr, RDS...) exigem TLS: acrescente
+`?ssl-mode=REQUIRED` (cifra a conexão) ou `?ssl-mode=VERIFY_CA&ssl-ca=/caminho/ca.pem`
+(também valida o certificado). O coletor cria as tabelas na subida e espera até 2 min o
 banco aceitar conexões; o site só lê. Em `data/` continuam só os arquivos do coletor
 (`config.json`, `schedule.json`, posts diários).
 
