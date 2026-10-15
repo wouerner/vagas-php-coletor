@@ -1,0 +1,4 @@
+playwright==1.63.0
+python-dotenv
+mcp>=2.3,<3
+PyMySQL[rsa]>=1.1,<2

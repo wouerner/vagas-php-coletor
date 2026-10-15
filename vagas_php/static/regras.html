@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regras · Vagas PHP</title>
+<meta name="description" content="Regras de filtro que decidem quais vagas, publicações e candidatos aparecem no site.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='48' ry='26' fill='%23777BB4'/><text x='50' y='60' font-size='30' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>php</text></svg>">
+<style>
+  :root {
+    --bg: #f6f6fa; --surface: #ffffff; --text: #1d1d2b; --muted: #5d6070;
+    --line: #e3e3ec; --accent: #5b5fa0; --accent-soft: #ebecf7; --chip: #f0f0f5;
+    --good-text: #006300; --good-soft: #e3f4e3; --bad-text: #a32020; --bad-soft: #fbe6e6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13131b; --surface: #1c1c27; --text: #e8e8f0; --muted: #a0a2b4;
+      --line: #2d2d3c; --accent: #a3a7e6; --accent-soft: #2a2b45; --chip: #262634;
+      --good-text: #5fd35f; --good-soft: #17301a; --bad-text: #ff8a8a; --bad-soft: #3a1c1f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 16px 48px; }
+  header { padding: 28px 0 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+  h1 span { color: var(--accent); }
+  nav { display: flex; gap: 6px; }
+  nav a { font-size: 14px; padding: 5px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
+  nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  .lead { color: var(--muted); margin: 4px 0 20px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; }
+  .general ul { margin: 6px 0 0; padding-left: 20px; }
+  .general li { margin: 4px 0; }
+  h2 { font-size: 19px; margin: 32px 0 4px; }
+  .group-note { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .rule { display: grid; grid-template-columns: 30px 1fr; gap: 0 10px; }
+  .rule .n { width: 26px; height: 26px; border-radius: 50%; background: var(--chip); color: var(--muted);
+             display: grid; place-items: center; font-size: 13px; font-weight: 600; margin-top: 1px; }
+  .rule h3 { margin: 0; font-size: 15px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  .badge { font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; }
+  .badge.aceita { color: var(--good-text); background: var(--good-soft); }
+  .badge.recusa { color: var(--bad-text); background: var(--bad-soft); }
+  .count { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .rule p { margin: 4px 0 0; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--chip);
+         border-radius: 6px; padding: 2px 6px; overflow-wrap: anywhere; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 13px; }
+  .scroll { overflow-x: auto; }
+  .not-collected h3 { font-size: 15px; margin: 18px 0 4px; }
+  .not-collected h3:first-child { margin-top: 0; }
+  .not-collected table { table-layout: fixed; }
+  .not-collected th:first-child { width: 34%; }
+  .not-collected td:first-child { font-weight: 500; }
+  .updated { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Vagas <span>PHP</span> · Regras</h1>
+    <nav><a href="./">Vagas</a><a href="dashboard">Dashboard</a><a href="regras" aria-current="page">Regras</a></nav>
+  </header>
+  <p class="lead">Por transparência, estas são as regras que decidem o que aparece no site. Esta página é gerada a partir
+    do próprio código do filtro: o que está aqui é exatamente o que o coletor aplica.</p>
+
+  <section class="card general" aria-labelledby="t-general">
+    <strong id="t-general">Regras gerais</strong>
+    <ul>
+      <li>Só aparecem vagas publicadas nas últimas <b id="max-age">72</b> horas.</li>
+      <li>A mesma vaga anunciada várias vezes (mesmo título e empresa, na mesma fonte) aparece uma vez só.</li>
+      <li>Issues fechadas no GitHub saem do site.</li>
+      <li>As regras de cada grupo são aplicadas na ordem abaixo: a primeira que se encaixa decide.</li>
+      <li>Quando uma regra muda, ela é reaplicada às publicações que já estão na base.</li>
+      <li>O que escapa das regras pode ser descartado à mão, e fica listado no fim da página.</li>
+    </ul>
+  </section>
+
+  <div id="groups"><p class="lead">Carregando regras…</p></div>
+
+  <h2 id="t-not-collected">Sites que não coletamos</h2>
+  <p class="group-note">Sites de vagas que conhecemos (muitos aparecem em links das vagas coletadas) e por que ficam de fora.
+    Não contornamos bloqueios: se o site proíbe robôs, ele não entra.</p>
+  <section class="card scroll not-collected" aria-labelledby="t-not-collected">
+    <h3>Bloqueiam robôs ou exigem login</h3>
+    <table>
+      <tr><th>Site</th><th>Motivo</th></tr>
+      <tr><td>Indeed</td><td>Checagem anti-robô ("Security Check"), sem API nem RSS.</td></tr>
+      <tr><td>InfoJobs</td><td>O robots.txt proíbe o site todo.</td></tr>
+      <tr><td>GeekHunter</td><td>O robots.txt proíbe as páginas de vagas.</td></tr>
+      <tr><td>Worqspace</td><td>O robots.txt proíbe o site todo.</td></tr>
+      <tr><td>Strider</td><td>O robots.txt proíbe o site todo, e as vagas exigem login.</td></tr>
+      <tr><td>Journy</td><td>As vagas exigem login.</td></tr>
+      <tr><td>Stack Vagas</td><td>A página é montada por JavaScript e o robots.txt proíbe a API.</td></tr>
+      <tr><td>Grupos de WhatsApp, Telegram e Discord</td><td>Só dá para ler entrando no grupo.</td></tr>
+    </table>
+    <h3>Parados, repetidos ou fora do foco</h3>
+    <table>
+      <tr><th>Site</th><th>Motivo</th></tr>
+      <tr><td>thePHP Website</td><td>Sem vagas novas desde 2022.</td></tr>
+      <tr><td>Canal phpbrasilvagas (Telegram)</td><td>Sem vagas novas desde abril de 2026.</td></tr>
+      <tr><td>Turing e Toptal</td><td>Vagas no exterior, com cadastro obrigatório.</td></tr>
+      <tr><td>MangaJobs, CandidataAI, alovagas e devagas</td><td>Repetem vagas de fontes que já coletamos (LinkedIn e Recrutei).</td></tr>
+      <tr><td>vagasremotas.net</td><td>Posts de blog que juntam várias vagas, a maioria fora de TI.</td></tr>
+      <tr><td>Remotive</td><td>Só vagas internacionais.</td></tr>
+    </table>
+    <h3>Possíveis, ainda não feitos</h3>
+    <table>
+      <tr><th>Site</th><th>Motivo</th></tr>
+      <tr><td>Lovel.dev e Impulso</td><td>Poucas vagas de PHP até agora, e a página da vaga não traz os dados estruturados.</td></tr>
+      <tr><td>EmpregosTec</td><td>Poucas vagas de PHP até agora, e não tem lista por tecnologia.</td></tr>
+      <tr><td>Teamtailor, Quickin, Abler, Kenoby e Pandapé</td><td>Sistemas de recrutamento por empresa, sem busca entre empresas: cada empresa teria que ser descoberta, como fazemos com a InHire.</td></tr>
+      <tr><td>BNE, Vagas.com.br e Trabalha Brasil</td><td>Sites genéricos, com poucas vagas de PHP.</td></tr>
+    </table>
+    <p class="updated">Lista revista em 14/10/2026.</p>
+  </section>
+
+  <h2 id="t-dismissed">Descartadas à mão</h2>
+  <p class="group-note">Itens que passaram pelas regras mas não eram vagas, com o motivo.</p>
+  <div class="card scroll" id="dismissed"></div>
+
+  <footer>Os números "na base" contam o que está guardado hoje. Publicações do LinkedIn recusadas na busca são
+    guardadas (fora do site) quando falam de PHP, desde 14/10/2026; as que nem citam PHP não são guardadas.</footer>
+</div>
+
+<script>
+const GROUPS = [
+  ["vagas", "Vagas de portais", "LinkedIn Vagas, Gupy, Sólides, Catho, Remotar, Programathor, Coodesh, Nerdin, Recrutei, UpVagas, páginas de carreira de empresas na InHire e issues dos repositórios de vagas no GitHub."],
+  ["posts", "Publicações do LinkedIn", "Posts que anunciam vagas. Precisam falar de PHP, anunciar uma vaga e não ser outra coisa."],
+  ["candidatos", "Candidatos (dashboard)", "Quem conta como pessoa com perfil PHP procurando emprego no Brasil. O site mostra só quantidades."],
+];
+const BR_TIME = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const NUM = new Intl.NumberFormat("pt-BR");
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) n[k] = v;
+  n.append(...kids.filter(k => k != null && k !== ""));
+  return n;
+};
+
+// Separa uma expressão regular nas alternativas de primeiro nível ("a|b|(c|d)" -> a, b, (c|d)),
+// tirando o grupo e os \b que envolvem tudo: fica mais fácil de ler que a expressão inteira.
+function alternatives(rx) {
+  let s = rx.replace(/^\\b/, "").replace(/\\b$/, "");
+  const wrapped = s.startsWith("(") && s.endsWith(")") && (() => {
+    let depth = 0;
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === "\\") { i++; continue; }
+      if (s[i] === "(") depth++;
+      else if (s[i] === ")" && --depth === 0 && i < s.length - 1) return false;
+    }
+    return true;
+  })();
+  if (wrapped) s = s.slice(1, -1).replace(/^\?:/, "");
+  const parts = [];
+  let depth = 0, cur = "";
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === "\\") { cur += c + (s[i + 1] ?? ""); i++; continue; }
+    if (c === "(" || c === "[") depth++;
+    if (c === ")" || c === "]") depth--;
+    if (c === "|" && depth === 0) { parts.push(cur); cur = ""; continue; }
+    cur += c;
+  }
+  parts.push(cur);
+  return parts.filter(Boolean);
+}
+
+function render(d) {
+  document.getElementById("max-age").textContent = d.max_age_hours;
+  const box = document.getElementById("groups");
+  box.replaceChildren();
+  for (const [key, title, note] of GROUPS) {
+    box.append(el("h2", {}, title), el("p", { className: "group-note" }, note));
+    d.rules.filter(r => r.group === key).forEach((r, i) => {
+      const n = d.counts[r.id];
+      const head = el("h3", {}, r.title,
+        el("span", { className: `badge ${r.effect}` }, r.effect === "aceita" ? "✓ aceita" : "✕ recusa"),
+        n != null ? el("span", { className: "count" }, `${NUM.format(n)} na base`) : null);
+      const body = el("div", {}, head, el("p", {}, r.text));
+      if (r.patterns.length) {
+        const chips = el("div", { className: "chips" });
+        for (const p of r.patterns) for (const a of alternatives(p)) chips.append(el("code", {}, a));
+        body.append(el("details", {}, el("summary", {}, "Expressões usadas"), chips));
+      }
+      box.append(el("section", { className: "card rule" }, el("div", { className: "n" }, String(i + 1)), body));
+    });
+  }
+  const dis = document.getElementById("dismissed");
+  if (!d.dismissed.length) {
+    dis.replaceChildren(el("p", { style: "margin:0;color:var(--muted)" }, "Nenhuma até agora."));
+    return;
+  }
+  const table = el("table", {}, el("tr", {}, el("th", {}, "Quando"), el("th", {}, "Item"), el("th", {}, "Motivo")));
+  for (const j of d.dismissed) {
+    const [at, ...reason] = j.dismissed.split(" ");
+    table.append(el("tr", {},
+      el("td", {}, BR_TIME.format(new Date(at)).replace(",", "")),
+      el("td", {}, j.url ? el("a", { href: j.url, target: "_blank", rel: "noopener" }, j.title || j.url) : j.title || "—"),
+      el("td", {}, reason.join(" ") || "—")));
+  }
+  dis.replaceChildren(table);
+}
+
+fetch("api/rules").then(r => r.json()).then(render).catch(e => {
+  document.getElementById("groups").replaceChildren(el("p", { className: "lead" }, "Não foi possível carregar as regras: " + e.message));
+});
+</script>
+</body>
+</html>

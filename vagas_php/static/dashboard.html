@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Vagas PHP</title>
+<meta name="description" content="Métricas das vagas PHP coletadas: vagas por site, novas por dia, modalidade, senioridade e stack.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='48' ry='26' fill='%23777BB4'/><text x='50' y='60' font-size='30' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>php</text></svg>">
+<style>
+  :root {
+    --bg: #f6f6fa; --surface: #ffffff; --text: #1d1d2b; --muted: #5d6070; --faint: #898781;
+    --line: #e3e3ec; --grid: #ececf1; --axis: #c3c2b7;
+    --accent: #5b5fa0; --accent-soft: #ebecf7; --chip: #f0f0f5;
+    --good: #0ca30c; --good-text: #006300; --critical: #d03b3b;
+    /* uma cor fixa por fonte (paleta validada para daltonismo, ordem fixa) */
+    --s-linkedin: #2a78d6; --s-gupy: #eb6834; --s-post: #1baf7a; --s-github: #eda100;
+    --s-remotar: #e87ba4; --s-programathor: #008300; --s-catho: #6250d6; --s-solides: #e34948;
+    /* fontes além das 8 cores da paleta: juntas em "Outros", em cinza */
+    --s-outros: #898781; --s-inhire: var(--s-outros); --s-coodesh: var(--s-outros);
+    --s-nerdin: var(--s-outros); --s-recrutei: var(--s-outros); --s-upvagas: var(--s-outros);
+    --s-seekers: #898781;
+    /* pessoas procurando emprego: entradas x saídas (par validado para daltonismo) */
+    --s-in: #2a78d6; --s-out: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13131b; --surface: #1c1c27; --text: #e8e8f0; --muted: #a0a2b4; --faint: #898781;
+      --line: #2d2d3c; --grid: #262634; --axis: #383845;
+      --accent: #a3a7e6; --accent-soft: #2a2b45; --chip: #262634;
+      --good-text: #0ca30c;
+      --s-linkedin: #3987e5; --s-gupy: #d95926; --s-post: #199e70; --s-github: #c98500;
+      --s-remotar: #d55181; --s-programathor: #008300; --s-catho: #9085e9; --s-solides: #e66767;
+      --s-in: #3987e5; --s-out: #d95926;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px 40px; }
+  header { padding: 28px 0 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+  h1 span { color: var(--accent); }
+  nav { display: flex; gap: 6px; }
+  nav a { font-size: 14px; padding: 5px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
+  nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  .sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+  .sub:has(+ .fresh) { margin-bottom: 4px; }
+  .fresh b { color: var(--text); font-weight: 600; }
+  td.nowrap { white-space: nowrap; }
+
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(12, 1fr); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; }
+  .card h2 { margin: 0 0 2px; font-size: 15px; }
+  .card .note { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+  .span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; }
+  .span-6 { grid-column: span 6; } .span-7 { grid-column: span 7; } .span-12 { grid-column: span 12; }
+  @media (max-width: 900px) { .span-3 { grid-column: span 6; } .span-4, .span-5, .span-6, .span-7 { grid-column: span 12; } }
+  @media (max-width: 520px) { .span-3 { grid-column: span 12; } }
+
+  .kpi .label { color: var(--muted); font-size: 13px; }
+  .kpi .value { font-size: 34px; font-weight: 650; line-height: 1.15; margin-top: 4px; }
+  .kpi .delta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .kpi .delta b.up { color: var(--good-text); } .kpi .delta b.down { color: var(--critical); }
+
+  .pie-wrap { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .pie-wrap svg { width: 190px; height: 190px; flex: none; }
+  .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; flex: 1; min-width: 180px; font-size: 14px; }
+  .legend li { display: grid; grid-template-columns: 12px 1fr auto auto; gap: 8px; align-items: center; }
+  .legend.inline { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .legend.inline li { display: flex; gap: 6px; }
+  .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+  .muted { color: var(--muted); }
+
+  svg text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  svg .value-label { fill: var(--text); font-size: 12px; }
+  svg .hit { fill: transparent; cursor: default; }
+  svg .partial { fill: var(--grid); }
+  .bars { display: grid; gap: 8px; }
+  .bar-row { display: grid; grid-template-columns: minmax(90px, 34%) 1fr; gap: 10px; align-items: center; font-size: 13px; }
+  .bar-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { display: grid; grid-template-columns: 1fr 32px; align-items: center; gap: 8px; }
+  .bar { height: 14px; border-radius: 0 4px 4px 0; background: var(--accent); min-width: 3px; }
+  .bar-track .num { font-size: 12px; color: var(--text); }
+  .empty { color: var(--muted); font-size: 13px; padding: 12px 0; }
+
+  details.table { margin-top: 10px; font-size: 13px; }
+  details.table summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 6px; font-size: 13px; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  td.num, th.num { text-align: right; }
+  .scroll { overflow-x: auto; }
+  .status { white-space: nowrap; }
+  .status.ok { color: var(--good-text); } .status.fail { color: var(--critical); }
+
+  select { font: inherit; font-size: 13px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+  .card-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+
+  #tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface); color: var(--text);
+         border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px;
+         box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; min-width: 130px; }
+  #tip .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+  #tip .row span:first-child { display: flex; gap: 6px; align-items: center; }
+  footer { color: var(--muted); font-size: 12px; padding: 20px 0; text-align: center; }
+  h2.section { font-size: 19px; margin: 34px 0 2px; letter-spacing: -0.01em; }
+  .kpi .split { display: flex; gap: 18px; margin-top: 6px; font-size: 13px; color: var(--muted); }
+  .kpi .split b { color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Vagas <span>PHP</span> · Dashboard</h1>
+    <nav><a href="./">Vagas</a><a href="dashboard" aria-current="page">Dashboard</a><a href="regras">Regras</a></nav>
+  </header>
+  <p class="sub" id="sub">Carregando…</p>
+  <p class="sub fresh" id="fresh"></p>
+
+  <div class="grid">
+    <div class="card kpi span-3"><div class="label">Vagas abertas (72 h)</div><div class="value" id="k-open">–</div><div class="delta">publicadas nas últimas 72 h</div></div>
+    <div class="card kpi span-3"><div class="label">Novas nas últimas 24 h</div><div class="value" id="k-new">–</div><div class="delta" id="k-new-delta"></div></div>
+    <div class="card kpi span-3"><div class="label">Remotas</div><div class="value" id="k-remote">–</div><div class="delta" id="k-remote-pct"></div></div>
+    <div class="card kpi span-3"><div class="label">Empresas contratando</div><div class="value" id="k-companies">–</div><div class="delta">com nome informado (72 h)</div></div>
+
+    <section class="card span-5" aria-labelledby="t-pie">
+      <h2 id="t-pie">Qual site tem mais vagas</h2>
+      <p class="note">Vagas abertas das últimas 72 h, por fonte</p>
+      <div class="pie-wrap"><svg id="pie" viewBox="0 0 200 200" role="img" aria-labelledby="t-pie"></svg><ul class="legend" id="pie-legend"></ul></div>
+    </section>
+
+    <section class="card span-7" aria-labelledby="t-daily">
+      <div class="card-head">
+        <div><h2 id="t-daily">Vagas novas por dia</h2>
+        <p class="note">Por dia de publicação (horário de Brasília), empilhadas por fonte</p></div>
+        <select id="days" aria-label="Período da série diária">
+          <option value="7">7 dias</option><option value="14" selected>14 dias</option><option value="30">30 dias</option>
+        </select>
+      </div>
+      <ul class="legend inline" id="daily-legend"></ul>
+      <svg id="daily" role="img" aria-labelledby="t-daily" style="width:100%;display:block"></svg>
+      <p class="note" id="daily-note"></p>
+      <details class="table"><summary>Ver tabela</summary><div class="scroll"><table id="daily-table"></table></div></details>
+    </section>
+
+    <section class="card span-4"><h2>Modalidade</h2><p class="note">Vagas abertas (72 h)</p><div class="bars" id="b-workplace"></div></section>
+    <section class="card span-4"><h2>Senioridade</h2><p class="note">Vagas abertas (72 h)</p><div class="bars" id="b-seniority"></div></section>
+    <section class="card span-4"><h2>Contratação</h2><p class="note">Vagas abertas (72 h)</p><div class="bars" id="b-contract"></div></section>
+    <section class="card span-6"><h2>Frameworks e plataformas</h2><p class="note">Vagas abertas (72 h) que citam cada um; uma vaga pode citar vários</p><div class="bars" id="b-stack"></div></section>
+    <section class="card span-6"><h2>Empresas com mais vagas</h2><p class="note">Vagas abertas (72 h); publicações de recrutadores não informam a empresa</p><div class="bars" id="b-companies"></div></section>
+
+  </div>
+
+  <h2 class="section" id="seekers">Pessoas com perfil PHP procurando emprego no Brasil</h2>
+  <p class="sub" id="seek-sub">Só o Brasil (LinkedIn): quem usa o selo "buscando emprego" ou publicou que está procurando. Só quantidades.</p>
+  <p class="sub fresh" id="seek-fresh"></p>
+  <div class="grid">
+    <div class="card kpi span-4"><div class="label">Procurando emprego agora no Brasil</div><div class="value" id="s-active">–</div><div class="delta" id="s-active-note"></div></div>
+    <div class="card kpi span-4"><div class="label">Entraram hoje</div><div class="value" id="s-in-today">–</div>
+      <div class="split"><span>7 dias <b id="s-in-week">–</b></span><span>30 dias <b id="s-in-month">–</b></span></div></div>
+    <div class="card kpi span-4"><div class="label">Deixaram o selo hoje</div><div class="value" id="s-out-today">–</div>
+      <div class="split"><span>7 dias <b id="s-out-week">–</b></span><span>30 dias <b id="s-out-month">–</b></span></div></div>
+
+    <section class="card span-7" aria-labelledby="t-flow">
+      <div class="card-head">
+        <div><h2 id="t-flow">Entradas e saídas</h2>
+        <p class="note">Entraram: começaram (ou voltaram) a procurar · Saíram: tiraram o selo</p></div>
+        <select id="gran" aria-label="Agrupar por">
+          <option value="daily">Por dia (30 dias)</option><option value="weekly">Por semana (12)</option><option value="monthly">Por mês (12)</option>
+        </select>
+      </div>
+      <ul class="legend inline"><li><span class="sw" style="background:var(--s-in)"></span>Entraram</li><li><span class="sw" style="background:var(--s-out)"></span>Deixaram o selo</li></ul>
+      <svg id="flow" role="img" aria-labelledby="t-flow" style="width:100%;display:block"></svg>
+      <details class="table"><summary>Ver tabela</summary><div class="scroll"><table id="flow-table"></table></div></details>
+    </section>
+    <section class="card span-5" aria-labelledby="t-active">
+      <h2 id="t-active">Procurando emprego ao longo do tempo</h2>
+      <p class="note" id="active-note">Pessoas procurando no fim de cada período</p>
+      <svg id="active" role="img" aria-labelledby="t-active" style="width:100%;display:block"></svg>
+    </section>
+
+    <section class="card span-12" aria-labelledby="t-runs">
+      <h2 id="t-runs">Saúde da coleta</h2>
+      <p class="note">Última e próxima coleta de cada fonte (horário de Brasília) e execuções nas últimas 24 h</p>
+      <div class="scroll"><table id="runs"></table></div>
+    </section>
+  </div>
+  <footer>Atualiza a cada 5 minutos. Contagens sem anúncios repetidos (mesmo título e empresa).</footer>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+// Ordem fixa: cada fonte tem sempre a mesma cor. A paleta validada tem 8 cores; as fontes
+// além delas (OTHER) aparecem juntas como "Outros", em cinza, nos gráficos.
+const SOURCES = [["linkedin", "Vagas LinkedIn"], ["gupy", "Gupy"], ["post", "Publicações LinkedIn"], ["github", "GitHub"],
+                 ["remotar", "Remotar"], ["programathor", "Programathor"], ["catho", "Catho"], ["solides", "Sólides"],
+                 ["inhire", "InHire"], ["coodesh", "Coodesh"], ["nerdin", "Nerdin"], ["recrutei", "Recrutei"],
+                 ["upvagas", "UpVagas"]];
+const OTHER = ["inhire", "coodesh", "nerdin", "recrutei", "upvagas"];
+const CHART = [...SOURCES.filter(([s]) => !OTHER.includes(s)),
+               ["outros", "Outros (" + SOURCES.filter(([s]) => OTHER.includes(s)).map(([, n]) => n).join(", ") + ")"]];
+const NAME = Object.fromEntries([...SOURCES, ...CHART]);
+const foldRow = r => ({ ...r, outros: OTHER.reduce((n, s) => n + (r[s] || 0), 0) });
+const foldPairs = pairs => { const m = foldRow(Object.fromEntries(pairs)); return CHART.map(([s]) => [s, m[s] || 0]); };
+const COLOR = s => `var(--s-${s})`;
+const NS = "http://www.w3.org/2000/svg";
+const BR_DAY = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit" });
+const BR_WEEKDAY = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", weekday: "short" });
+const BR_TIME = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const pct = (n, total) => total ? Math.round(100 * n / total) + "%" : "0%";
+
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) n[k] = v;
+  n.append(...kids.filter(k => k != null && k !== ""));
+  return n;
+};
+const svg = (tag, attrs = {}) => {
+  const n = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  return n;
+};
+const swatch = s => el("span", { className: "sw", style: `background:${COLOR(s)}` });
+
+// --- tooltip -------------------------------------------------------------
+const tip = document.getElementById("tip");
+function showTip(evt, title, rows) {
+  tip.replaceChildren(el("div", { style: "font-weight:600;margin-bottom:4px" }, title),
+    ...rows.map(([label, value, s]) => el("div", { className: "row" },
+      el("span", {}, s ? swatch(s) : null, label), el("b", { className: "num" }, String(value)))));
+  tip.style.display = "block";
+  const x = Math.min(evt.clientX + 14, innerWidth - tip.offsetWidth - 8);
+  const y = Math.min(evt.clientY + 14, innerHeight - tip.offsetHeight - 8);
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+const hideTip = () => { tip.style.display = "none"; };
+function hover(node, fn) {
+  node.addEventListener("pointermove", e => fn(e));
+  node.addEventListener("pointerleave", hideTip);
+}
+
+// --- KPIs ----------------------------------------------------------------
+function kpis(k) {
+  document.getElementById("k-open").textContent = k.open;
+  document.getElementById("k-new").textContent = k.new_24h;
+  const diff = k.new_24h - k.prev_24h;
+  const d = document.getElementById("k-new-delta");
+  d.replaceChildren(diff === 0 ? "igual às 24 h anteriores" :
+    el("span", {}, el("b", { className: diff > 0 ? "up" : "down" }, (diff > 0 ? "▲ +" : "▼ ") + diff),
+       ` vs. 24 h anteriores (${k.prev_24h})`));
+  document.getElementById("k-remote").textContent = k.remote;
+  document.getElementById("k-remote-pct").textContent = `${pct(k.remote, k.open)} das vagas abertas`;
+  document.getElementById("k-companies").textContent = k.companies;
+}
+
+// --- pizza: vagas por fonte ---------------------------------------------
+function pie(bySource) {
+  const box = document.getElementById("pie");
+  const legend = document.getElementById("pie-legend");
+  box.replaceChildren(); legend.replaceChildren();
+  const total = bySource.reduce((n, [, v]) => n + v, 0);
+  const cx = 100, cy = 100, r = 92;
+  if (!total) {
+    box.append(svg("circle", { cx, cy, r, fill: "var(--grid)" }));
+  }
+  let angle = -Math.PI / 2;
+  for (const [s, v] of bySource) {
+    if (v) {
+      const a = 2 * Math.PI * v / total;
+      let shape;
+      if (v === total) {
+        shape = svg("circle", { cx, cy, r, fill: COLOR(s) });
+      } else {
+        const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
+        const x2 = cx + r * Math.cos(angle + a), y2 = cy + r * Math.sin(angle + a);
+        shape = svg("path", { d: `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${a > Math.PI ? 1 : 0} 1 ${x2},${y2} Z`,
+                              fill: COLOR(s), stroke: "var(--surface)", "stroke-width": 2, "stroke-linejoin": "round" });
+      }
+      box.append(shape);
+      hover(shape, e => showTip(e, NAME[s], [["Vagas", v], ["Participação", pct(v, total)]]));
+      angle += a;
+    }
+    legend.append(el("li", {}, swatch(s), el("span", {}, NAME[s]),
+      el("b", { className: "num" }, String(v)), el("span", { className: "num muted" }, pct(v, total))));
+  }
+  legend.append(el("li", { style: "border-top:1px solid var(--line);padding-top:6px" },
+    el("span", {}), el("span", { className: "muted" }, "Total"), el("b", { className: "num" }, String(total)), el("span", {})));
+}
+
+// --- colunas empilhadas: novas por dia -----------------------------------
+function daily(rows, since) {
+  rows = rows.map(foldRow);
+  const box = document.getElementById("daily");
+  box.replaceChildren();
+  // Desenha na largura real do cartão: o texto mantém o tamanho também no celular.
+  const W = Math.max(300, box.parentElement.clientWidth - 2), H = 230, L = 30, R = 6, T = 22, B = 40;
+  box.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  box.setAttribute("height", H);
+  const totals = rows.map(r => CHART.reduce((n, [s]) => n + r[s], 0));
+  const max = Math.max(4, ...totals);
+  const step = max <= 8 ? 2 : max <= 20 ? 5 : max <= 50 ? 10 : 20;
+  const top = Math.ceil(max / step) * step;
+  const y = v => T + (H - T - B) * (1 - v / top);
+  const slot = (W - L - R) / rows.length;
+  const bw = Math.min(34, slot * 0.66);
+  const sinceDay = since ? new Date(since).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) : null;
+
+  // Dias anteriores ao início da coleta: só parte das fontes foi lida para trás.
+  rows.forEach((r, i) => {
+    if (sinceDay && r.day < sinceDay)
+      box.append(svg("rect", { class: "partial", x: L + i * slot, y: T, width: slot, height: H - T - B, opacity: 0.6 }));
+  });
+  for (let v = 0; v <= top; v += step) {
+    box.append(svg("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: v ? "var(--grid)" : "var(--axis)", "stroke-width": 1 }));
+    const t = svg("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }); t.textContent = v; box.append(t);
+  }
+  const every = Math.max(1, Math.ceil(rows.length / Math.floor((W - L - R) / 44)));
+  rows.forEach((r, i) => {
+    const x = L + i * slot + (slot - bw) / 2;
+    let acc = 0;
+    const parts = CHART.filter(([s]) => r[s]);
+    parts.forEach(([s], j) => {
+      const y0 = y(acc), y1 = y(acc + r[s]);
+      const h = Math.max(0, y0 - y1 - (j < parts.length - 1 ? 2 : 0));  // 2px de folga entre segmentos
+      const last = j === parts.length - 1;
+      const rad = last ? Math.min(4, h, bw / 2) : 0;
+      box.append(svg("path", { fill: COLOR(s), d:
+        `M${x},${y0} V${y0 - h + rad} Q${x},${y0 - h} ${x + rad},${y0 - h} H${x + bw - rad} Q${x + bw},${y0 - h} ${x + bw},${y0 - h + rad} V${y0} Z` }));
+      acc += r[s];
+    });
+    if (totals[i]) {
+      const t = svg("text", { x: x + bw / 2, y: y(totals[i]) - 5, "text-anchor": "middle", class: "value-label" });
+      t.textContent = totals[i]; box.append(t);
+    }
+    const date = new Date(r.day + "T00:00:00Z");
+    if ((rows.length - 1 - i) % every === 0) {  // conta a partir de hoje: o último dia sempre tem rótulo
+      const t1 = svg("text", { x: x + bw / 2, y: H - B + 16, "text-anchor": "middle" }); t1.textContent = BR_DAY.format(date);
+      const t2 = svg("text", { x: x + bw / 2, y: H - B + 29, "text-anchor": "middle" }); t2.textContent = BR_WEEKDAY.format(date).replace(".", "");
+      box.append(t1, t2);
+    }
+    const hit = svg("rect", { class: "hit", x: L + i * slot, y: T, width: slot, height: H - T - B });
+    hover(hit, e => showTip(e, `${BR_WEEKDAY.format(date).replace(".", "")}, ${BR_DAY.format(date)}`,
+      [...CHART.map(([s, n]) => [n, r[s], s]), ["Total", totals[i]]]));
+    box.append(hit);
+  });
+
+  const legend = document.getElementById("daily-legend");
+  legend.replaceChildren(...CHART.map(([s, n]) => el("li", {}, swatch(s), n)));
+  document.getElementById("daily-note").textContent = sinceDay && rows.some(r => r.day < sinceDay)
+    ? `Coleta iniciada em ${BR_DAY.format(new Date(sinceDay + "T00:00:00Z"))}: os dias com fundo cinza têm dados parciais (só o que ainda estava publicado naquele momento).`
+    : "";
+  const table = document.getElementById("daily-table");
+  table.replaceChildren(
+    el("tr", {}, el("th", {}, "Dia"), ...CHART.map(([, n]) => el("th", { className: "num" }, n)), el("th", { className: "num" }, "Total")),
+    ...rows.slice().reverse().map((r, i) => el("tr", {},
+      el("td", {}, BR_DAY.format(new Date(r.day + "T00:00:00Z"))),
+      ...CHART.map(([s]) => el("td", { className: "num" }, String(r[s]))),
+      el("td", { className: "num" }, el("b", {}, String(totals[rows.length - 1 - i]))))));
+}
+
+// --- barras horizontais (uma série) --------------------------------------
+function bars(id, items) {
+  const box = document.getElementById(id);
+  if (!items.length) { box.replaceChildren(el("div", { className: "empty" }, "Sem dados nas últimas 72 h.")); return; }
+  const max = Math.max(...items.map(([, v]) => v));
+  const total = items.reduce((n, [, v]) => n + v, 0);
+  box.replaceChildren(...items.map(([name, v]) => {
+    const row = el("div", { className: "bar-row" },
+      el("span", { className: "name", title: name }, name),
+      el("div", { className: "bar-track" },
+        el("div", {}, el("div", { className: "bar", style: `width:${(100 * v / max).toFixed(1)}%` })),
+        el("span", { className: "num" }, String(v))));
+    hover(row, e => showTip(e, name, [["Vagas", v], ["Participação", pct(v, total)]]));
+    return row;
+  }));
+}
+
+// --- defasagem: última e próxima coleta -------------------------------------
+function ago(iso) {  // "há 35 min" / "em 2 h 10 min"
+  const min = Math.round((new Date(iso) - Date.now()) / 60000), a = Math.abs(min);
+  const txt = a < 1 ? "agora" : a < 60 ? `${a} min` : a < 48 * 60
+    ? `${Math.floor(a / 60)} h` + (a % 60 && a < 600 ? ` ${a % 60} min` : "") : `${Math.round(a / 1440)} dias`;
+  return a < 1 ? "agora" : min < 0 ? `há ${txt}` : `em ${txt}`;
+}
+const when = iso => `${BR_TIME.format(new Date(iso)).replace(",", "")} (${ago(iso)})`;
+let schedule = null;
+// Agenda gravada pelo coletor a cada minuto: se parou de atualizar, o coletor está parado.
+const scheduleStale = () => !schedule || Date.now() - new Date(schedule.updated_at) > 5 * 60000;
+function nextRun(source) {
+  const s = schedule?.sources?.[source];
+  if (!schedule) return "—";
+  if (!s || !s.enabled) return "desativada";
+  if (s.running) return "⟳ coletando agora";
+  if (!s.next_run) return "—";
+  return new Date(s.next_run) < Date.now() ? "em instantes" : when(s.next_run);
+}
+function freshness(id, sources, runsData, label) {
+  const last = sources.map(s => runsData?.[s]?.last_ok_at).filter(Boolean).sort().pop();
+  const nexts = sources.map(s => schedule?.sources?.[s]).filter(s => s && s.enabled);
+  const running = nexts.some(s => s.running);
+  const next = nexts.map(s => s.next_run).filter(Boolean).sort()[0];
+  const box = document.getElementById(id);
+  box.replaceChildren(
+    `${label}: última captura `, el("b", {}, last ? when(last) : "—"), " · próxima ",
+    el("b", {}, running ? "coletando agora" : !next ? "—" : new Date(next) < Date.now() ? "em instantes" : when(next)),
+    scheduleStale() ? " · ⚠ o coletor não atualiza a agenda há mais de 5 min (parado?)" : "");
+}
+
+// --- saúde da coleta -------------------------------------------------------
+function runs(data) {
+  const table = document.getElementById("runs");
+  table.replaceChildren(el("tr", {}, el("th", {}, "Fonte"), el("th", {}, "Última coleta"), el("th", {}, "Próxima coleta"), el("th", {}, "Status"),
+    el("th", { className: "num" }, "Lidas"), el("th", { className: "num" }, "Novas PHP"),
+    el("th", { className: "num" }, "Coletas 24 h"), el("th", { className: "num" }, "Falhas 24 h")));
+  for (const [s, n] of [...SOURCES, ["seekers", "Candidatos LinkedIn"]]) {
+    const { last, last_24h: day } = data[s] || {};
+    let status = el("span", { className: "status muted" }, "— sem coleta");
+    if (last && last.ok === null) status = el("span", { className: "status muted" }, "⟳ coletando");
+    else if (last && last.ok) status = el("span", { className: "status ok" }, "✓ ok");
+    else if (last) status = el("span", { className: "status fail", title: last.error || "" }, "✕ falhou");
+    table.append(el("tr", {},
+      el("td", {}, el("span", { style: "display:inline-flex;gap:8px;align-items:center" }, swatch(s), n)),
+      el("td", { className: "nowrap" }, last ? BR_TIME.format(new Date(last.started_at)) : "—"),
+      el("td", { className: "nowrap" }, nextRun(s)),
+      el("td", {}, status),
+      el("td", { className: "num" }, last ? String(last.found ?? "—") : "—"),
+      el("td", { className: "num" }, last ? String(last.new_jobs ?? "—") : "—"),
+      el("td", { className: "num" }, String(day?.total || 0)),
+      el("td", { className: "num" }, String(day?.failed || 0))));
+  }
+}
+
+// --- pessoas procurando emprego -------------------------------------------
+const P_DAY = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit" });
+const P_MONTH = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", month: "short", year: "2-digit" });
+const periodDate = p => new Date((p.length === 7 ? p + "-01" : p) + "T00:00:00Z");
+function periodLabel(p, gran, long = false) {
+  const d = periodDate(p);
+  if (gran === "monthly") return P_MONTH.format(d).replace(". de ", "/").replace(".", "");
+  if (gran === "weekly") return (long ? "Semana de " : "") + P_DAY.format(d);
+  return long ? `${BR_WEEKDAY.format(d).replace(".", "")}, ${P_DAY.format(d)}` : P_DAY.format(d);
+}
+const niceTop = max => { const step = max <= 8 ? 2 : max <= 20 ? 5 : max <= 50 ? 10 : max <= 200 ? 50 : 100;
+                         return [Math.ceil(max / step) * step, step]; };
+function frame(box, H) {
+  box.replaceChildren();
+  const W = Math.max(280, box.parentElement.clientWidth - 2);
+  box.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  box.setAttribute("height", H);
+  return W;
+}
+function yAxis(box, top, step, y, L, W, R) {
+  for (let v = 0; v <= top; v += step) {
+    box.append(svg("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: v ? "var(--grid)" : "var(--axis)", "stroke-width": 1 }));
+    const t = svg("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }); t.textContent = v; box.append(t);
+  }
+}
+
+// Colunas agrupadas: entradas x saídas por período (uma escala só).
+function flow(rows, gran) {
+  const box = document.getElementById("flow");
+  const H = 230, L = 30, R = 6, T = 14, B = 30, W = frame(box, H);
+  const [top, step] = niceTop(Math.max(4, ...rows.flatMap(r => [r.entered, r.left])));
+  const y = v => T + (H - T - B) * (1 - v / top);
+  yAxis(box, top, step, y, L, W, R);
+  const slot = (W - L - R) / rows.length;
+  const bw = Math.max(2, Math.min(16, (slot * 0.72 - 2) / 2));
+  const every = Math.max(1, Math.ceil(rows.length / Math.floor((W - L - R) / 46)));
+  rows.forEach((r, i) => {
+    const x0 = L + i * slot + (slot - (2 * bw + 2)) / 2;
+    [[r.entered, "in"], [r.left, "out"]].forEach(([v, s], j) => {
+      if (!v) return;
+      const x = x0 + j * (bw + 2), y0 = y(0), h = y0 - y(v), rad = Math.min(4, h, bw / 2);
+      box.append(svg("path", { fill: COLOR(s), d:
+        `M${x},${y0} V${y0 - h + rad} Q${x},${y0 - h} ${x + rad},${y0 - h} H${x + bw - rad} Q${x + bw},${y0 - h} ${x + bw},${y0 - h + rad} V${y0} Z` }));
+    });
+    if ((rows.length - 1 - i) % every === 0) {
+      const t = svg("text", { x: L + i * slot + slot / 2, y: H - B + 16, "text-anchor": "middle" });
+      t.textContent = periodLabel(r.period, gran); box.append(t);
+    }
+    const hit = svg("rect", { class: "hit", x: L + i * slot, y: T, width: slot, height: H - T - B });
+    hover(hit, e => showTip(e, periodLabel(r.period, gran, true),
+      [["Entraram", r.entered, "in"], ["Deixaram o selo", r.left, "out"]]));
+    box.append(hit);
+  });
+  document.getElementById("flow-table").replaceChildren(
+    el("tr", {}, el("th", {}, "Período"), el("th", { className: "num" }, "Entraram"),
+       el("th", { className: "num" }, "Deixaram o selo"), el("th", { className: "num" }, "Procurando")),
+    ...rows.slice().reverse().map(r => el("tr", {}, el("td", {}, periodLabel(r.period, gran, true)),
+      el("td", { className: "num" }, String(r.entered)), el("td", { className: "num" }, String(r.left)),
+      el("td", { className: "num" }, r.active == null ? "—" : String(r.active)))));
+}
+
+// Linha: quantas pessoas procuravam no fim de cada período (sem registro = falha na linha).
+function activeLine(rows, gran) {
+  const box = document.getElementById("active");
+  const H = 230, L = 34, R = 26, T = 18, B = 30, W = frame(box, H);
+  const [top, step] = niceTop(Math.max(4, ...rows.map(r => r.active || 0)));
+  const y = v => T + (H - T - B) * (1 - v / top);
+  yAxis(box, top, step, y, L, W, R);
+  const slot = (W - L - R) / rows.length, cx = i => L + i * slot + slot / 2;
+  let d = "", pen = false;
+  rows.forEach((r, i) => {
+    if (r.active == null) { pen = false; return; }
+    d += `${pen ? "L" : "M"}${cx(i)},${y(r.active)} `; pen = true;
+  });
+  if (d) box.append(svg("path", { d, fill: "none", stroke: "var(--accent)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  const lastI = rows.map(r => r.active != null).lastIndexOf(true);
+  if (lastI >= 0) {
+    box.append(svg("circle", { cx: cx(lastI), cy: y(rows[lastI].active), r: 4, fill: "var(--accent)", stroke: "var(--surface)", "stroke-width": 2 }));
+    const t = svg("text", { x: cx(lastI), y: y(rows[lastI].active) - 9, "text-anchor": "middle", class: "value-label" });
+    t.textContent = rows[lastI].active; box.append(t);
+  }
+  const every = Math.max(1, Math.ceil(rows.length / Math.floor((W - L - R) / 46)));
+  const cross = svg("line", { y1: T, y2: H - B, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden" });
+  box.append(cross);
+  rows.forEach((r, i) => {
+    if ((rows.length - 1 - i) % every === 0) {
+      const t = svg("text", { x: cx(i), y: H - B + 16, "text-anchor": "middle" });
+      t.textContent = periodLabel(r.period, gran); box.append(t);
+    }
+    const hit = svg("rect", { class: "hit", x: L + i * slot, y: T, width: slot, height: H - T - B });
+    hit.addEventListener("pointermove", e => {
+      cross.setAttribute("x1", cx(i)); cross.setAttribute("x2", cx(i)); cross.setAttribute("visibility", "visible");
+      showTip(e, periodLabel(r.period, gran, true), [["Procurando", r.active == null ? "sem registro" : r.active]]);
+    });
+    hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); hideTip(); });
+    box.append(hit);
+  });
+}
+
+let lastSeekers = null;
+function drawSeekers() {
+  if (!lastSeekers) return;
+  const gran = document.getElementById("gran").value;
+  flow(lastSeekers[gran], gran);
+  activeLine(lastSeekers[gran], gran);
+}
+
+async function loadSeekers() {
+  try {
+    const res = await fetch("api/seekers");
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || res.status);
+    const k = d.kpis;
+    document.getElementById("s-active").textContent = k.active;
+    document.getElementById("s-active-note").textContent =
+      `${k.badge} com o selo` + (k.pending ? ` · ${k.pending} aguardando confirmar o local` : "");
+    for (const [kind, id] of [["entered", "in"], ["left", "out"]]) {
+      document.getElementById(`s-${id}-today`).textContent = k[kind].today;
+      document.getElementById(`s-${id}-week`).textContent = k[kind].week;
+      document.getElementById(`s-${id}-month`).textContent = k[kind].month;
+    }
+    lastSeekers = d;
+    drawSeekers();
+    const since = d.collecting_since ? BR_TIME.format(new Date(d.collecting_since)).split(",")[0] : null;
+    document.getElementById("seek-sub").textContent =
+      `Só o Brasil (local do perfil no LinkedIn): quem usa o selo "buscando emprego" ou publicou que está procurando (vale por ${d.active_days} dias após o post). ` +
+      `${k.tracked} pessoas acompanhadas. Só quantidades.` +
+      (since ? ` Coleta desde ${since}: nas primeiras semanas, "entraram" inclui quem já procurava antes.` : " A primeira coleta ainda não rodou.");
+  } catch (e) {
+    document.getElementById("seek-sub").textContent = "Não foi possível carregar os dados de candidatos: " + e.message;
+  }
+}
+
+async function load() {
+  loadSeekers();
+  const days = document.getElementById("days").value;
+  try {
+    const res = await fetch("api/dashboard?days=" + days);
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || res.status);
+    kpis(d.kpis);
+    pie(foldPairs(d.by_source));
+    lastDaily = [d.daily, d.collecting_since];
+    daily(...lastDaily);
+    bars("b-workplace", d.workplace);
+    bars("b-seniority", d.seniority);
+    bars("b-contract", d.contract);
+    bars("b-stack", d.stack);
+    bars("b-companies", d.companies);
+    schedule = d.schedule;
+    runs(d.runs);
+    freshness("fresh", SOURCES.map(([s]) => s), d.runs, "Vagas");
+    freshness("seek-fresh", ["seekers"], d.runs, "Candidatos");
+    document.getElementById("sub").textContent =
+      `Vagas de engenharia de software com PHP publicadas nas últimas ${d.max_age_hours} h · atualizado ${BR_TIME.format(new Date())} (Brasília)`;
+  } catch (e) {
+    document.getElementById("sub").textContent = "Não foi possível carregar o dashboard: " + e.message;
+  }
+}
+let lastDaily = null, resizeTimer;
+addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (lastDaily) daily(...lastDaily); drawSeekers(); }, 150);
+});
+document.getElementById("days").addEventListener("change", load);
+document.getElementById("gran").addEventListener("change", drawSeekers);
+load();
+setInterval(load, 5 * 60 * 1000);
+</script>
+</body>
+</html>

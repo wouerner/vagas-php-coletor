@@ -1,0 +1,77 @@
+# Roda junto com o projeto ../linkedin em portas diferentes. A sessão do LinkedIn é
+# própria (./.session, copiada do projeto linkedin); veja LINKEDIN_SESSION_PATH abaixo.
+#
+#             linkedin   vagas-php
+#   MCP         8765       8766
+#   noVNC       6080       6081
+#   VNC         5900       5901
+#   site          -        8780
+services:
+  # Base local. Em produção (Coolify) o MySQL fica em outro servidor: só DATABASE_URL muda.
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+      MYSQL_DATABASE: vagas
+      MYSQL_USER: vagas
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:-vagas}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-vagas-root}"
+    ports:
+      - "127.0.0.1:${MYSQL_PUBLISH_PORT:-3307}:3306"   # para inspecionar com um cliente
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uvagas", "-p${MYSQL_PASSWORD:-vagas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  vagas-php:
+    build: .
+    image: vagas-php
+    command: ["serve"]
+    restart: unless-stopped
+    depends_on:
+      mysql: {condition: service_healthy}
+    user: "${UID:-1000}:${GID:-1000}"
+    shm_size: 1gb
+    environment:
+      TZ: America/Sao_Paulo
+      MCP_HOST: 0.0.0.0           # dentro do container; a porta só é publicada no localhost
+      MCP_PORT: "8000"
+      LINKEDIN_HEADLESS: "false"  # navegador no display virtual, visível pelo noVNC
+      VAGAS_MAX_AGE_HOURS: "${VAGAS_MAX_AGE_HOURS:-72}"   # idade máxima das vagas
+      DATABASE_URL: "mysql://vagas:${MYSQL_PASSWORD:-vagas}@mysql:3306/vagas"
+    ports:
+      # Só em localhost do servidor: de fora, use túnel SSH.
+      - "127.0.0.1:${MCP_PUBLISH_PORT:-8766}:8000"     # MCP (http://localhost:8766/mcp)
+      - "127.0.0.1:${NOVNC_PUBLISH_PORT:-6081}:6080"   # noVNC (http://localhost:6081/vnc.html)
+      - "127.0.0.1:${VNC_PUBLISH_PORT:-5901}:5900"     # VNC
+    volumes:
+      - ./.env:/app/.env:ro
+      # Sessão própria do LinkedIn (copiada do projeto linkedin). Para voltar a
+      # compartilhar com ele, use LINKEDIN_SESSION_PATH=../linkedin/.session.
+      - ${LINKEDIN_SESSION_PATH:-./.session}:/app/.session
+      - ./data:/app/data           # config e agenda do coletor, posts diários (vagas no MySQL)
+
+  web:
+    image: vagas-php
+    command: ["web"]
+    restart: unless-stopped
+    user: "${UID:-1000}:${GID:-1000}"
+    depends_on: [vagas-php]
+    environment:
+      TZ: America/Sao_Paulo
+      WEB_HOST: 0.0.0.0
+      WEB_PORT: "8000"
+      VAGAS_MAX_AGE_HOURS: "${VAGAS_MAX_AGE_HOURS:-72}"
+      DATABASE_URL: "mysql://vagas:${MYSQL_PASSWORD:-vagas}@mysql:3306/vagas"
+    ports:
+      # Para publicar o site na rede, use WEB_BIND=0.0.0.0 (ou um proxy reverso).
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PUBLISH_PORT:-8780}:8000"   # http://localhost:8780
+    volumes:
+      - ./data:/app/data           # agenda das coletas (schedule.json) para o dashboard
+
+volumes:
+  mysql-data:

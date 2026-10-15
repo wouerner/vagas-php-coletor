@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vagas PHP</title>
+<meta name="description" content="Vagas de engenharia de software com PHP, Laravel e Symfony, coletadas do LinkedIn, Gupy, Sólides, Catho, Remotar, Programathor, Coodesh, InHire e GitHub.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='48' ry='26' fill='%23777BB4'/><text x='50' y='60' font-size='30' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>php</text></svg>">
+<style>
+  :root {
+    --bg: #f6f6fa; --surface: #ffffff; --text: #1d1d2b; --muted: #5d6070; --line: #e3e3ec;
+    --accent: #5b5fa0; --accent-soft: #ebecf7; --ok: #1f7a4d; --ok-soft: #e3f4ea;
+    --warn: #8a5a00; --warn-soft: #fbf0d9; --chip: #f0f0f5;
+    /* idade da vaga: nova -> antiga */
+    --age-new: #1f8a4c; --age-new-soft: #e1f5e9;
+    --age-recent: #2f6fb8; --age-recent-soft: #e3eefa;
+    --age-days: #a3620a; --age-days-soft: #fcefd9;
+    --age-old: #7a7c88; --age-old-soft: #ececf1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13131b; --surface: #1c1c27; --text: #e8e8f0; --muted: #a0a2b4; --line: #2d2d3c;
+      --accent: #a3a7e6; --accent-soft: #2a2b45; --ok: #7fd3a6; --ok-soft: #173326;
+      --warn: #f0c56e; --warn-soft: #3a2f16; --chip: #262634;
+      --age-new: #6fd69a; --age-new-soft: #16321f;
+      --age-recent: #84b4ee; --age-recent-soft: #1a2a40;
+      --age-days: #f0b866; --age-days-soft: #3a2a12;
+      --age-old: #8e90a0; --age-old-soft: #2a2a35;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  header { padding: 28px 0 12px; }
+  .top { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
+  nav { display: flex; gap: 6px; }
+  nav a { font-size: 14px; padding: 5px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
+  nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); margin: 4px 0 0; }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .stats b { color: var(--text); }
+
+  form { position: sticky; top: 0; z-index: 1; background: var(--bg); padding: 12px 0;
+         display: grid; gap: 8px; grid-template-columns: 1fr repeat(4, auto); }
+  input, select, button { font: inherit; color: var(--text); background: var(--surface);
+         border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+  input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .sources { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+  .sources label { cursor: pointer; font-size: 13px; padding: 4px 10px; border-radius: 999px;
+         background: var(--chip); border: 1px solid transparent; user-select: none; }
+  .sources input { position: absolute; opacity: 0; pointer-events: none; }
+  .sources input:checked + span { color: var(--accent); font-weight: 600; }
+  .sources label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .sources label:has(input:focus-visible) { outline: 2px solid var(--accent); }
+
+  /* Atualização automática: indicador "ao vivo" e barra até a próxima atualização. */
+  .live { margin-left: auto; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+          font-size: 13px; padding: 4px 11px; border-radius: 999px; color: var(--muted);
+          background: var(--surface); }
+  .live:hover { border-color: var(--accent); color: var(--text); }
+  .live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+  .live[data-state=ok] .dot { animation: pulse 2s ease-out infinite; }
+  .live[data-state=loading] .dot { background: var(--accent); animation: blink .8s ease-in-out infinite alternate; }
+  .live[data-state=error] { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
+  .live[data-state=error] .dot { background: var(--warn); }
+  .live[data-state=news] { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+  .live[data-state=news] .dot { background: var(--accent); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); }
+                     100% { box-shadow: 0 0 0 7px transparent; } }
+  @keyframes blink { from { opacity: 1; } to { opacity: .25; } }
+  .tick { grid-column: 1 / -1; height: 2px; border-radius: 2px; background: var(--line); overflow: hidden; }
+  .tick span { display: block; height: 100%; width: 0; background: var(--accent); opacity: .6; }
+  .job.fresh { border-color: var(--accent); border-left-color: var(--age);
+               box-shadow: 0 0 0 1px var(--accent); animation: arrive 2.5s ease-out; }
+  @keyframes arrive { from { background: var(--accent-soft); } }
+  .tag.fresh { background: var(--accent); color: var(--surface); font-weight: 600; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  @media (prefers-reduced-motion: reduce) {
+    .live .dot, .job.fresh { animation: none !important; }
+    .tick span { transition: none !important; }
+  }
+
+  #list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 10px; }
+  .job { --age: var(--age-old); --age-soft: var(--age-old-soft);
+         background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--age);
+         border-radius: 12px; padding: 14px 16px; }
+  .job.new    { --age: var(--age-new);    --age-soft: var(--age-new-soft); }
+  .job.recent { --age: var(--age-recent); --age-soft: var(--age-recent-soft); }
+  .job.days   { --age: var(--age-days);   --age-soft: var(--age-days-soft); }
+  .job.old    { background: var(--bg); }
+  .job.old h2 a, .job.old .meta { color: var(--muted); }
+  .job.old .tags { opacity: .7; }
+  .head { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
+  .job h2 { margin: 0; font-size: 16px; line-height: 1.35; min-width: 0; }
+  .age { flex: none; font-size: 12px; font-weight: 600; white-space: nowrap; padding: 2px 9px;
+         border-radius: 999px; color: var(--age); background: var(--age-soft); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px;
+         margin-right: 5px; vertical-align: -1px; background: var(--c); }
+  .job h2 a { color: var(--text); text-decoration: none; }
+  .job h2 a:hover { color: var(--accent); text-decoration: underline; }
+  .meta { color: var(--muted); font-size: 13px; margin-top: 3px; overflow-wrap: anywhere; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .tag.src { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .tag.remote { background: var(--ok-soft); color: var(--ok); }
+  .tag.closed { background: var(--warn-soft); color: var(--warn); }
+  details { margin-top: 8px; font-size: 14px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .desc { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 6px; max-height: 420px;
+          overflow: auto; padding: 10px; border-radius: 8px; background: var(--bg); }
+  .empty, .more { text-align: center; color: var(--muted); padding: 28px 0; }
+  .more button { cursor: pointer; padding: 8px 20px; }
+  footer { color: var(--muted); font-size: 12px; padding: 24px 0 40px; text-align: center; }
+
+  @media (max-width: 700px) {
+    form { grid-template-columns: 1fr 1fr; }
+    form > input[type=search] { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <h1>Vagas <span>PHP</span></h1>
+      <nav><a href="./" aria-current="page">Vagas</a><a href="dashboard">Dashboard</a><a href="regras">Regras</a></nav>
+    </div>
+    <p class="sub">Engenharia de software com PHP, Laravel e Symfony: vagas do LinkedIn, Gupy, Sólides, Catho, Remotar, Programathor, Coodesh e de empresas que usam a InHire, publicações de recrutadores e issues de repositórios de vagas no GitHub. Só vagas publicadas nas últimas 72 horas (horário de Brasília).</p>
+    <div class="stats" id="stats"></div>
+    <div class="legend" aria-label="Cores por idade da vaga">
+      <span style="--c: var(--age-new)">nova (até 6 h)</span>
+      <span style="--c: var(--age-recent)">recente (6 a 24 h)</span>
+      <span style="--c: var(--age-days)">1 a 2 dias</span>
+      <span style="--c: var(--age-old)">antiga (2 a 3 dias)</span>
+    </div>
+  </header>
+
+  <form id="filters" role="search">
+    <input type="search" name="q" placeholder="Buscar: laravel, remoto, empresa…" aria-label="Buscar">
+    <select name="workplace" aria-label="Modalidade">
+      <option value="">Modalidade</option><option>Remoto</option><option>Híbrido</option><option>Presencial</option>
+    </select>
+    <select name="seniority" aria-label="Senioridade">
+      <option value="">Senioridade</option><option>Estágio</option><option>Júnior</option>
+      <option>Pleno</option><option>Sênior</option><option>Especialista</option>
+    </select>
+    <select name="stack" aria-label="Stack">
+      <option value="">Stack</option><option>Laravel</option><option>Symfony</option><option>CodeIgniter</option>
+      <option>CakePHP</option><option>Yii</option><option>Laminas/Zend</option><option>Hyperf/Swoole</option>
+      <option>Livewire</option><option>Filament</option><option>Magento</option><option>WordPress</option><option>Drupal</option>
+    </select>
+    <select name="hours" aria-label="Período">
+      <option value="1">Última 1 hora</option><option value="4">Últimas 4 horas</option>
+      <option value="6">Últimas 6 horas</option><option value="24">Últimas 24 horas</option>
+      <option value="48">Últimas 48 horas</option>
+      <option value="72" selected>Últimas 72 horas</option>
+    </select>
+    <div class="sources" role="radiogroup" aria-label="Fonte">
+      <label><input type="radio" name="source" value="" checked><span>Todas as fontes</span></label>
+      <label><input type="radio" name="source" value="linkedin"><span>Vagas LinkedIn</span></label>
+      <label><input type="radio" name="source" value="gupy"><span>Gupy</span></label>
+      <label><input type="radio" name="source" value="solides"><span>Sólides</span></label>
+      <label><input type="radio" name="source" value="catho"><span>Catho</span></label>
+      <label><input type="radio" name="source" value="remotar"><span>Remotar</span></label>
+      <label><input type="radio" name="source" value="programathor"><span>Programathor</span></label>
+      <label><input type="radio" name="source" value="coodesh"><span>Coodesh</span></label>
+      <label><input type="radio" name="source" value="nerdin"><span>Nerdin</span></label>
+      <label><input type="radio" name="source" value="recrutei"><span>Recrutei</span></label>
+      <label><input type="radio" name="source" value="upvagas"><span>UpVagas</span></label>
+      <label><input type="radio" name="source" value="inhire"><span>InHire</span></label>
+      <label><input type="radio" name="source" value="post"><span>Publicações LinkedIn</span></label>
+      <label><input type="radio" name="source" value="github"><span>GitHub</span></label>
+      <button type="button" class="live" id="live" data-state="loading"
+              title="Atualiza sozinho a cada minuto. Clique para atualizar agora.">
+        <span class="dot" aria-hidden="true"></span><span id="live-text">Carregando…</span>
+      </button>
+    </div>
+    <div class="tick" aria-hidden="true"><span id="tick"></span></div>
+  </form>
+
+  <p class="sr" role="status" id="announce"></p>
+  <ul id="list"></ul>
+  <div class="more" id="more" hidden><button type="button">Carregar mais</button></div>
+  <footer>A página se atualiza sozinha a cada minuto. Confira sempre a vaga na fonte original antes de se candidatar.</footer>
+</div>
+
+<script>
+const SOURCE_NAMES = { linkedin: "Vaga LinkedIn", gupy: "Gupy", post: "Publicação LinkedIn", github: "GitHub",
+                       inhire: "InHire", solides: "Sólides", catho: "Catho", remotar: "Remotar",
+                       programathor: "Programathor", coodesh: "Coodesh", nerdin: "Nerdin",
+                       recrutei: "Recrutei", upvagas: "UpVagas" };
+const PAGE = 30;
+const REFRESH_MS = 60 * 1000;          // aba visível
+const HIDDEN_REFRESH_MS = 5 * 60 * 1000; // aba em segundo plano (só para o contador no título)
+const FRESH_MS = 10 * 60 * 1000;        // quanto tempo uma vaga que chegou fica destacada
+const TITLE = document.title;
+const form = document.getElementById("filters");
+const list = document.getElementById("list");
+const more = document.getElementById("more");
+const live = document.getElementById("live");
+const liveText = document.getElementById("live-text");
+const tickBar = document.getElementById("tick");
+const announce = document.getElementById("announce");
+let offset = 0, seq = 0, manualBusy = false;
+// Vagas já mostradas e as que chegaram com a página aberta (id -> quando chegou).
+let seen = new Set(), fresh = new Map(), unseen = 0, lastUpdate = 0, autoTimer;
+const HHMM = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
+const el = (tag, attrs = {}, ...children) => {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) node[k] = v;
+  node.append(...children.filter(c => c != null && c !== ""));
+  return node;
+};
+const safeUrl = url => /^https?:\/\//i.test(url || "") ? url : null;
+
+const BRASILIA = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+function ago(iso) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (isNaN(date)) return null;
+  const h = Math.floor((Date.now() - date) / 3600000);
+  if (h < 1) return "há menos de 1 h";
+  return h < 48 ? `há ${h} h` : `há ${Math.floor(h / 24)} dias`;
+}
+
+// Idade da vaga: faixa de cor e texto curto ("40 min", "5 h", "1 d 3 h").
+const AGE_BANDS = [[6, "new", "nova"], [24, "recent", "recente"], [48, "days", "1-2 dias"],
+                   [Infinity, "old", "antiga"]];
+
+function age(iso) {
+  const date = new Date(iso);
+  if (!iso || isNaN(date)) return null;
+  const min = Math.max(0, Math.floor((Date.now() - date) / 60000));
+  const h = min / 60;
+  const text = min < 60 ? `${min} min`
+    : h < 24 ? `${Math.floor(h)} h`
+    : `${Math.floor(h / 24)} d` + (Math.floor(h % 24) ? ` ${Math.floor(h % 24)} h` : "");
+  const [, band, label] = AGE_BANDS.find(([limit]) => h < limit);
+  return { text, band, label, at: BRASILIA.format(date) };
+}
+
+function card(job) {
+  const url = safeUrl(job.url);
+  const title = job.title || "(sem título)";
+  const who = [job.company, job.source === "post" ? job.author : null, job.location]
+    .filter(Boolean).join(" · ");
+  const a = age(job.posted_at || job.first_seen);
+  const tags = el("div", { className: "tags" },
+    el("span", { className: "tag src" }, SOURCE_NAMES[job.source] || job.source));
+  if (job.closed_at) tags.append(el("span", { className: "tag closed" }, "encerrada"));
+  if (job.workplace) tags.append(el("span", { className: "tag" + (job.workplace === "Remoto" ? " remote" : "") }, job.workplace));
+  for (const t of [job.seniority, job.contract, job.salary, ...(job.stack || "").split(",")])
+    if (t) tags.append(el("span", { className: "tag" }, t));
+
+  const li = el("li", { className: "job" + (a ? " " + a.band : "") },
+    el("div", { className: "head" },
+      el("h2", {}, url ? el("a", { href: url, target: "_blank", rel: "noopener" }, title) : title),
+      a && el("span", { className: "age", title: `Vaga ${a.label}: publicada há ${a.text}` }, a.text)),
+    el("div", { className: "meta" },
+      [who, a && `publicada em ${a.at} (Brasília)`].filter(Boolean).join(" · ")),
+    tags);
+  li.dataset.id = job.id;
+  if (job.description) {
+    li.append(el("details", {}, el("summary", {}, "Descrição"),
+      el("div", { className: "desc" }, job.description)));
+  }
+  return li;
+}
+
+// Primeira vaga visível abaixo dos filtros, para manter a rolagem quando chegam vagas no topo.
+function scrollAnchor() {
+  if (window.scrollY < 10) return null;
+  const top = form.getBoundingClientRect().bottom;
+  const li = [...list.children].find(n => n.dataset.id && n.getBoundingClientRect().bottom > top);
+  return li && { id: li.dataset.id, y: li.getBoundingClientRect().top };
+}
+
+function render(jobs, { append = false, auto = false } = {}) {
+  const open = new Set([...list.querySelectorAll("details[open]")].map(d => d.closest(".job").dataset.id));
+  const anchor = auto && scrollAnchor();
+  const now = Date.now();
+  for (const [id, at] of fresh) if (now - at > FRESH_MS) fresh.delete(id);
+  if (!append) list.replaceChildren();
+  let added = 0;
+  for (const job of jobs) {
+    if (auto && !seen.has(job.id)) { fresh.set(job.id, now); added++; }
+    seen.add(job.id);
+    const li = card(job);
+    if (fresh.has(job.id)) {
+      li.classList.add("fresh");
+      li.querySelector(".tags").prepend(el("span", { className: "tag fresh" }, "acabou de chegar"));
+    }
+    if (open.has(job.id)) li.querySelector("details")?.setAttribute("open", "");
+    list.append(li);
+  }
+  if (anchor) {
+    const li = [...list.children].find(n => n.dataset.id === anchor.id);
+    if (li) window.scrollBy(0, li.getBoundingClientRect().top - anchor.y);
+  }
+  return added;
+}
+
+// mode: "reset" (filtros mudaram), "more" (próxima página) ou "auto" (atualização
+// automática: recarrega tudo o que já está na tela, mantendo rolagem e descrições abertas).
+async function load(mode = "reset") {
+  const mine = ++seq;
+  const auto = mode === "auto";
+  if (mode === "reset") { offset = 0; seen = new Set(); fresh = new Map(); }
+  const params = new URLSearchParams(new FormData(form));
+  for (const [k, v] of [...params]) if (!v) params.delete(k);
+  params.set("limit", auto ? Math.min(Math.max(offset, PAGE), 200) : PAGE);
+  params.set("offset", auto ? 0 : offset);
+  if (!auto) manualBusy = true;
+  setLive("loading", "Atualizando…");
+  try {
+    const res = await fetch("api/jobs?" + params);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (mine !== seq) return;  // resposta de uma busca antiga
+    const added = render(data.jobs, { append: mode === "more", auto });
+    offset = mode === "more" ? offset + data.jobs.length : data.jobs.length;
+    more.hidden = !data.has_more;
+    if (!list.children.length) list.append(el("li", { className: "empty" }, "Nenhuma vaga encontrada com esses filtros."));
+    updated(added);
+  } catch (e) {
+    if (mine !== seq) return;
+    if (!auto) list.replaceChildren(el("li", { className: "empty" }, "Não foi possível carregar as vagas."));
+    setLive("error", "Sem conexão · tentando de novo");
+  } finally {
+    if (!auto) manualBusy = false;
+  }
+  if (!auto) {
+    history.replaceState(null, "", "?" + new URLSearchParams([...new FormData(form)].filter(([, v]) => v)));
+    schedule();  // filtros novos: a próxima atualização automática conta a partir daqui
+  }
+}
+
+function setLive(state, text) {
+  live.dataset.state = state;
+  liveText.textContent = text;
+}
+
+// "N vagas novas" fica até a próxima atualização; o destaque nos cards dura FRESH_MS.
+function updated(added) {
+  lastUpdate = Date.now();
+  const at = HHMM.format(lastUpdate);
+  if (added) {
+    const msg = added === 1 ? "1 vaga nova" : `${added} vagas novas`;
+    setLive("news", `${msg} · ${at}`);
+    announce.textContent = msg;
+    if (document.hidden) unseen += added;
+  } else {
+    setLive("ok", `Ao vivo · atualizado às ${at}`);
+  }
+  document.title = unseen ? `(${unseen}) ${TITLE}` : TITLE;
+}
+
+// Barra fina que enche até a próxima atualização.
+function startBar(ms) {
+  tickBar.style.transition = "none";
+  tickBar.style.width = "0";
+  tickBar.getBoundingClientRect();  // aplica o 0 antes de animar
+  tickBar.style.transition = `width ${ms}ms linear`;
+  tickBar.style.width = "100%";
+}
+
+function schedule(ms = document.hidden ? HIDDEN_REFRESH_MS : REFRESH_MS) {
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(refresh, ms);
+  startBar(ms);
+}
+
+async function refresh() {
+  clearTimeout(autoTimer);
+  if (manualBusy) return schedule(3000);
+  await Promise.all([load("auto"), loadStats()]);
+  schedule();
+}
+
+async function loadStats() {
+  try {
+    const s = await (await fetch("api/stats")).json();
+    const box = document.getElementById("stats");
+    const open = Object.values(s.sources || {}).reduce((n, x) => n + (x.open || 0), 0);
+    box.replaceChildren(el("span", {}, el("b", {}, String(open)), " vagas abertas na base"));
+    const runs = Object.values(s.last_runs || {}).filter(r => r && r.ok).map(r => r.finished_at).sort();
+    if (runs.length) box.append(el("span", {}, "última coleta " + ago(runs[runs.length - 1])));
+  } catch (e) { /* estatística é opcional */ }
+}
+
+// Restaura filtros da URL (links compartilháveis).
+for (const [k, v] of new URLSearchParams(location.search)) {
+  const field = form.elements[k];
+  if (field) field.value = v;
+}
+
+let timer;
+form.addEventListener("input", e => {
+  clearTimeout(timer);
+  timer = setTimeout(() => load("reset"), e.target.type === "search" ? 300 : 0);
+});
+form.addEventListener("submit", e => { e.preventDefault(); load("reset"); });
+more.querySelector("button").addEventListener("click", () => load("more"));
+live.addEventListener("click", refresh);
+// Ao voltar para a aba: zera o contador do título e atualiza se o que está na tela já é velho.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  unseen = 0;
+  document.title = TITLE;
+  if (Date.now() - lastUpdate > REFRESH_MS) refresh();
+  else schedule(REFRESH_MS - (Date.now() - lastUpdate));
+});
+load("reset");
+loadStats();
+</script>
+</body>
+</html>

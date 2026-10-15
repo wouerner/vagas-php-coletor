@@ -1,0 +1,137 @@
+"""Site que lista as vagas PHP coletadas. Usa a base do coletor (MySQL) só para leitura.
+
+Rotas: /             página (static/index.html)
+       /api/jobs     vagas em JSON (filtros: q, source, workplace, seniority, stack, hours,
+                     include_closed, limit, offset)
+       /api/stats    totais por fonte e últimas coletas
+       /dashboard    dashboard (static/dashboard.html)
+       /api/dashboard  números do dashboard (days: dias da série diária, 3-90) e próximas coletas
+       /api/seekers  pessoas com perfil PHP procurando emprego: só quantidades
+       /regras       regras de filtro (static/regras.html)
+       /api/rules    as regras (de php.RULES), quantas vagas cada uma decidiu e as
+                     descartadas à mão
+
+Uso: python -m vagas_php.web   (http://WEB_HOST:WEB_PORT/)
+"""
+
+import json
+import os
+from pathlib import Path
+
+import uvicorn
+from pymysql.err import ProgrammingError
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import FileResponse, JSONResponse
+from starlette.routing import Route
+
+from . import dates, php
+from .store import SOURCES, Store
+
+ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.getenv("VAGAS_DATA_DIR", ROOT / "data"))
+STATIC = Path(__file__).resolve().parent / "static"
+
+_store: Store | None = None
+
+
+def store() -> Store:
+    # Conecta na primeira requisição; as tabelas são criadas pelo coletor.
+    global _store
+    if _store is None:
+        _store = Store(readonly=True, wait=0)
+    return _store
+
+
+def _number(value: str | None, default: float, low: float, high: float) -> float:
+    try:
+        return min(max(float(value), low), high)
+    except (TypeError, ValueError):
+        return default
+
+
+async def index(request: Request):
+    return FileResponse(STATIC / "index.html")
+
+
+async def jobs(request: Request):
+    p = request.query_params
+    source = p.get("source") or None
+    if source and source not in SOURCES:
+        return JSONResponse({"error": f"source deve ser {', '.join(SOURCES)}"}, status_code=400)
+    limit = int(_number(p.get("limit"), 50, 1, 200))
+    try:
+        rows = store().query_jobs(
+            q=p.get("q") or None, source=source, workplace=p.get("workplace") or None,
+            seniority=p.get("seniority") or None, stack=p.get("stack") or None,
+            hours=_number(p.get("hours"), 72, 1, 72),
+            include_closed=p.get("include_closed") in ("1", "true"),
+            limit=limit + 1, offset=int(_number(p.get("offset"), 0, 0, 1e6)))
+    except ProgrammingError:  # tabelas ainda não criadas pelo coletor
+        rows = []
+    return JSONResponse({"jobs": rows[:limit], "has_more": len(rows) > limit,
+                         "max_age_hours": dates.MAX_AGE_HOURS})
+
+
+async def dashboard_page(request: Request):
+    return FileResponse(STATIC / "dashboard.html")
+
+
+def schedule() -> dict | None:
+    """Próximas coletas, gravadas pelo coletor em data/schedule.json (a cada minuto)."""
+    try:
+        return json.loads((DATA_DIR / "schedule.json").read_text())
+    except (OSError, ValueError):
+        return None
+
+
+async def dashboard(request: Request):
+    days = int(_number(request.query_params.get("days"), 14, 3, 90))
+    try:
+        return JSONResponse({**store().dashboard(days), "schedule": schedule()})
+    except ProgrammingError:
+        return JSONResponse({"error": "base ainda vazia"}, status_code=503)
+
+
+async def seekers(request: Request):
+    # Só agregados: nomes e perfis ficam fora do site (ver list_seekers no MCP).
+    try:
+        return JSONResponse({**store().seekers_dashboard(), "schedule": schedule()})
+    except ProgrammingError:
+        return JSONResponse({"error": "base ainda sem dados de candidatos"}, status_code=503)
+
+
+async def rules_page(request: Request):
+    return FileResponse(STATIC / "regras.html")
+
+
+async def rules(request: Request):
+    try:
+        stats = store().rule_stats()
+    except ProgrammingError:
+        stats = {"counts": {}, "dismissed": []}
+    return JSONResponse({"rules": php.RULES, **stats, "max_age_hours": dates.MAX_AGE_HOURS})
+
+
+async def stats(request: Request):
+    try:
+        return JSONResponse(store().stats())
+    except ProgrammingError:
+        return JSONResponse({"sources": {}, "last_runs": {}})
+
+
+app = Starlette(routes=[
+    Route("/", index),
+    Route("/api/jobs", jobs),
+    Route("/api/stats", stats),
+    Route("/dashboard", dashboard_page),
+    Route("/api/dashboard", dashboard),
+    Route("/api/seekers", seekers),
+    Route("/regras", rules_page),
+    Route("/api/rules", rules),
+])
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host=os.getenv("WEB_HOST", "127.0.0.1"), port=int(os.getenv("WEB_PORT", 8780)),
+                proxy_headers=True)
