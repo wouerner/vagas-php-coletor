@@ -47,7 +47,9 @@ def dashboard_screenshot(path: Path) -> dict:
         try:
             page = browser.new_page(viewport={"width": 1200, "height": 1000},
                                     device_scale_factor=2, color_scheme="light")
-            page.goto(DASHBOARD_URL, wait_until="networkidle")
+            # ?print=1: sem Google Analytics (não conta visita nem mostra o aviso de cookies).
+            page.goto(DASHBOARD_URL + ("&" if "?" in DASHBOARD_URL else "?") + "print=1",
+                      wait_until="networkidle")
             page.wait_for_function("document.getElementById('k-open').textContent.trim() !== '–'",
                                    timeout=30000)
             page.wait_for_timeout(1500)  # gráficos

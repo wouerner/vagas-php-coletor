@@ -81,6 +81,7 @@ services:
     depends_on: [vagas-php]
     environment:
       SERVICE_URL_WEB_8000:          # o Coolify gera/usa o domínio do site
+      VAGAS_GA_ID: ${VAGAS_GA_ID:-}  # Google Analytics (G-XXXXXXXXXX); vazio: sem GA
       TZ: America/Sao_Paulo
       WEB_HOST: 0.0.0.0
       WEB_PORT: "8000"

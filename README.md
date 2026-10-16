@@ -137,6 +137,11 @@ stack e período (1, 4, 6, 24, 48 ou 72 h; os filtros ficam na URL, para compart
 - `GET /api/jobs?q=laravel&source=github&workplace=Remoto&seniority=Pleno&stack=Laravel&hours=24&limit=30&offset=0`
 - `GET /api/stats`
 
+**Google Analytics**: com `VAGAS_GA_ID=G-XXXXXXXXXX` as páginas recebem a tag do GA
+(`vagas_php/static/analytics.html`) com aviso de cookies (LGPD, *Consent Mode*): sem aceite,
+o GA não grava cookies. Sem a variável (padrão local), nada é carregado. O print do
+dashboard para o post diário abre `?print=1`, que fica sem a tag.
+
 ## Dashboard
 
 `http://192.168.15.10:8780/dashboard` (ou o link no topo do site): vagas abertas,

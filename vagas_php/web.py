@@ -10,18 +10,23 @@ Rotas: /             página (static/index.html)
        /api/rules    as regras (de php.RULES), quantas vagas cada uma decidiu e as
                      descartadas à mão
 
+Google Analytics: com VAGAS_GA_ID=G-XXXXXXXXXX as páginas recebem a tag (static/analytics.html,
+com aviso de consentimento). ?print=1 tira a tag (print do dashboard para o post diário).
+
 Uso: python -m vagas_php.web   (http://WEB_HOST:WEB_PORT/)
 """
 
 import json
+import logging
 import os
+import re
 from pathlib import Path
 
 import uvicorn
 from pymysql.err import ProgrammingError
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse
 from starlette.routing import Route
 
 from . import dates, php
@@ -32,6 +37,12 @@ DATA_DIR = Path(os.getenv("VAGAS_DATA_DIR", ROOT / "data"))
 STATIC = Path(__file__).resolve().parent / "static"
 
 _store: Store | None = None
+
+log = logging.getLogger(__name__)
+GA_ID = os.getenv("VAGAS_GA_ID", "").strip()
+if GA_ID and not re.fullmatch(r"G-[A-Z0-9]{4,20}", GA_ID):
+    log.warning("VAGAS_GA_ID inválido (%r): Google Analytics desligado", GA_ID)
+    GA_ID = ""
 
 
 def store() -> Store:
@@ -49,8 +60,16 @@ def _number(value: str | None, default: float, low: float, high: float) -> float
         return default
 
 
+def page(request: Request, name: str) -> HTMLResponse:
+    html = (STATIC / name).read_text()
+    if GA_ID and "print" not in request.query_params:
+        tag = (STATIC / "analytics.html").read_text().replace("{GA_ID}", GA_ID)
+        html = html.replace("</head>", tag + "</head>", 1)
+    return HTMLResponse(html)
+
+
 async def index(request: Request):
-    return FileResponse(STATIC / "index.html")
+    return page(request, "index.html")
 
 
 async def jobs(request: Request):
@@ -73,7 +92,7 @@ async def jobs(request: Request):
 
 
 async def dashboard_page(request: Request):
-    return FileResponse(STATIC / "dashboard.html")
+    return page(request, "dashboard.html")
 
 
 def schedule() -> dict | None:
@@ -93,7 +112,7 @@ async def dashboard(request: Request):
 
 
 async def rules_page(request: Request):
-    return FileResponse(STATIC / "regras.html")
+    return page(request, "regras.html")
 
 
 async def rules(request: Request):
