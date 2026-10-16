@@ -1,9 +1,8 @@
 # vagas-php
 
 Coleta e lista **vagas de engenharia de software com PHP** (PHP, Laravel, Symfony,
-CodeIgniter, Hyperf...). Mesma arquitetura do projeto [`../linkedin`](../linkedin)
-(Python + Playwright em Docker, servidor MCP, coleta agendada, MySQL 8), com um site
-para navegar pelas vagas.
+CodeIgniter, Hyperf...): Python + Playwright em Docker, servidor MCP, coleta agendada e
+MySQL 8, com um site para navegar pelas vagas.
 
 ## Fontes
 
@@ -67,8 +66,8 @@ Issues fechadas no GitHub ficam marcadas como encerradas e saem do site.
 
 ## Configuração
 
-O `.env` tem as credenciais do LinkedIn (copiadas de `../linkedin/.env`) e os ajustes
-das fontes; veja `.env.example`. Ajustes feitos pela ferramenta MCP
+Copie `.env.example` para `.env` e ajuste: credenciais do LinkedIn (só para a fonte
+`post` e o post diário) e as configurações das fontes. Ajustes feitos pela ferramenta MCP
 `configure_scheduler` ficam em `data/config.json` e têm precedência sobre o `.env`.
 
 ## Serviço (Docker)
@@ -79,24 +78,22 @@ docker compose logs -f         # acompanha as coletas
 docker compose down
 ```
 
-Portas (escolhidas para rodar junto com o projeto linkedin; só o site fica aberto na rede,
-o resto só em `127.0.0.1`):
+Portas (por padrão tudo só em `127.0.0.1`; o site pode ser aberto na rede):
 
-| | linkedin | vagas-php | variável |
-|---|---|---|---|
-| site | | `8780`: http://192.168.15.10:8780 (aberto na rede: `WEB_BIND=0.0.0.0` no `.env`) | `WEB_PUBLISH_PORT`, `WEB_BIND` |
-| MCP | `8765` | `8766`: http://localhost:8766/mcp | `MCP_PUBLISH_PORT` |
-| noVNC | `6080` | `6081`: http://localhost:6081/vnc.html | `NOVNC_PUBLISH_PORT` |
-| VNC | `5900` | `5901` | `VNC_PUBLISH_PORT` |
+| | porta | variável |
+|---|---|---|
+| site | `8780`: http://localhost:8780 (aberto na rede com `WEB_BIND=0.0.0.0` no `.env`) | `WEB_PUBLISH_PORT`, `WEB_BIND` |
+| MCP | `8766`: http://localhost:8766/mcp | `MCP_PUBLISH_PORT` |
+| noVNC | `6081`: http://localhost:6081/vnc.html | `NOVNC_PUBLISH_PORT` |
+| VNC | `5901` | `VNC_PUBLISH_PORT` |
+| MySQL | `3307` | `MYSQL_PUBLISH_PORT` |
 
 ### Sessão do LinkedIn
 
-O container monta `./.session`, um perfil do Chromium próprio, copiado do projeto
-`../linkedin` (mude com `LINKEDIN_SESSION_PATH`). Como cada projeto tem a sua trava
-`.session/.bot.lock`, os dois podem abrir navegadores ao mesmo tempo na mesma conta.
-Para voltar a compartilhar o login e a trava, use
-`LINKEDIN_SESSION_PATH=../linkedin/.session`. Se o LinkedIn pedir verificação
-(2FA/captcha), conclua pelo noVNC: http://localhost:6081/vnc.html.
+O container monta `./.session`, o perfil do Chromium com o login do LinkedIn (mude com
+`LINKEDIN_SESSION_PATH`). Só a fonte `post` e o post diário usam a sessão. No primeiro
+uso, ou se o LinkedIn pedir verificação (2FA/captcha), conclua o login pelo noVNC:
+http://localhost:6081/vnc.html.
 
 ### Usar no Claude Code
 
@@ -121,7 +118,7 @@ Com `VAGAS_LINKEDIN_DAILY_POST=true`, o serviço publica todo dia às `VAGAS_LIN
 
 - imagem: print do topo do dashboard (números, vagas por site e vagas novas por dia);
 - texto: resumo do dia (vagas abertas, novas em 24 h, remotas, empresas), fontes, filtro,
-  hashtags e "Deus seja Louvado" no fim.
+  hashtags e, se definida, a assinatura `VAGAS_LINKEDIN_POST_SIGNATURE` no fim.
 
 Antes de publicar, confere se o texto aparece uma vez só (o LinkedIn pode restaurar um
 rascunho) e se a imagem foi anexada; se não, não publica. No máximo um post por dia: se
@@ -144,7 +141,7 @@ dashboard para o post diário abre `?print=1`, que fica sem a tag.
 
 ## Dashboard
 
-`http://192.168.15.10:8780/dashboard` (ou o link no topo do site): vagas abertas,
+`http://localhost:8780/dashboard` (ou o link no topo do site): vagas abertas,
 novas nas últimas 24 h, remotas e empresas; **pizza de vagas por site**; **vagas novas
 por dia** (colunas empilhadas por fonte, 7/14/30 dias, dia de Brasília); modalidade,
 senioridade, contratação, frameworks e empresas com mais vagas; e a saúde da coleta
@@ -181,8 +178,8 @@ docker compose up -d
 
 Use `docker-compose.coolify.yml`:
 
-1. Suba o projeto num repositório Git **privado** (o `.gitignore` já tira `.env`, `.session/` e `data/`).
-2. No Coolify: *New Resource → Private Repository*, build pack **Docker Compose**,
+1. Use este repositório (ou um fork). O `.gitignore` já tira `.env`, `.session/` e `data/`.
+2. No Coolify: *New Resource → Public Repository* (ou *Private Repository*, num fork privado), build pack **Docker Compose**,
    *Docker Compose Location* `/docker-compose.coolify.yml`.
 3. Crie no MySQL 8 do outro servidor a base e um usuário com permissão total nela
    (`CREATE DATABASE vagas CHARACTER SET utf8mb4; CREATE USER 'vagas'@'%' IDENTIFIED BY '...';
@@ -217,6 +214,10 @@ docker compose run --rm vagas-php list --q laravel --hours 24
 ## Observações
 
 - `.env`, `.session/` e `data/` estão no `.gitignore`; trate-os como senhas.
+- **Use por sua conta e risco.** O projeto lê páginas e APIs públicas de terceiros:
+  respeite os termos de uso e o `robots.txt` de cada site, mantenha os intervalos longos
+  e não republique as vagas como se fossem suas. Os dados pertencem aos sites e às
+  empresas que publicaram as vagas.
 - Automação viola os Termos de Uso do LinkedIn. A fonte `post` usa a sua conta:
   mantenha intervalos longos (mínimo 2 h) ou desligue com `VAGAS_POSTS_ENABLED=false`.
   Só `post` usa a conta; as demais fontes não usam login.
@@ -224,4 +225,8 @@ docker compose run --rm vagas-php list --q laravel --hours 24
   automático com checagem anti-robô), **InfoJobs** e **GeekHunter** (o robots.txt proíbe
   a coleta das vagas).
 - O LinkedIn muda o HTML com frequência; se a fonte `post` parar de trazer resultados,
-  os seletores ficam em `vagas_php/bot.py` (os mesmos do projeto linkedin).
+  os seletores ficam em `vagas_php/bot.py`.
+
+## Licença
+
+[MIT](LICENSE).

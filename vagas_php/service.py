@@ -4,7 +4,7 @@ Cada fonte tem o seu intervalo. As que não usam navegador (LinkedIn público, G
 e os demais portais)
 rodam numa thread comum; a busca de publicações usa o navegador logado, numa thread
 única (o Playwright síncrono não é thread-safe e o perfil do Chromium só aceita um
-navegador por vez — a trava em .session/ também coordena com o projeto linkedin).
+navegador por vez; a trava em .session/ garante isso).
 
 Uso: python -m vagas_php.service   (MCP em http://HOST:PORT/mcp)
 """

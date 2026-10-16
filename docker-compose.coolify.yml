@@ -3,7 +3,7 @@
 #   - sem arquivo .env montado: as variáveis são editadas na aba Environment Variables;
 #   - MySQL 8 em outro servidor: DATABASE_URL=mysql://usuario:senha@host:3306/base
 #     (obrigatória; senha com caracteres especiais vai codificada, ex.: @ -> %40);
-#   - volumes nomeados no lugar de ./data e ../linkedin/.session;
+#   - volumes nomeados no lugar de ./data e ./.session;
 #   - o site não publica porta: o domínio vai no serviço "web", porta 8000;
 #   - MCP desligado por padrão (VAGAS_MCP_ENABLED=false); ligado, ele e o noVNC (sem
 #     senha!) ficam só no 127.0.0.1 do servidor: use túnel SSH.
@@ -55,6 +55,7 @@ services:
       VAGAS_LINKEDIN_DAILY_POST: ${VAGAS_LINKEDIN_DAILY_POST:-false}
       VAGAS_LINKEDIN_POST_TIME: ${VAGAS_LINKEDIN_POST_TIME:-09:00}
       VAGAS_LINKEDIN_POST_DAYS: ${VAGAS_LINKEDIN_POST_DAYS:-0-6}
+      VAGAS_LINKEDIN_POST_SIGNATURE: ${VAGAS_LINKEDIN_POST_SIGNATURE:-}
       VAGAS_INHIRE_ENABLED: ${VAGAS_INHIRE_ENABLED:-true}
       VAGAS_INHIRE_TENANTS: ${VAGAS_INHIRE_TENANTS:-}
       VAGAS_INHIRE_INTERVAL_HOURS: ${VAGAS_INHIRE_INTERVAL_HOURS:-2}

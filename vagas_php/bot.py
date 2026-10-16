@@ -1,5 +1,5 @@
 """Bot que faz login no LinkedIn e lê posts: da timeline (feed) ou da busca de
-publicações (ex.: "vaga php"). Derivado do bot do projeto linkedin."""
+publicações (ex.: "vaga php")."""
 
 import fcntl
 import os
@@ -13,7 +13,7 @@ from playwright.sync_api import BrowserContext, Page, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
 
 BASE_URL = "https://www.linkedin.com"
-# Pode apontar para a sessão do projeto linkedin (mesmo login e mesma trava de navegador).
+# Perfil do Chromium com o login (a trava .bot.lock garante um navegador por vez).
 SESSION_DIR = Path(os.getenv("VAGAS_SESSION_DIR") or Path(__file__).resolve().parent.parent / ".session")
 # Contêineres de post: layout novo (classes ofuscadas, identificado por
 # componentkey) e o layout clássico (data-urn).

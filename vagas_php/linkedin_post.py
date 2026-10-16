@@ -21,12 +21,13 @@ from .bot import BASE_URL, LinkedInBot
 log = logging.getLogger("vagas_php.linkedin_post")
 
 DASHBOARD_URL = os.getenv("VAGAS_DASHBOARD_URL", "http://web:8000/dashboard")
-SIGNATURE = "Deus seja Louvado"
 SOURCES_TEXT = ("LinkedIn (vagas e publicações), Gupy, Catho, Sólides, Remotar, Programathor, "
                 "Coodesh, Nerdin, Recrutei, UpVagas, InHire e dos repositórios de vagas no GitHub")
 
 
 def text(k: dict, day: datetime) -> str:
+    # Linha opcional no fim do post; vazia: sem assinatura. Lida aqui, depois do .env.
+    signature = os.getenv("VAGAS_LINKEDIN_POST_SIGNATURE", "").strip()
     return f"""Montei um coletor de vagas PHP 🐘
 
 Ele junta, a cada poucas horas, vagas de {SOURCES_TEXT}. Contam só vagas publicadas nas últimas 72 horas, incluindo Laravel, Symfony, WordPress, Magento e Drupal.
@@ -35,9 +36,7 @@ Hoje ({day:%d/%m}): {k['open']} vagas abertas, {k['new']} novas nas últimas 24 
 
 Um filtro tira o que cita PHP mas não é vaga (cursos, listas de grupos, propaganda de currículo). As regras ficam públicas, por transparência.
 
-#php #laravel #vagas #desenvolvimento
-
-{SIGNATURE}"""
+#php #laravel #vagas #desenvolvimento""" + (f"\n\n{signature}" if signature else "")
 
 
 def dashboard_screenshot(path: Path) -> dict:
@@ -102,8 +101,8 @@ def publish(body: str, image: Path, out_dir: Path, headless: bool = True,
         page.screenshot(path=str(out_dir / "preview-imagem.png"))
 
         typed = editor.inner_text()
-        first_line = body.split("\n")[0]
-        if typed.count(first_line) != 1 or SIGNATURE not in typed:
+        first_line, last_line = body.split("\n")[0], body.rstrip().split("\n")[-1]
+        if typed.count(first_line) != 1 or last_line not in typed:
             raise RuntimeError("O texto na caixa de publicação não confere; nada publicado.")
         removable = box.get_by_role("button", name=re.compile(r"^(Remover conteúdo de mídia|Remove media)"))
         if not removable.count():
