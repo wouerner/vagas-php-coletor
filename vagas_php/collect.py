@@ -61,7 +61,7 @@ def collect_linkedin(store: Store, hours: float) -> dict:
         })
     new = store.save_jobs(jobs)
     return {"found": len(jobs), "relevant": sum(j["relevant"] for j in jobs), "new": new,
-            "details_failed": details_failed}
+            "failed": details_failed}
 
 
 # --- Gupy: portal de vagas (sem login) ------------------------------------------
@@ -185,18 +185,23 @@ def collect_coodesh(store: Store, since: datetime) -> dict:
     """O sitemap tem todas as vagas abertas: só as alteradas dentro da janela podem ser
     novas."""
     day = since.astimezone(dates.BRASILIA).date().isoformat()
-    candidates = [(job_id, title, url) for job_id, title, url, lastmod in coodesh_jobs.list_jobs()
+    listed = coodesh_jobs.list_jobs()
+    candidates = [(job_id, title, url) for job_id, title, url, lastmod in listed
                   if not lastmod or lastmod >= day]
-    return _jobposting_jobs(store, "coodesh", candidates, coodesh_jobs.job_details)
+    # "listed" é o sitemap todo: vazio indica problema na fonte, não falta de vagas.
+    return {**_jobposting_jobs(store, "coodesh", candidates, coodesh_jobs.job_details),
+            "listed": len(listed)}
 
 
 def collect_recrutei(store: Store, since: datetime) -> dict:
     """Como na Coodesh: o sitemap tem todas as vagas abertas, de todas as áreas, e só as
     alteradas dentro da janela podem ser novas."""
     day = since.astimezone(dates.BRASILIA).date().isoformat()
-    candidates = [(job_id, title, url) for job_id, title, url, lastmod in recrutei_jobs.list_jobs()
+    listed = recrutei_jobs.list_jobs()
+    candidates = [(job_id, title, url) for job_id, title, url, lastmod in listed
                   if not lastmod or lastmod >= day]
-    return _jobposting_jobs(store, "recrutei", candidates, recrutei_jobs.job_details)
+    return {**_jobposting_jobs(store, "recrutei", candidates, recrutei_jobs.job_details),
+            "listed": len(listed)}
 
 
 def collect_nerdin(store: Store) -> dict:
@@ -488,5 +493,7 @@ def run(store: Store, source: str, headless: bool = True) -> dict:
     except Exception as e:
         store.finish_run(run_id, error=f"{type(e).__name__}: {e}")
         raise
-    store.finish_run(run_id, found=result["found"], new_jobs=result["new"])
+    # Sem "listed" no resultado, a fonte já devolve só o que listou na janela (= found).
+    store.finish_run(run_id, found=result["found"], new_jobs=result["new"],
+                     listed=result.get("listed", result["found"]), failed=result.get("failed", 0))
     return result

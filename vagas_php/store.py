@@ -60,7 +60,9 @@ SCHEMA = [
     started_at  VARCHAR(40) NOT NULL,
     finished_at VARCHAR(40),
     ok          TINYINT,
-    found       INT,
+    found       INT,                   -- vagas processadas (as que a coleta baixou/analisou)
+    listed      INT,                   -- itens que a fonte listou, antes de tirar as já conhecidas
+    failed      INT,                   -- vagas cujo detalhe falhou (tenta de novo na próxima)
     new_jobs    INT,
     error       TEXT,
     INDEX runs_source (source, id)
@@ -170,7 +172,18 @@ class Store:
         if not readonly:
             for statement in SCHEMA:
                 self.execute(statement)
+            self._add_columns()
             self._normalize_dates()
+
+    def _add_columns(self) -> None:
+        """Colunas criadas depois da tabela: o CREATE TABLE IF NOT EXISTS não as acrescenta."""
+        have = {(r[0], r[1]) for r in self.execute(
+            "SELECT table_name, column_name FROM information_schema.columns "
+            "WHERE table_schema = DATABASE()")}
+        for table, column, ddl in (("runs", "listed", "INT AFTER found"),
+                                   ("runs", "failed", "INT AFTER listed")):
+            if (table, column) not in have:
+                self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
     def _wait_for_db(self, wait: float) -> None:
         """Na subida o MySQL pode ainda não aceitar conexões: tenta por `wait` s."""
@@ -451,11 +464,13 @@ class Store:
                                    (source, now_iso())).lastrowid
 
     def finish_run(self, run_id: int, found: int = 0, new_jobs: int = 0,
-                   error: str | None = None) -> None:
+                   error: str | None = None, listed: int | None = None,
+                   failed: int | None = None) -> None:
         with self.tx():
             self.execute(
-                "UPDATE runs SET finished_at = ?, ok = ?, found = ?, new_jobs = ?, error = ? "
-                "WHERE id = ?", (now_iso(), error is None, found, new_jobs, error, run_id))
+                "UPDATE runs SET finished_at = ?, ok = ?, found = ?, listed = ?, failed = ?, "
+                "new_jobs = ?, error = ? WHERE id = ?",
+                (now_iso(), error is None, found, listed, failed, new_jobs, error, run_id))
 
     def last_runs(self, source: str | None = None, n: int = 5) -> list[dict]:
         if source:

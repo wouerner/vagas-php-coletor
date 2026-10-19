@@ -372,6 +372,10 @@ function freshness(id, sources, runsData, label) {
 }
 
 // --- saúde da coleta -------------------------------------------------------
+// Fontes que listam todas as vagas abertas a cada coleta (não só as da janela):
+// lista vazia aí é sinal de problema na fonte (bloqueio, mudança no site).
+const FULL_LIST = new Set(["programathor", "coodesh", "recrutei", "nerdin", "inhire"]);
+
 function runs(data) {
   const table = document.getElementById("runs");
   table.replaceChildren(el("tr", {}, el("th", {}, "Fonte"), el("th", {}, "Última coleta"), el("th", {}, "Próxima coleta"), el("th", {}, "Status"),
@@ -381,6 +385,8 @@ function runs(data) {
     const { last, last_24h: day } = data[s] || {};
     let status = el("span", { className: "status muted" }, "— sem coleta");
     if (last && last.ok === null) status = el("span", { className: "status muted" }, "⟳ coletando");
+    else if (last && last.ok && last.listed === 0 && FULL_LIST.has(s))
+      status = el("span", { className: "status fail", title: "A fonte não listou nenhuma vaga" }, "⚠ lista vazia");
     else if (last && last.ok) status = el("span", { className: "status ok" }, "✓ ok");
     else if (last) status = el("span", { className: "status fail", title: last.error || "" }, "✕ falhou");
     table.append(el("tr", {},
@@ -388,7 +394,8 @@ function runs(data) {
       el("td", { className: "nowrap" }, last ? BR_TIME.format(new Date(last.started_at)) : "—"),
       el("td", { className: "nowrap" }, nextRun(s)),
       el("td", {}, status),
-      el("td", { className: "num" }, last ? String(last.found ?? "—") : "—"),
+      el("td", { className: "num", title: last ? `listadas: ${last.listed ?? "—"} · analisadas: ${last.found ?? "—"} · detalhe falhou: ${last.failed ?? "—"}` : "" },
+        last ? String(last.listed ?? last.found ?? "—") + (last.failed ? ` (${last.failed} ✕)` : "") : "—"),
       el("td", { className: "num" }, last ? String(last.new_jobs ?? "—") : "—"),
       el("td", { className: "num" }, String(day?.total || 0)),
       el("td", { className: "num" }, String(day?.failed || 0))));
