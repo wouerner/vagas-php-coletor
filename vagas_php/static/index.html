@@ -12,7 +12,7 @@
     --accent: #5b5fa0; --accent-soft: #ebecf7; --ok: #1f7a4d; --ok-soft: #e3f4ea;
     --warn: #8a5a00; --warn-soft: #fbf0d9; --chip: #f0f0f5;
     /* idade da vaga: nova -> antiga */
-    --age-new: #1f8a4c; --age-new-soft: #e1f5e9;
+    --age-new: #17703d; --age-new-soft: #e1f5e9;
     --age-recent: #29609f; --age-recent-soft: #e3eefa;
     --age-days: #8a5208; --age-days-soft: #fcefd9;
     --age-old: #5d6070; --age-old-soft: #ececf1;
@@ -93,7 +93,7 @@
   .job.days   { --age: var(--age-days);   --age-soft: var(--age-days-soft); }
   .job.old    { background: var(--bg); }
   .job.old h2 a, .job.old .meta { color: var(--muted); }
-  .job.old .tags { opacity: .7; }
+  .job.old .tags .tag { color: var(--muted); }
   .head { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
   .job h2 { margin: 0; font-size: 16px; line-height: 1.35; min-width: 0; }
   .age { flex: none; font-size: 12px; font-weight: 600; white-space: nowrap; padding: 2px 9px;
@@ -122,8 +122,8 @@
   .more button { cursor: pointer; padding: 8px 20px; }
   .themes { margin-top: 28px; }
   .themes h2 { font-size: 16px; margin: 0 0 8px; }
-  .themes .n { font-size: 12px; opacity: .75; }
-  .themes a.zero { opacity: .55; }
+  .themes .n { font-size: 12px; color: var(--muted); }
+  .themes a.zero { color: var(--muted); background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
   footer { color: var(--muted); font-size: 12px; padding: 24px 0 40px; text-align: center; }
 
   @media (max-width: 700px) {
