@@ -49,7 +49,9 @@ HIRING = re.compile(
     r"(est[aá]|que) (buscando|procurando|contratando|em busca)(?! (de )?(um |uma |nova |novo )?"
     r"(emprego|trabalho|vaga|oportunidade|recoloca|recolocação|uma recoloca))|"
     r"busca (uma pessoa|um\(a\)|um profissional)|"
-    r"divulga(ndo|[cç][aã]o)|candidate-se|candidatar-se|inscreva-se|envie (seu )?curr[ií]culo|"
+    # "divulgação" sozinha aparece em outros assuntos ("divulgação de vulnerabilidades").
+    r"divulga(ndo|[cç][aã]o) (de |da |das |desta |dessa |essa |esta |uma |a |as )?"
+    r"(nova |nossa )?(vagas?|oportunidades?)\b|candidate-se|candidatar-se|inscreva-se|envie (seu )?curr[ií]culo|"
     r"me chama no privado|repassando vagas|hiring|we'?re hiring|job opening|open position|"
     r"join (our|the) team)", re.I)
 HIRING_WEAK = re.compile(
