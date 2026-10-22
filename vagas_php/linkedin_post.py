@@ -10,10 +10,11 @@ import json
 import logging
 import os
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Error as PlaywrightError, sync_playwright
 
 from . import dates
 from .bot import BASE_URL, LinkedInBot
@@ -28,6 +29,10 @@ SOURCES_TEXT = ("LinkedIn (vagas e publicações), Gupy, Catho, Sólides, Remota
 def text(k: dict, day: datetime) -> str:
     # Linha opcional no fim do post; vazia: sem assinatura. Lida aqui, depois do .env.
     signature = os.getenv("VAGAS_LINKEDIN_POST_SIGNATURE", "").strip()
+    # Convite para o canal do Telegram, antes dos hashtags; vazia: sem a linha.
+    telegram = os.getenv("VAGAS_LINKEDIN_POST_TELEGRAM", "https://t.me/vagas_php").strip()
+    invite = (f"Receba o resumo semanal das vagas e alertas em tempo real no Telegram: {telegram}\n\n"
+              if telegram else "")
     return f"""Montei um coletor de vagas PHP 🐘
 
 Ele junta, a cada poucas horas, vagas de {SOURCES_TEXT}. Contam só vagas publicadas nas últimas 72 horas, incluindo Laravel, Symfony, WordPress, Magento e Drupal.
@@ -36,7 +41,7 @@ Hoje ({day:%d/%m}): {k['open']} vagas abertas, {k['new']} novas nas últimas 24 
 
 Um filtro tira o que cita PHP mas não é vaga (cursos, listas de grupos, propaganda de currículo). As regras ficam públicas, por transparência.
 
-#php #laravel #vagas #desenvolvimento""" + (f"\n\n{signature}" if signature else "")
+{invite}#php #laravel #vagas #desenvolvimento""" + (f"\n\n{signature}" if signature else "")
 
 
 def dashboard_screenshot(path: Path) -> dict:
@@ -65,6 +70,39 @@ def dashboard_screenshot(path: Path) -> dict:
     return {key: int(v) for key, v in k.items()}
 
 
+# Onde procurar a caixa de publicação e o editor, em ordem. Os locators CSS do
+# Playwright atravessam shadow roots abertos, então "#interop-outlet ..." alcança o
+# editor dentro do shadow DOM (caixa antiga, Quill). Desde out/2026 a caixa é um
+# <dialog> nativo no DOM principal, com editor TipTap/ProseMirror.
+COMPOSER_EDITOR = ("[componentkey=ShareBox_textEditor][contenteditable=true], "
+                   "div.ProseMirror[contenteditable=true], "
+                   "div.ql-editor[contenteditable=true], "
+                   "div[role=textbox][contenteditable=true]")
+COMPOSER_BOXES = ("dialog[open]", "#interop-outlet", "body")
+
+
+def find_composer(page, timeout: int = 20000):
+    """(caixa, editor) da caixa de publicação aberta: a primeira caixa de
+    COMPOSER_BOXES com um editor visível. A caixa é usada para achar os botões."""
+    deadline = time.monotonic() + timeout / 1000
+    while True:
+        for box_sel in COMPOSER_BOXES:
+            box = page.locator(box_sel)
+            editor = box.locator(COMPOSER_EDITOR).first
+            try:
+                if editor.is_visible():
+                    log.info("Caixa de publicação: %s", box_sel)
+                    return box, editor
+            except PlaywrightError:  # navegação no meio da busca
+                pass
+        if time.monotonic() > deadline:
+            raise RuntimeError(
+                f"Editor da caixa de publicação não encontrado em {timeout // 1000}s "
+                f"(caixas {', '.join(COMPOSER_BOXES)}; editor {COMPOSER_EDITOR}). O LinkedIn "
+                "pode ter mudado a caixa: rode python -m vagas_php post --probe.")
+        page.wait_for_timeout(500)
+
+
 def publish(body: str, image: Path, out_dir: Path, headless: bool = True,
             dry_run: bool = False) -> None:
     """Abre a caixa de publicação, escreve o texto, anexa a imagem, confere e publica
@@ -75,12 +113,9 @@ def publish(body: str, image: Path, out_dir: Path, headless: bool = True,
         page.goto(f"{BASE_URL}/feed/", wait_until="domcontentloaded")
         page.wait_for_timeout(5000)
         page.get_by_text(re.compile(r"^(Começar publicação|Começar um post|Start a post)$")).first.click()
-        # A caixa de publicação fica num shadow DOM; buscar só dentro dela evita pegar
-        # botões do feed com o mesmo nome (ex.: "Avançar" de carrosséis).
-        box = page.locator("#interop-outlet")
-        editor = box.locator("div.ql-editor[contenteditable=true], "
-                             "div[role=textbox][contenteditable=true]").first
-        editor.wait_for(timeout=20000)
+        # Buscar só dentro da caixa evita pegar botões do feed com o mesmo nome (ex.:
+        # "Avançar" de carrosséis).
+        box, editor = find_composer(page)
         editor.click()
         page.keyboard.press("Control+A")  # rascunho restaurado de uma tentativa anterior
         page.keyboard.press("Backspace")
@@ -91,13 +126,16 @@ def publish(body: str, image: Path, out_dir: Path, headless: bool = True,
                 page.keyboard.insert_text(line)
         page.wait_for_timeout(1000)
         with page.expect_file_chooser(timeout=15000) as chooser:
-            box.get_by_role("button", name=re.compile(r"^(Adicionar mídia|Add media)$")).click()
+            box.get_by_role("button", name=re.compile(r"^(Adicionar mídia|Add media|Mídia|Media)$")).click()
         chooser.value.set_files(str(image))
         # Etapa "Editor" da imagem: "Avançar" volta para a caixa com a imagem anexada.
         box.get_by_role("button", name=re.compile(r"^(Avançar|Next)$")).click(timeout=30000)
         page.wait_for_timeout(3000)
         page.screenshot(path=str(out_dir / "preview.png"))
-        box.locator("img[src^='data:image']").last.scroll_into_view_if_needed(timeout=5000)
+        # Miniatura da imagem anexada: data: na caixa antiga, blob: na nova.
+        attached = box.locator("img[src^='data:image'], img[src^='blob:']")
+        if attached.count():
+            attached.last.scroll_into_view_if_needed(timeout=5000)
         page.screenshot(path=str(out_dir / "preview-imagem.png"))
 
         typed = editor.inner_text()
@@ -105,11 +143,17 @@ def publish(body: str, image: Path, out_dir: Path, headless: bool = True,
         if typed.count(first_line) != 1 or last_line not in typed:
             raise RuntimeError("O texto na caixa de publicação não confere; nada publicado.")
         removable = box.get_by_role("button", name=re.compile(r"^(Remover conteúdo de mídia|Remove media)"))
-        if not removable.count():
+        if not (removable.count() or attached.count()):
             raise RuntimeError("A imagem não foi anexada; nada publicado.")
         if dry_run:
+            # Caixa antiga: Esc pede confirmação. Nova (<dialog>): "Fechar" pede confirmação.
             page.keyboard.press("Escape")
-            box.get_by_role("button", name=re.compile(r"^(Descartar|Discard)$")).click(timeout=10000)
+            discard = box.get_by_role("button", name=re.compile(r"^(Descartar|Discard)$"))
+            try:
+                discard.first.wait_for(timeout=3000)
+            except PlaywrightError:
+                box.get_by_role("button", name=re.compile(r"^(Fechar|Dismiss)$")).first.click(timeout=10000)
+            discard.first.click(timeout=10000)
             page.wait_for_timeout(1500)
             return
 

@@ -4,6 +4,9 @@ Coleta e lista **vagas de engenharia de software com PHP** (PHP, Laravel, Symfon
 CodeIgniter, Hyperf...): Python + Playwright em Docker, servidor MCP, coleta agendada e
 MySQL 8, com um site para navegar pelas vagas.
 
+Canal no Telegram: [t.me/vagas_php](https://t.me/vagas_php) — alertas de vagas em tempo real
+e um resumo semanal toda segunda às 10h.
+
 ## Fontes
 
 | Fonte | Como | Login | Intervalo padrão |
@@ -118,7 +121,12 @@ Com `VAGAS_LINKEDIN_DAILY_POST=true`, o serviço publica todo dia às `VAGAS_LIN
 
 - imagem: print do topo do dashboard (números, vagas por site e vagas novas por dia);
 - texto: resumo do dia (vagas abertas, novas em 24 h, remotas, empresas), fontes, filtro,
-  hashtags e, se definida, a assinatura `VAGAS_LINKEDIN_POST_SIGNATURE` no fim.
+  convite para o canal do Telegram (`VAGAS_LINKEDIN_POST_TELEGRAM`, padrão
+  `https://t.me/vagas_php`; vazia, sem a linha), hashtags e, se definida, a assinatura
+  `VAGAS_LINKEDIN_POST_SIGNATURE` no fim.
+
+O resumo semanal do [canal do Telegram](https://t.me/vagas_php) (`telegram-digest`) é este
+mesmo post: o mesmo print do dashboard e o mesmo texto.
 
 Antes de publicar, confere se o texto aparece uma vez só (o LinkedIn pode restaurar um
 rascunho) e se a imagem foi anexada; se não, não publica. No máximo um post por dia: se

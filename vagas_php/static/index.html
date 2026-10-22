@@ -41,6 +41,10 @@
   h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
   h1 span { color: var(--accent); }
   .sub { color: var(--muted); margin: 4px 0 0; }
+  /* Convite para o canal do Telegram: mesmo selo "ativo" do menu. */
+  .tg { display: inline-flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; margin-top: 10px;
+        font-size: 14px; padding: 7px 14px; border-radius: 12px; background: var(--accent-soft); }
+  .tg a { font-weight: 600; overflow-wrap: anywhere; }
   .stats { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; font-size: 13px; color: var(--muted); }
   .stats b { color: var(--text); }
 
@@ -140,6 +144,7 @@
       <nav><a href="/" aria-current="page">Vagas</a><a href="/dashboard">Dashboard</a><a href="/empresas">Empresas</a><a href="/recrutadores">Recrutadores</a><a href="/mercado-php">Mercado</a><a href="/regras">Regras</a></nav>
     </div>
     <p class="sub">Engenharia de software com PHP, Laravel e Symfony: vagas do LinkedIn, Gupy, Sólides, Catho, Remotar, Programathor, Coodesh e de empresas que usam a InHire, publicações de recrutadores e issues de repositórios de vagas no GitHub. Só vagas publicadas nas últimas 72 horas (horário de Brasília).</p>
+    <p class="tg">Receba as vagas de PHP no seu Telegram <a href="https://t.me/vagas_php" rel="noopener">t.me/vagas_php</a></p>
     <div class="stats" id="stats"><!--ssr:stats--></div>
     <div class="legend" aria-label="Cores por idade da vaga">
       <span style="--c: var(--age-new)">nova (até 6 h)</span>
