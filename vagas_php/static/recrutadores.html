@@ -23,10 +23,11 @@
   a { color: var(--accent); }
   .wrap { max-width: 900px; margin: 0 auto; padding: 0 16px 48px; }
   header { padding: 28px 0 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
-  h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
-  h1 span { color: var(--accent); }
+  .brand { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
+  .brand span { color: var(--accent); }
+  h1 { margin: 10px 0 0; font-size: 24px; line-height: 1.25; letter-spacing: -0.02em; }
   nav { display: flex; flex-wrap: wrap; gap: 6px; }
-  nav a { font-size: 14px; padding: 5px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
+  nav a { font-size: 14px; padding: 9px 14px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
   nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
   .lead { color: var(--muted); margin: 4px 0 20px; }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; }
@@ -51,20 +52,21 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Vagas <span>PHP</span> · Recrutadores</h1>
-    <nav><a href="./">Vagas</a><a href="dashboard">Dashboard</a><a href="empresas">Empresas</a><a href="recrutadores" aria-current="page">Recrutadores</a><a href="regras">Regras</a></nav>
+    <a class="brand" href="/">Vagas <span>PHP</span></a>
+    <nav><a href="/">Vagas</a><a href="/dashboard">Dashboard</a><a href="/empresas">Empresas</a><a href="/recrutadores" aria-current="page">Recrutadores</a><a href="/mercado-php">Mercado</a><a href="/regras">Regras</a></nav>
   </header>
-  <p class="lead">Tech recruiters que mais publicaram vagas PHP no LinkedIn nos últimos <b class="days">90</b> dias.
+  <h1>Tech recruiters de vagas PHP</h1>
+  <p class="lead">Tech recruiters que mais publicaram vagas PHP no LinkedIn nos últimos <b><!--ssr:days--></b> dias.
     Seguir esses perfis ajuda a ver as vagas assim que saem.</p>
 
-  <div id="list"><p class="lead">Carregando…</p></div>
+  <div id="list"><!--ssr:list--></div>
 
   <section class="card about" aria-labelledby="t-about">
     <strong id="t-about">Como a lista é feita</strong>
     <ul>
-      <li>Conta os posts públicos do LinkedIn que anunciam vaga PHP e passam pelas <a href="regras">regras do site</a>,
-        publicados nos últimos <span class="days">90</span> dias. A mesma vaga repetida conta uma vez.</li>
-      <li>Entra quem tem <b id="min">2</b> ou mais vagas no período e trabalha com recrutamento segundo o próprio headline
+      <li>Conta os posts públicos do LinkedIn que anunciam vaga PHP e passam pelas <a href="/regras">regras do site</a>,
+        publicados nos últimos <span><!--ssr:days--></span> dias. A mesma vaga repetida conta uma vez.</li>
+      <li>Entra quem tem <b><!--ssr:min--></b> ou mais vagas no período e trabalha com recrutamento segundo o próprio headline
         do LinkedIn (Tech Recruiter, Talent Acquisition, recrutamento...). Páginas de vagas e devs que divulgam vagas não entram.</li>
       <li>O headline passou a ser guardado em 22/10/2026: a lista cresce conforme novos posts são coletados.</li>
       <li>Está na lista e prefere sair? Abra uma <a href="https://github.com/wouerner/vagas-php-coletor/issues" target="_blank" rel="noopener">issue no GitHub</a>
@@ -75,39 +77,5 @@
   <footer>Os dados vêm só de publicações públicas. Não temos relação com as pessoas listadas.</footer>
 </div>
 
-<script>
-const BR_DATE = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" });
-const el = (tag, attrs = {}, ...kids) => {
-  const n = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) n[k] = v;
-  n.append(...kids.filter(k => k != null && k !== ""));
-  return n;
-};
-
-function render(d) {
-  document.querySelectorAll(".days").forEach(n => { n.textContent = d.days; });
-  document.getElementById("min").textContent = d.min_jobs;
-  const box = document.getElementById("list");
-  if (!d.recruiters.length) {
-    box.replaceChildren(el("section", { className: "card" },
-      el("p", { style: "margin:0;color:var(--muted)" }, "Ainda não há recrutadores com vagas suficientes no período. Volte em alguns dias.")));
-    return;
-  }
-  box.replaceChildren(...d.recruiters.map((p, i) => {
-    const info = el("div", {},
-      el("h2", {}, el("a", { href: p.url, target: "_blank", rel: "nofollow noopener" }, p.name || p.url)),
-      p.headline ? el("p", { className: "headline" }, p.headline) : null,
-      el("p", { className: "meta" }, "Última vaga em " + BR_DATE.format(new Date(p.last_posted))));
-    if (p.stack.length) info.append(el("div", { className: "chips" }, ...p.stack.map(s => el("span", { className: "chip" }, s))));
-    return el("section", { className: "card person" },
-      el("div", { className: "n" }, String(i + 1)), info,
-      el("div", { className: "jobs" }, el("b", {}, String(p.jobs)), el("span", {}, p.jobs === 1 ? "vaga" : "vagas")));
-  }));
-}
-
-fetch("api/recruiters").then(r => r.json()).then(render).catch(e => {
-  document.getElementById("list").replaceChildren(el("p", { className: "lead" }, "Não foi possível carregar a lista: " + e.message));
-});
-</script>
 </body>
 </html>

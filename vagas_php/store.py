@@ -387,7 +387,26 @@ class Store:
             run = self.execute("SELECT * FROM runs WHERE source = ? ORDER BY id DESC LIMIT 1",
                                   (source,)).fetchone()
             last[source] = dict(run) if run else None
-        return {"sources": by_source, "last_runs": last}
+        return {"sources": by_source, "last_runs": last, "open_total": self.open_count()}
+
+    def open_count(self) -> int:
+        """Vagas abertas que o site mostra (últimas 72 h, sem as repetidas): o mesmo que
+        query_jobs sem filtros e sem limite."""
+        return self.execute(
+            f"""SELECT count(*) FROM jobs WHERE relevant = 1 AND dismissed IS NULL
+                  AND closed_at IS NULL AND COALESCE(posted_at, first_seen) >= ? AND {DEDUP}""",
+            (dates.cutoff(),)).fetchone()[0]
+
+    def job_facets(self, days: int = 90) -> list[dict]:
+        """Fonte, empresa, modalidade, senioridade, contratação e stack das vagas aceitas
+        dos últimos `days` dias, sem as repetidas e incluindo as já encerradas: números
+        das páginas por tema (/vagas/laravel...)."""
+        since = dates.utc_iso(dates.now_utc() - timedelta(days=days))
+        return [dict(r) for r in self.execute(
+            f"""SELECT source, company, workplace, seniority, contract, stack,
+                       COALESCE(posted_at, first_seen) AS posted
+                FROM jobs WHERE relevant = 1 AND dismissed IS NULL AND {DEDUP}
+                  AND COALESCE(posted_at, first_seen) >= ?""", (since,))]
 
     def dashboard(self, days: int = 14) -> dict:
         """Números do dashboard. Distribuições: vagas abertas das últimas 72 h (as que o

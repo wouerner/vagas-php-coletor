@@ -25,10 +25,11 @@
   a { color: var(--accent); }
   .wrap { max-width: 900px; margin: 0 auto; padding: 0 16px 48px; }
   header { padding: 28px 0 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
-  h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
-  h1 span { color: var(--accent); }
+  .brand { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
+  .brand span { color: var(--accent); }
+  h1 { margin: 10px 0 0; font-size: 24px; line-height: 1.25; letter-spacing: -0.02em; }
   nav { display: flex; flex-wrap: wrap; gap: 6px; }
-  nav a { font-size: 14px; padding: 5px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
+  nav a { font-size: 14px; padding: 9px 14px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
   nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
   .lead { color: var(--muted); margin: 4px 0 20px; }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; }
@@ -46,7 +47,7 @@
   .count { font-size: 12px; color: var(--muted); font-weight: 400; }
   .rule p { margin: 4px 0 0; }
   details { margin-top: 8px; }
-  summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+  summary { cursor: pointer; color: var(--accent); font-size: 13px; padding: 8px 0; }
   .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
   code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--chip);
          border-radius: 6px; padding: 2px 6px; overflow-wrap: anywhere; }
@@ -66,16 +67,17 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Vagas <span>PHP</span> · Regras</h1>
-    <nav><a href="./">Vagas</a><a href="dashboard">Dashboard</a><a href="empresas">Empresas</a><a href="recrutadores">Recrutadores</a><a href="regras" aria-current="page">Regras</a></nav>
+    <a class="brand" href="/">Vagas <span>PHP</span></a>
+    <nav><a href="/">Vagas</a><a href="/dashboard">Dashboard</a><a href="/empresas">Empresas</a><a href="/recrutadores">Recrutadores</a><a href="/mercado-php">Mercado</a><a href="/regras" aria-current="page">Regras</a></nav>
   </header>
+  <h1>Regras de filtro das vagas PHP</h1>
   <p class="lead">Por transparência, estas são as regras que decidem o que aparece no site. Esta página é gerada a partir
     do próprio código do filtro: o que está aqui é exatamente o que o coletor aplica.</p>
 
   <section class="card general" aria-labelledby="t-general">
     <strong id="t-general">Regras gerais</strong>
     <ul>
-      <li>Só aparecem vagas publicadas nas últimas <b id="max-age">72</b> horas.</li>
+      <li>Só aparecem vagas publicadas nas últimas <b><!--ssr:max_age--></b> horas.</li>
       <li>A mesma vaga anunciada várias vezes (mesmo título e empresa, na mesma fonte) aparece uma vez só.</li>
       <li>Issues fechadas no GitHub saem do site.</li>
       <li>As regras de cada grupo são aplicadas na ordem abaixo: a primeira que se encaixa decide.</li>
@@ -84,7 +86,7 @@
     </ul>
   </section>
 
-  <div id="groups"><p class="lead">Carregando regras…</p></div>
+  <div id="groups"><!--ssr:groups--></div>
 
   <h2 id="t-not-collected">Sites que não coletamos</h2>
   <p class="group-note">Sites de vagas que conhecemos (muitos aparecem em links das vagas coletadas) e por que ficam de fora.
@@ -125,95 +127,11 @@
 
   <h2 id="t-dismissed">Descartadas à mão</h2>
   <p class="group-note">Itens que passaram pelas regras mas não eram vagas, com o motivo.</p>
-  <div class="card scroll" id="dismissed"></div>
+  <div class="card scroll" id="dismissed"><!--ssr:dismissed--></div>
 
   <footer>Os números "na base" contam o que está guardado hoje. Publicações do LinkedIn recusadas na busca são
     guardadas (fora do site) quando falam de PHP, desde 14/10/2026; as que nem citam PHP não são guardadas.</footer>
 </div>
 
-<script>
-const GROUPS = [
-  ["vagas", "Vagas de portais", "LinkedIn Vagas, Gupy, Sólides, Catho, Remotar, Programathor, Coodesh, Nerdin, Recrutei, UpVagas, páginas de carreira de empresas na InHire e issues dos repositórios de vagas no GitHub."],
-  ["posts", "Publicações do LinkedIn", "Posts que anunciam vagas. Precisam falar de PHP, anunciar uma vaga e não ser outra coisa."],
-  ["empresas", "Empresas", "Quem aparece na página de empresas, entre as vagas de portais aceitas."],
-  ["recrutadores", "Recrutadores", "Quem aparece na página de recrutadores, entre os autores das publicações aceitas."],
-];
-const BR_TIME = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-const NUM = new Intl.NumberFormat("pt-BR");
-const el = (tag, attrs = {}, ...kids) => {
-  const n = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) n[k] = v;
-  n.append(...kids.filter(k => k != null && k !== ""));
-  return n;
-};
-
-// Separa uma expressão regular nas alternativas de primeiro nível ("a|b|(c|d)" -> a, b, (c|d)),
-// tirando o grupo e os \b que envolvem tudo: fica mais fácil de ler que a expressão inteira.
-function alternatives(rx) {
-  let s = rx.replace(/^\\b/, "").replace(/\\b$/, "");
-  const wrapped = s.startsWith("(") && s.endsWith(")") && (() => {
-    let depth = 0;
-    for (let i = 0; i < s.length; i++) {
-      if (s[i] === "\\") { i++; continue; }
-      if (s[i] === "(") depth++;
-      else if (s[i] === ")" && --depth === 0 && i < s.length - 1) return false;
-    }
-    return true;
-  })();
-  if (wrapped) s = s.slice(1, -1).replace(/^\?:/, "");
-  const parts = [];
-  let depth = 0, cur = "";
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (c === "\\") { cur += c + (s[i + 1] ?? ""); i++; continue; }
-    if (c === "(" || c === "[") depth++;
-    if (c === ")" || c === "]") depth--;
-    if (c === "|" && depth === 0) { parts.push(cur); cur = ""; continue; }
-    cur += c;
-  }
-  parts.push(cur);
-  return parts.filter(Boolean);
-}
-
-function render(d) {
-  document.getElementById("max-age").textContent = d.max_age_hours;
-  const box = document.getElementById("groups");
-  box.replaceChildren();
-  for (const [key, title, note] of GROUPS) {
-    box.append(el("h2", {}, title), el("p", { className: "group-note" }, note));
-    d.rules.filter(r => r.group === key).forEach((r, i) => {
-      const n = d.counts[r.id];
-      const head = el("h3", {}, r.title,
-        el("span", { className: `badge ${r.effect}` }, r.effect === "aceita" ? "✓ aceita" : "✕ recusa"),
-        n != null ? el("span", { className: "count" }, `${NUM.format(n)} na base`) : null);
-      const body = el("div", {}, head, el("p", {}, r.text));
-      if (r.patterns.length) {
-        const chips = el("div", { className: "chips" });
-        for (const p of r.patterns) for (const a of alternatives(p)) chips.append(el("code", {}, a));
-        body.append(el("details", {}, el("summary", {}, "Expressões usadas"), chips));
-      }
-      box.append(el("section", { className: "card rule" }, el("div", { className: "n" }, String(i + 1)), body));
-    });
-  }
-  const dis = document.getElementById("dismissed");
-  if (!d.dismissed.length) {
-    dis.replaceChildren(el("p", { style: "margin:0;color:var(--muted)" }, "Nenhuma até agora."));
-    return;
-  }
-  const table = el("table", {}, el("tr", {}, el("th", {}, "Quando"), el("th", {}, "Item"), el("th", {}, "Motivo")));
-  for (const j of d.dismissed) {
-    const [at, ...reason] = j.dismissed.split(" ");
-    table.append(el("tr", {},
-      el("td", {}, BR_TIME.format(new Date(at)).replace(",", "")),
-      el("td", {}, j.url ? el("a", { href: j.url, target: "_blank", rel: "noopener" }, j.title || j.url) : j.title || "—"),
-      el("td", {}, reason.join(" ") || "—")));
-  }
-  dis.replaceChildren(table);
-}
-
-fetch("api/rules").then(r => r.json()).then(render).catch(e => {
-  document.getElementById("groups").replaceChildren(el("p", { className: "lead" }, "Não foi possível carregar as regras: " + e.message));
-});
-</script>
 </body>
 </html>

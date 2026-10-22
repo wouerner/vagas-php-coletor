@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vagas PHP por tema</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='48' ry='26' fill='%23777BB4'/><text x='50' y='60' font-size='30' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>php</text></svg>">
+<style>
+  /* Página por tema (/vagas/laravel-remoto) e lista de temas (/vagas), toda renderizada no
+     servidor (web.theme_page). Os cards de vaga são os mesmos de index.html. */
+  :root {
+    --bg: #f6f6fa; --surface: #ffffff; --text: #1d1d2b; --muted: #5d6070; --line: #e3e3ec;
+    --accent: #5b5fa0; --accent-soft: #ebecf7; --ok: #1f7a4d; --ok-soft: #e3f4ea;
+    --warn: #8a5a00; --warn-soft: #fbf0d9; --chip: #f0f0f5;
+    --age-new: #1f8a4c; --age-new-soft: #e1f5e9;
+    --age-recent: #29609f; --age-recent-soft: #e3eefa;
+    --age-days: #8a5208; --age-days-soft: #fcefd9;
+    --age-old: #5d6070; --age-old-soft: #ececf1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13131b; --surface: #1c1c27; --text: #e8e8f0; --muted: #a0a2b4; --line: #2d2d3c;
+      --accent: #a3a7e6; --accent-soft: #2a2b45; --ok: #7fd3a6; --ok-soft: #173326;
+      --warn: #f0c56e; --warn-soft: #3a2f16; --chip: #262634;
+      --age-new: #6fd69a; --age-new-soft: #16321f;
+      --age-recent: #84b4ee; --age-recent-soft: #1a2a40;
+      --age-days: #f0b866; --age-days-soft: #3a2a12;
+      --age-old: #a0a2b4; --age-old-soft: #2a2a35;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  header { padding: 28px 0 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
+  .brand { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
+  .brand span { color: var(--accent); }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; }
+  nav a { font-size: 14px; padding: 9px 14px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
+  nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  nav a .n { font-size: 12px; opacity: .75; }
+  nav a.zero { opacity: .55; }
+  .crumbs { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+  h1 { margin: 6px 0 0; font-size: 26px; line-height: 1.25; letter-spacing: -0.02em; }
+  .intro { color: var(--muted); }
+  .intro b { color: var(--text); }
+  .intro p { margin: 8px 0; }
+
+  #list:empty { display: none; }
+  #list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
+  .job { --age: var(--age-old); --age-soft: var(--age-old-soft);
+         background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--age);
+         border-radius: 12px; padding: 14px 16px; }
+  .job.new    { --age: var(--age-new);    --age-soft: var(--age-new-soft); }
+  .job.recent { --age: var(--age-recent); --age-soft: var(--age-recent-soft); }
+  .job.days   { --age: var(--age-days);   --age-soft: var(--age-days-soft); }
+  .job.old    { background: var(--bg); }
+  .job.old h2 a, .job.old .meta { color: var(--muted); }
+  .job.old .tags { opacity: .7; }
+  .head { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
+  .job h2 { margin: 0; font-size: 16px; line-height: 1.35; min-width: 0; }
+  .job h2 a { color: var(--text); text-decoration: underline; text-decoration-color: var(--line);
+              text-underline-offset: 3px; }
+  .job h2 a:hover { color: var(--accent); text-decoration-color: currentColor; }
+  /* Vaga com página no site: o card inteiro leva a ela; links e descrição ficam por cima. */
+  .job { position: relative; }
+  .job h2 a.page::after { content: ""; position: absolute; inset: 0; }
+  .job .meta a, .job summary, .job .desc { position: relative; z-index: 1; }
+  .age { flex: none; font-size: 12px; font-weight: 600; white-space: nowrap; padding: 2px 9px;
+         border-radius: 999px; color: var(--age); background: var(--age-soft); }
+  .meta { color: var(--muted); font-size: 13px; margin-top: 3px; overflow-wrap: anywhere; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .tag.src { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .tag.remote { background: var(--ok-soft); color: var(--ok); }
+  .tag.closed { background: var(--warn-soft); color: var(--warn); }
+  details { margin-top: 2px; font-size: 14px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 8px 0; width: fit-content; }
+  .desc { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 6px; max-height: 420px;
+          overflow: auto; padding: 10px; border-radius: 8px; background: var(--bg); }
+  .more { margin: 16px 0 0; font-size: 14px; }
+  .more:empty { display: none; }
+
+  .themes { margin-top: 28px; }
+  .themes h2 { font-size: 16px; margin: 0 0 8px; }
+  footer { color: var(--muted); font-size: 12px; padding: 28px 0 40px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/">Vagas <span>PHP</span></a>
+    <nav><a href="/" aria-current="page">Vagas</a><a href="/dashboard">Dashboard</a><a href="/empresas">Empresas</a><a href="/recrutadores">Recrutadores</a><a href="/mercado-php">Mercado</a><a href="/regras">Regras</a></nav>
+  </header>
+  <p class="crumbs"><a href="/">Vagas PHP</a> › <!--ssr:crumb--></p>
+  <main>
+    <h1><!--ssr:h1--></h1>
+    <div class="intro"><!--ssr:intro--></div>
+    <ul id="list"><!--ssr:list--></ul>
+    <p class="more"><!--ssr:more--></p>
+    <!--ssr:related-->
+  </main>
+  <footer>Confira sempre a vaga na fonte original antes de se candidatar.</footer>
+</div>
+</body>
+</html>

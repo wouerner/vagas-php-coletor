@@ -145,6 +145,22 @@ nos últimos 90 dias, reconhecidos pelo headline do autor do post (`php.RECRUITE
 quem tem `VAGAS_RECRUITERS_MIN` vagas ou mais (padrão 2). Quem pedir para sair vai em
 `VAGAS_RECRUITERS_HIDE` (URLs dos perfis, separadas por vírgula), configurada só no servidor.
 
+**Busca (Google e assistentes de IA)**: as páginas saem já renderizadas no servidor (robôs
+que não executam JavaScript leem as vagas), com título, descrição, canonical, Open Graph e
+JSON-LD (`vagas_php/seo.py`). Páginas para buscadores:
+
+- `/vagas` e `/vagas/<tema>`: vagas abertas por stack, modalidade, senioridade e algumas
+  combinações (`/vagas/laravel-remoto`, `/vagas/php-junior`...), com um resumo em números;
+  os temas saem de `php.py` (`THEMES` em `web.py`).
+- `/vaga/<número>-<título>`: uma página por vaga de portal, com JSON-LD `JobPosting` (Google
+  for Jobs) enquanto está aberta; depois de 72 h ela fica com `noindex` e sugere vagas
+  parecidas (`vaga.py`). Posts do LinkedIn não ganham página.
+- `/mercado-php`: números do mercado PHP em texto, para citar (`mercado.py`).
+- `/sitemap.xml`, `/robots.txt` e `/llms.txt`.
+
+O endereço público usado no canonical e no sitemap vem de `VAGAS_SITE_URL` ou, sem ela, dos
+cabeçalhos `X-Forwarded-*` do proxy.
+
 **Google Analytics**: com `VAGAS_GA_ID=G-XXXXXXXXXX` as páginas recebem a tag do GA
 (`vagas_php/static/analytics.html`) com aviso de cookies (LGPD, *Consent Mode*): sem aceite,
 o GA não grava cookies. Sem a variável (padrão local), nada é carregado. O print do
@@ -187,6 +203,8 @@ docker compose up -d
 
 ## Produção (Coolify)
 
+A instalação atual (domínio, Cloudflare e Coolify) está descrita em [docs/deploy.md](docs/deploy.md).
+
 Use `docker-compose.coolify.yml`:
 
 1. Use este repositório (ou um fork). O `.gitignore` já tira `.env`, `.session/` e `data/`.
@@ -198,7 +216,8 @@ Use `docker-compose.coolify.yml`:
 4. Em *Environment Variables* preencha `DATABASE_URL` (obrigatória), `LINKEDIN_EMAIL`, `LINKEDIN_PASSWORD` e o
    que quiser mudar (os padrões são os do `.env.example`). As publicações (`post`)
    começam **desligadas** (`VAGAS_POSTS_ENABLED=false`).
-5. No serviço `web`, defina o domínio com a porta interna: `https://vagas.seudominio.com:8000`.
+5. No serviço `web`, defina o domínio com `https://` (ex.: `https://vagas.seudominio.com`).
+   A porta interna 8000 vem de `SERVICE_URL_WEB_8000` no compose.
 6. Deploy. As vagas ficam no MySQL; a sessão do LinkedIn e os arquivos do coletor nos
    volumes `linkedin-session` e `vagas-data`.
 

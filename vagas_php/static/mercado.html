@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mercado de trabalho PHP no Brasil · Vagas PHP</title>
+<meta name="description" content="Números do mercado de trabalho PHP no Brasil: vagas abertas, modalidade, contratação, senioridade e stacks.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='48' ry='26' fill='%23777BB4'/><text x='50' y='60' font-size='30' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>php</text></svg>">
+<style>
+  :root {
+    --bg: #f6f6fa; --surface: #ffffff; --text: #1d1d2b; --muted: #5d6070;
+    --line: #e3e3ec; --accent: #5b5fa0; --accent-soft: #ebecf7; --chip: #f0f0f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13131b; --surface: #1c1c27; --text: #e8e8f0; --muted: #a0a2b4;
+      --line: #2d2d3c; --accent: #a3a7e6; --accent-soft: #2a2b45; --chip: #262634;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 16px 48px; }
+  header { padding: 28px 0 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
+  .brand { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
+  .brand span { color: var(--accent); }
+  header nav { display: flex; flex-wrap: wrap; gap: 6px; }
+  header nav a { font-size: 14px; padding: 9px 14px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
+  header nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  .crumbs { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+  h1 { margin: 6px 0 0; font-size: 26px; line-height: 1.25; letter-spacing: -0.02em; }
+  .lead { color: var(--muted); margin: 4px 0 16px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; }
+  .card h2 { margin: 0 0 6px; font-size: 17px; }
+  .card p { margin: 6px 0; }
+  .card ul, .card ol { margin: 6px 0 0; padding-left: 20px; }
+  .card li { margin: 3px 0; overflow-wrap: anywhere; }
+  .summary p { font-size: 16px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+  th, td { text-align: left; padding: 5px 8px 5px 0; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  td.num, th.num { text-align: right; padding-right: 0; padding-left: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .topics { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+  .topics a { font-size: 13px; padding: 7px 12px; border-radius: 999px; background: var(--chip); text-decoration: none; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
+  .grid .card { margin-bottom: 10px; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+  footer { color: var(--muted); font-size: 13px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/">Vagas <span>PHP</span></a>
+    <nav><a href="/">Vagas</a><a href="/dashboard">Dashboard</a><a href="/empresas">Empresas</a><a href="/recrutadores">Recrutadores</a><a href="/mercado-php" aria-current="page">Mercado</a><a href="/regras">Regras</a></nav>
+  </header>
+  <p class="crumbs"><a href="/">Vagas PHP</a> › Mercado de trabalho PHP</p>
+  <h1>Mercado de trabalho PHP no Brasil</h1>
+  <p class="lead">Em números, a partir das vagas PHP que o site coleta. <!--ssr:updated--></p>
+
+  <section class="card summary" aria-labelledby="t-resumo">
+    <h2 id="t-resumo">Resumo</h2>
+    <!--ssr:resumo-->
+  </section>
+
+  <section class="card" aria-labelledby="t-semanas">
+    <h2 id="t-semanas">Vagas novas por semana</h2>
+    <!--ssr:semanas-->
+  </section>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="t-modalidade">
+      <h2 id="t-modalidade">Remoto, híbrido ou presencial</h2>
+      <!--ssr:modalidade-->
+    </section>
+    <section class="card" aria-labelledby="t-contrato">
+      <h2 id="t-contrato">CLT ou PJ</h2>
+      <!--ssr:contrato-->
+    </section>
+    <section class="card" aria-labelledby="t-senioridade">
+      <h2 id="t-senioridade">Senioridade</h2>
+      <!--ssr:senioridade-->
+    </section>
+    <section class="card" aria-labelledby="t-stacks">
+      <h2 id="t-stacks">Stacks mais pedidas</h2>
+      <!--ssr:stacks-->
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="t-empresas">
+    <h2 id="t-empresas">Empresas que mais anunciam vagas PHP</h2>
+    <!--ssr:empresas-->
+  </section>
+
+  <section class="card" aria-labelledby="t-recrutadores">
+    <h2 id="t-recrutadores">Recrutadores</h2>
+    <!--ssr:recrutadores-->
+  </section>
+
+  <section class="card" aria-labelledby="t-fontes">
+    <h2 id="t-fontes">De onde vêm as vagas</h2>
+    <!--ssr:fontes-->
+  </section>
+
+  <section class="card" aria-labelledby="t-temas">
+    <h2 id="t-temas">Vagas por tema</h2>
+    <!--ssr:temas-->
+  </section>
+
+  <section class="card" aria-labelledby="t-metodologia">
+    <h2 id="t-metodologia">Metodologia</h2>
+    <!--ssr:metodologia-->
+  </section>
+
+  <footer>Os números mudam a cada coleta. Dados em JSON: <a href="/api/dashboard">/api/dashboard</a>, <a href="/api/jobs">/api/jobs</a>, <a href="/api/companies">/api/companies</a>.</footer>
+</div>
+</body>
+</html>

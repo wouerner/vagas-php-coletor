@@ -21,13 +21,19 @@ def terms() -> list[str]:
             if t.strip()]
 
 
+PERIOD = {"monthly": " por mês", "yearly": " por ano", "hourly": " por hora"}
+
+
 def _salary(s: dict | None) -> str | None:
+    """A API manda os valores em centavos ("from": 187800 = R$ 1.878) e o período em
+    "type" (monthly, yearly...)."""
     if not s or not (s.get("from") or s.get("to")):
         return None
     cur = {"BRL": "R$", "USD": "US$", "EUR": "€"}.get(s.get("currency") or "BRL", s.get("currency"))
-    fmt = lambda v: f"{cur} {float(v):,.0f}".replace(",", ".")  # noqa: E731
+    fmt = lambda v: f"{cur} {float(v) / 100:,.0f}".replace(",", ".")  # noqa: E731
     low, high = s.get("from"), s.get("to")
-    return f"{fmt(low)} a {fmt(high)}" if low and high and low != high else fmt(high or low)
+    value = f"{fmt(low)} a {fmt(high)}" if low and high and low != high else fmt(high or low)
+    return value + PERIOD.get(s.get("type") or "", "")
 
 
 def search(term: str, since: datetime, max_pages: int = 5) -> list[dict]:

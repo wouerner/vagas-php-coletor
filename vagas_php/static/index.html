@@ -13,9 +13,9 @@
     --warn: #8a5a00; --warn-soft: #fbf0d9; --chip: #f0f0f5;
     /* idade da vaga: nova -> antiga */
     --age-new: #1f8a4c; --age-new-soft: #e1f5e9;
-    --age-recent: #2f6fb8; --age-recent-soft: #e3eefa;
-    --age-days: #a3620a; --age-days-soft: #fcefd9;
-    --age-old: #7a7c88; --age-old-soft: #ececf1;
+    --age-recent: #29609f; --age-recent-soft: #e3eefa;
+    --age-days: #8a5208; --age-days-soft: #fcefd9;
+    --age-old: #5d6070; --age-old-soft: #ececf1;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -25,7 +25,7 @@
       --age-new: #6fd69a; --age-new-soft: #16321f;
       --age-recent: #84b4ee; --age-recent-soft: #1a2a40;
       --age-days: #f0b866; --age-days-soft: #3a2a12;
-      --age-old: #8e90a0; --age-old-soft: #2a2a35;
+      --age-old: #a0a2b4; --age-old-soft: #2a2a35;
     }
   }
   * { box-sizing: border-box; }
@@ -36,7 +36,7 @@
   header { padding: 28px 0 12px; }
   .top { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
   nav { display: flex; flex-wrap: wrap; gap: 6px; }
-  nav a { font-size: 14px; padding: 5px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
+  nav a { font-size: 14px; padding: 9px 14px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
   nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
   h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
   h1 span { color: var(--accent); }
@@ -101,20 +101,29 @@
   .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12px; color: var(--muted); }
   .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px;
          margin-right: 5px; vertical-align: -1px; background: var(--c); }
-  .job h2 a { color: var(--text); text-decoration: none; }
-  .job h2 a:hover { color: var(--accent); text-decoration: underline; }
+  .job h2 a { color: var(--text); text-decoration: underline; text-decoration-color: var(--line);
+              text-underline-offset: 3px; }
+  .job h2 a:hover { color: var(--accent); text-decoration-color: currentColor; }
+  /* Vaga com página no site: o card inteiro leva a ela; links e descrição ficam por cima. */
+  .job { position: relative; }
+  .job h2 a.page::after { content: ""; position: absolute; inset: 0; }
+  .job .meta a, .job summary, .job .desc { position: relative; z-index: 1; }
   .meta { color: var(--muted); font-size: 13px; margin-top: 3px; overflow-wrap: anywhere; }
   .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
   .tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
   .tag.src { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .tag.remote { background: var(--ok-soft); color: var(--ok); }
   .tag.closed { background: var(--warn-soft); color: var(--warn); }
-  details { margin-top: 8px; font-size: 14px; }
-  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  details { margin-top: 2px; font-size: 14px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 8px 0; width: fit-content; }
   .desc { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 6px; max-height: 420px;
           overflow: auto; padding: 10px; border-radius: 8px; background: var(--bg); }
   .empty, .more { text-align: center; color: var(--muted); padding: 28px 0; }
   .more button { cursor: pointer; padding: 8px 20px; }
+  .themes { margin-top: 28px; }
+  .themes h2 { font-size: 16px; margin: 0 0 8px; }
+  .themes .n { font-size: 12px; opacity: .75; }
+  .themes a.zero { opacity: .55; }
   footer { color: var(--muted); font-size: 12px; padding: 24px 0 40px; text-align: center; }
 
   @media (max-width: 700px) {
@@ -128,10 +137,10 @@
   <header>
     <div class="top">
       <h1>Vagas <span>PHP</span></h1>
-      <nav><a href="./" aria-current="page">Vagas</a><a href="dashboard">Dashboard</a><a href="empresas">Empresas</a><a href="recrutadores">Recrutadores</a><a href="regras">Regras</a></nav>
+      <nav><a href="/" aria-current="page">Vagas</a><a href="/dashboard">Dashboard</a><a href="/empresas">Empresas</a><a href="/recrutadores">Recrutadores</a><a href="/mercado-php">Mercado</a><a href="/regras">Regras</a></nav>
     </div>
     <p class="sub">Engenharia de software com PHP, Laravel e Symfony: vagas do LinkedIn, Gupy, Sólides, Catho, Remotar, Programathor, Coodesh e de empresas que usam a InHire, publicações de recrutadores e issues de repositórios de vagas no GitHub. Só vagas publicadas nas últimas 72 horas (horário de Brasília).</p>
-    <div class="stats" id="stats"></div>
+    <div class="stats" id="stats"><!--ssr:stats--></div>
     <div class="legend" aria-label="Cores por idade da vaga">
       <span style="--c: var(--age-new)">nova (até 6 h)</span>
       <span style="--c: var(--age-recent)">recente (6 a 24 h)</span>
@@ -184,8 +193,12 @@
   </form>
 
   <p class="sr" role="status" id="announce"></p>
-  <ul id="list"></ul>
+  <ul id="list"><!--ssr:list--></ul>
   <div class="more" id="more" hidden><button type="button">Carregar mais</button></div>
+  <section class="themes" aria-labelledby="t-themes">
+    <h2 id="t-themes">Vagas por tema</h2>
+    <nav><!--ssr:themes--></nav>
+  </section>
   <footer>A página se atualiza sozinha a cada minuto. Confira sempre a vaga na fonte original antes de se candidatar.</footer>
 </div>
 
@@ -231,6 +244,8 @@ function ago(iso) {
   return h < 48 ? `há ${h} h` : `há ${Math.floor(h / 24)} dias`;
 }
 
+// A primeira lista vem pronta do servidor (web.job_card, mesmo HTML de card()): mudou um,
+// mude o outro.
 // Idade da vaga: faixa de cor e texto curto ("40 min", "5 h", "1 d 3 h").
 const AGE_BANDS = [[6, "new", "nova"], [24, "recent", "recente"], [48, "days", "1-2 dias"],
                    [Infinity, "old", "antiga"]];
@@ -260,12 +275,17 @@ function card(job) {
   for (const t of [job.seniority, job.contract, job.salary, ...(job.stack || "").split(",")])
     if (t) tags.append(el("span", { className: "tag" }, t));
 
+  // Vaga de portal: o título leva à página da vaga no site (job.path) e o anúncio original
+  // fica na linha de baixo. Post do LinkedIn: o título leva ao post.
+  const original = text => el("a", { href: url, target: "_blank", rel: "noopener" }, text);
+  const link = job.path ? el("a", { className: "page", href: job.path }, title) : url ? original(title) : title;
+  const meta = [who, a && `publicada em ${a.at} (Brasília)`].filter(Boolean).join(" · ");
   const li = el("li", { className: "job" + (a ? " " + a.band : "") },
     el("div", { className: "head" },
-      el("h2", {}, url ? el("a", { href: url, target: "_blank", rel: "noopener" }, title) : title),
+      el("h2", {}, link),
       a && el("span", { className: "age", title: `Vaga ${a.label}: publicada há ${a.text}` }, a.text)),
-    el("div", { className: "meta" },
-      [who, a && `publicada em ${a.at} (Brasília)`].filter(Boolean).join(" · ")),
+    el("div", { className: "meta" }, meta,
+      job.path && url && meta ? " · " : null, job.path && url ? original("ver anúncio original") : null),
     tags);
   li.dataset.id = job.id;
   if (job.description) {
@@ -321,7 +341,7 @@ async function load(mode = "reset") {
   if (!auto) manualBusy = true;
   setLive("loading", "Atualizando…");
   try {
-    const res = await fetch("api/jobs?" + params);
+    const res = await fetch("/api/jobs?" + params);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     if (mine !== seq) return;  // resposta de uma busca antiga
@@ -338,7 +358,9 @@ async function load(mode = "reset") {
     if (!auto) manualBusy = false;
   }
   if (!auto) {
-    history.replaceState(null, "", "?" + new URLSearchParams([...new FormData(form)].filter(([, v]) => v)));
+    // Só os filtros fora do padrão (sem ?hours=72 numa visita comum à home).
+    const query = new URLSearchParams([...new FormData(form)].filter(([k, v]) => v && !(k === "hours" && v === "72")));
+    history.replaceState(null, "", query.toString() ? "?" + query : location.pathname);
     schedule();  // filtros novos: a próxima atualização automática conta a partir daqui
   }
 }
@@ -387,9 +409,9 @@ async function refresh() {
 
 async function loadStats() {
   try {
-    const s = await (await fetch("api/stats")).json();
+    const s = await (await fetch("/api/stats")).json();
     const box = document.getElementById("stats");
-    const open = Object.values(s.sources || {}).reduce((n, x) => n + (x.open || 0), 0);
+    const open = s.open_total ?? 0;
     box.replaceChildren(el("span", {}, el("b", {}, String(open)), " vagas abertas na base"));
     const runs = Object.values(s.last_runs || {}).filter(r => r && r.ok).map(r => r.finished_at).sort();
     if (runs.length) box.append(el("span", {}, "última coleta " + ago(runs[runs.length - 1])));

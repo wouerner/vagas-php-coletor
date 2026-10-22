@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vaga · Vagas PHP</title>
+<meta name="description" content="Vaga para devs PHP.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='48' ry='26' fill='%23777BB4'/><text x='50' y='60' font-size='30' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>php</text></svg>">
+<style>
+  :root {
+    --bg: #f6f6fa; --surface: #ffffff; --text: #1d1d2b; --muted: #5d6070;
+    --line: #e3e3ec; --accent: #5b5fa0; --accent-soft: #ebecf7; --chip: #f0f0f5;
+    --warn: #7a4b00; --warn-soft: #fff4dc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13131b; --surface: #1c1c27; --text: #e8e8f0; --muted: #a0a2b4;
+      --line: #2d2d3c; --accent: #a3a7e6; --accent-soft: #2a2b45; --chip: #262634;
+      --warn: #f3c46b; --warn-soft: #3a2f17;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 16px 48px; }
+  header { padding: 28px 0 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
+  .brand { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
+  .brand span { color: var(--accent); }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; }
+  header nav a { font-size: 14px; padding: 9px 14px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
+  header nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  .crumbs { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 12px; overflow-wrap: anywhere; }
+  .crumbs a { font-size: 13px; color: var(--muted); text-decoration: underline; padding: 0; background: none; border-radius: 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; }
+  .job .title { margin: 0; font-size: 24px; line-height: 1.25; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .job .company { margin: 4px 0 0; font-size: 16px; font-weight: 600; color: var(--muted); overflow-wrap: anywhere; }
+  .job h2 { font-size: 17px; margin: 22px 0 6px; }
+  .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 14px 0 0; }
+  .facts dt { color: var(--muted); font-size: 13px; padding-top: 1px; }
+  .facts dd { margin: 0; overflow-wrap: anywhere; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+  .chip { font-size: 12px; padding: 1px 9px; border-radius: 999px; background: var(--chip); color: var(--muted); text-decoration: none; }
+  a.chip:hover { color: var(--accent); background: var(--accent-soft); }
+  .apply { margin: 18px 0 0; }
+  .button { display: inline-block; padding: 10px 18px; border-radius: 10px; background: var(--accent); color: var(--surface);
+            font-weight: 600; text-decoration: none; }
+  .button:hover { filter: brightness(1.08); }
+  .description { overflow-wrap: anywhere; }
+  .description p { margin: 0 0 10px; }
+  .description h3 { font-size: 15px; margin: 16px 0 6px; }
+  .closed-job .description { opacity: .75; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .closed { background: var(--warn-soft); color: var(--warn); border-radius: 12px; padding: 12px 16px; margin: 0 0 10px; }
+  .similar h2 { font-size: 16px; margin: 0 0 6px; }
+  .similar ul { margin: 0; padding-left: 20px; }
+  .similar li { margin: 6px 0; overflow-wrap: anywhere; }
+  .similar .meta { display: block; }
+  .more { margin: 14px 0 0; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 28px; }
+  @media (max-width: 480px) {
+    .facts { grid-template-columns: 1fr; gap: 0; }
+    .facts dd { margin-bottom: 6px; }
+    .button { display: block; text-align: center; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/">Vagas <span>PHP</span></a>
+    <nav><a href="/" aria-current="page">Vagas</a><a href="/dashboard">Dashboard</a><a href="/empresas">Empresas</a><a href="/recrutadores">Recrutadores</a><a href="/mercado-php">Mercado</a><a href="/regras">Regras</a></nav>
+  </header>
+  <!--ssr:crumbs-->
+  <main>
+<!--ssr:vaga-->
+  </main>
+  <footer>As vagas são coletadas de portais públicos (LinkedIn, Gupy, Sólides, Catho...). A candidatura é feita no site original.</footer>
+</div>
+</body>
+</html>
