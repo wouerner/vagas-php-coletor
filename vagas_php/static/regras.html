@@ -27,7 +27,7 @@
   header { padding: 28px 0 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
   h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
   h1 span { color: var(--accent); }
-  nav { display: flex; gap: 6px; }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; }
   nav a { font-size: 14px; padding: 5px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
   nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
   .lead { color: var(--muted); margin: 4px 0 20px; }
@@ -67,7 +67,7 @@
 <div class="wrap">
   <header>
     <h1>Vagas <span>PHP</span> · Regras</h1>
-    <nav><a href="./">Vagas</a><a href="dashboard">Dashboard</a><a href="regras" aria-current="page">Regras</a></nav>
+    <nav><a href="./">Vagas</a><a href="dashboard">Dashboard</a><a href="recrutadores">Recrutadores</a><a href="regras" aria-current="page">Regras</a></nav>
   </header>
   <p class="lead">Por transparência, estas são as regras que decidem o que aparece no site. Esta página é gerada a partir
     do próprio código do filtro: o que está aqui é exatamente o que o coletor aplica.</p>
@@ -135,6 +135,7 @@
 const GROUPS = [
   ["vagas", "Vagas de portais", "LinkedIn Vagas, Gupy, Sólides, Catho, Remotar, Programathor, Coodesh, Nerdin, Recrutei, UpVagas, páginas de carreira de empresas na InHire e issues dos repositórios de vagas no GitHub."],
   ["posts", "Publicações do LinkedIn", "Posts que anunciam vagas. Precisam falar de PHP, anunciar uma vaga e não ser outra coisa."],
+  ["recrutadores", "Recrutadores", "Quem aparece na página de recrutadores, entre os autores das publicações aceitas."],
 ];
 const BR_TIME = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 const NUM = new Intl.NumberFormat("pt-BR");

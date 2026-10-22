@@ -232,6 +232,16 @@ RECRUITING = re.compile(
     r"buscamos|contratamos|estamos contratando|apply here|we'?re hiring)", re.I)
 
 
+# Headline (o texto abaixo do nome) de quem trabalha com recrutamento: página /recrutadores.
+RECRUITER = re.compile(
+    r"\b(recruit\w*|recrut\w*|talent acquisition|aquisi[cç][aã]o de talentos|talent partner|"
+    r"head\s?hunt\w*|(tech|talent|it) hunter)", re.I)
+
+
+def is_recruiter(headline: str | None) -> bool:
+    return bool(headline and RECRUITER.search(headline))
+
+
 def details(title: str | None, *texts: str | None) -> dict:
     """Modalidade, senioridade, contratação e stack, priorizando o título."""
     return {
@@ -323,4 +333,12 @@ RULES = [
     {"group": "posts", "id": "no_hiring", "effect": "recusa",
      "title": "Sem sinal de contratação",
      "text": "Fala de PHP, mas não anuncia vaga.", "patterns": []},
+
+    {"group": "recrutadores", "id": "recruiter", "effect": "aceita",
+     "title": "Headline de recrutamento",
+     "text": "Entra na página de recrutadores quem publicou vagas PHP aceitas nos últimos "
+             "90 dias (o mínimo de vagas aparece na página) e tem no headline do LinkedIn (o texto abaixo do nome) Tech "
+             "Recruiter, recrutamento, Talent Acquisition, headhunter... Páginas de vagas e "
+             "devs que divulgam vagas não entram.",
+     "patterns": _patterns(RECRUITER)},
 ]

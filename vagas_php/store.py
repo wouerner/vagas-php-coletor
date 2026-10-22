@@ -45,6 +45,7 @@ SCHEMA = [
     url         TEXT,
     author      VARCHAR(512),
     author_url  TEXT,
+    author_headline VARCHAR(512),      -- texto abaixo do nome do autor do post (cargo)
     description MEDIUMTEXT,
     posted_at   VARCHAR(40),           -- quando foi publicada (ISO; aproximada para posts)
     first_seen  VARCHAR(40) NOT NULL,
@@ -75,7 +76,8 @@ DEDUP = """seq IN (SELECT max(seq) FROM jobs GROUP BY source,
              lower(COALESCE(title, '')), lower(COALESCE(company, author, '')))"""
 
 FIELDS = ("source", "relevant", "title", "company", "location", "workplace", "seniority",
-          "contract", "stack", "salary", "url", "author", "author_url", "description",
+          "contract", "stack", "salary", "url", "author", "author_url", "author_headline",
+          "description",
           "posted_at", "closed_at")
 
 
@@ -181,7 +183,8 @@ class Store:
             "SELECT table_name, column_name FROM information_schema.columns "
             "WHERE table_schema = DATABASE()")}
         for table, column, ddl in (("runs", "listed", "INT AFTER found"),
-                                   ("runs", "failed", "INT AFTER listed")):
+                                   ("runs", "failed", "INT AFTER listed"),
+                                   ("jobs", "author_headline", "VARCHAR(512) AFTER author_url")):
             if (table, column) not in have:
                 self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
@@ -285,6 +288,7 @@ class Store:
                             stack = COALESCE(new.stack, jobs.stack),
                             salary = COALESCE(new.salary, jobs.salary),
                             url = COALESCE(new.url, jobs.url),
+                            author_headline = COALESCE(new.author_headline, jobs.author_headline),
                             description = CASE WHEN char_length(COALESCE(new.description, ''))
                                                     > char_length(COALESCE(jobs.description, ''))
                                                THEN new.description ELSE jobs.description END,
@@ -457,6 +461,34 @@ class Store:
             "SELECT source, title, url, dismissed FROM jobs WHERE dismissed IS NOT NULL "
             "ORDER BY dismissed DESC")]
         return {"counts": dict(counts), "dismissed": dismissed}
+
+    def recruiters(self, days: int = 90, min_jobs: int = 2, hidden=()) -> list[dict]:
+        """Tech recruiters (php.is_recruiter no headline) que publicaram vagas PHP aceitas
+        nos últimos `days` dias (página /recrutadores), com `min_jobs` ou mais vagas. Os
+        perfis de `hidden` (pediram para sair) ficam de fora."""
+        profile = lambda url: url.split("?")[0].rstrip("/").lower()  # noqa: E731
+        hidden = {profile(u) for u in hidden if u}
+        since = dates.utc_iso(dates.now_utc() - timedelta(days=days))
+        people: dict[str, dict] = {}
+        for r in self.execute(
+                f"""SELECT author, author_url, author_headline, stack,
+                           COALESCE(posted_at, first_seen) AS posted
+                    FROM jobs WHERE source = 'post' AND relevant = 1 AND dismissed IS NULL
+                      AND author_url IS NOT NULL AND {DEDUP}
+                      AND COALESCE(posted_at, first_seen) >= ?
+                    ORDER BY posted DESC""", (since,)):
+            key = profile(r["author_url"])
+            if key in hidden:
+                continue
+            p = people.setdefault(key, {"name": r["author"], "url": r["author_url"].split("?")[0],
+                                        "headline": r["author_headline"], "jobs": 0,
+                                        "last_posted": r["posted"], "stack": Counter()})
+            p["headline"] = p["headline"] or r["author_headline"]  # o mais recente que houver
+            p["jobs"] += 1
+            p["stack"].update(s for s in (r["stack"] or "").split(",") if s and s != "PHP")
+        out = [{**p, "stack": [s for s, _ in p["stack"].most_common(4)]} for p in people.values()
+               if p["jobs"] >= min_jobs and php.is_recruiter(p["headline"])]
+        return sorted(out, key=lambda p: (p["jobs"], p["last_posted"]), reverse=True)
 
     def start_run(self, source: str) -> int:
         with self.tx():

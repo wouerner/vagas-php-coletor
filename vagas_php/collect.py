@@ -351,7 +351,8 @@ def post_to_job(post: Post) -> dict:
     return {
         "id": jid, "source": "post", "relevant": php.is_php_hiring_post(text),
         "title": _post_title(text), "company": None, "url": post.url,
-        "author": post.author, "author_url": post.author_url, "description": text,
+        "author": post.author, "author_url": post.author_url,
+        "author_headline": post.headline, "description": text,
         "posted_at": dates.from_relative(post.time),
         **php.details(None, text),
     }
@@ -416,7 +417,8 @@ def import_post(store: Store, url: str) -> dict:
            "post:h:" + hashlib.sha1(f"{author.get('name')}|{text[:300]}".encode()).hexdigest()[:20],
            "source": "post", "relevant": verdict in php.POST_OK, "title": _post_title(text),
            "company": None, "url": canonical.split("?")[0], "author": author.get("name"),
-           "author_url": author.get("url"), "description": text,
+           "author_url": author.get("url"), "author_headline": author.get("jobTitle"),
+           "description": text,
            "posted_at": dates.normalize(post.get("datePublished")), **php.details(None, text)}
     saved = verdict not in ("post_no_php", "job_seeker")
     if saved:

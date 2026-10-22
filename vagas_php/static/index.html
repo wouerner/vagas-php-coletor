@@ -35,7 +35,7 @@
   .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
   header { padding: 28px 0 12px; }
   .top { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
-  nav { display: flex; gap: 6px; }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; }
   nav a { font-size: 14px; padding: 5px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
   nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
   h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
@@ -128,7 +128,7 @@
   <header>
     <div class="top">
       <h1>Vagas <span>PHP</span></h1>
-      <nav><a href="./" aria-current="page">Vagas</a><a href="dashboard">Dashboard</a><a href="regras">Regras</a></nav>
+      <nav><a href="./" aria-current="page">Vagas</a><a href="dashboard">Dashboard</a><a href="recrutadores">Recrutadores</a><a href="regras">Regras</a></nav>
     </div>
     <p class="sub">Engenharia de software com PHP, Laravel e Symfony: vagas do LinkedIn, Gupy, Sólides, Catho, Remotar, Programathor, Coodesh e de empresas que usam a InHire, publicações de recrutadores e issues de repositórios de vagas no GitHub. Só vagas publicadas nas últimas 72 horas (horário de Brasília).</p>
     <div class="stats" id="stats"></div>

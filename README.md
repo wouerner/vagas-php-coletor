@@ -133,6 +133,12 @@ stack e período (1, 4, 6, 24, 48 ou 72 h; os filtros ficam na URL, para compart
 
 - `GET /api/jobs?q=laravel&source=github&workplace=Remoto&seniority=Pleno&stack=Laravel&hours=24&limit=30&offset=0`
 - `GET /api/stats`
+- `GET /api/recruiters`
+
+**Recrutadores** (`/recrutadores`): tech recruiters que mais publicaram vagas PHP no LinkedIn
+nos últimos 90 dias, reconhecidos pelo headline do autor do post (`php.RECRUITER`). Só entra
+quem tem `VAGAS_RECRUITERS_MIN` vagas ou mais (padrão 2). Quem pedir para sair vai em
+`VAGAS_RECRUITERS_HIDE` (URLs dos perfis, separadas por vírgula), configurada só no servidor.
 
 **Google Analytics**: com `VAGAS_GA_ID=G-XXXXXXXXXX` as páginas recebem a tag do GA
 (`vagas_php/static/analytics.html`) com aviso de cookies (LGPD, *Consent Mode*): sem aceite,

@@ -9,6 +9,9 @@ Rotas: /             página (static/index.html)
        /regras       regras de filtro (static/regras.html)
        /api/rules    as regras (de php.RULES), quantas vagas cada uma decidiu e as
                      descartadas à mão
+       /recrutadores tech recruiters que mais publicam vagas PHP (static/recrutadores.html)
+       /api/recruiters  a lista: últimos 90 dias, VAGAS_RECRUITERS_MIN vagas ou mais (padrão
+                     2), sem os perfis de VAGAS_RECRUITERS_HIDE (URLs, separadas por vírgula)
 
 Google Analytics: com VAGAS_GA_ID=G-XXXXXXXXXX as páginas recebem a tag (static/analytics.html,
 com aviso de consentimento). ?print=1 tira a tag (print do dashboard para o post diário).
@@ -123,6 +126,23 @@ async def rules(request: Request):
     return JSONResponse({"rules": php.RULES, **stats, "max_age_hours": dates.MAX_AGE_HOURS})
 
 
+RECRUITERS_DAYS = 90
+RECRUITERS_MIN = max(int(os.getenv("VAGAS_RECRUITERS_MIN") or 2), 1)
+RECRUITERS_HIDE = [u.strip() for u in os.getenv("VAGAS_RECRUITERS_HIDE", "").split(",") if u.strip()]
+
+
+async def recruiters_page(request: Request):
+    return page(request, "recrutadores.html")
+
+
+async def recruiters(request: Request):
+    try:
+        rows = store().recruiters(RECRUITERS_DAYS, RECRUITERS_MIN, RECRUITERS_HIDE)
+    except ProgrammingError:
+        rows = []
+    return JSONResponse({"recruiters": rows, "days": RECRUITERS_DAYS, "min_jobs": RECRUITERS_MIN})
+
+
 async def stats(request: Request):
     try:
         return JSONResponse(store().stats())
@@ -138,6 +158,8 @@ app = Starlette(routes=[
     Route("/api/dashboard", dashboard),
     Route("/regras", rules_page),
     Route("/api/rules", rules),
+    Route("/recrutadores", recruiters_page),
+    Route("/api/recruiters", recruiters),
 ])
 
 

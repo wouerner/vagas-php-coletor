@@ -37,7 +37,7 @@
   header { padding: 28px 0 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
   h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
   h1 span { color: var(--accent); }
-  nav { display: flex; gap: 6px; }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; }
   nav a { font-size: 14px; padding: 5px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
   nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
   .sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
@@ -107,7 +107,7 @@
 <div class="wrap">
   <header>
     <h1>Vagas <span>PHP</span> · Dashboard</h1>
-    <nav><a href="./">Vagas</a><a href="dashboard" aria-current="page">Dashboard</a><a href="regras">Regras</a></nav>
+    <nav><a href="./">Vagas</a><a href="dashboard" aria-current="page">Dashboard</a><a href="recrutadores">Recrutadores</a><a href="regras">Regras</a></nav>
   </header>
   <p class="sub" id="sub">Carregando…</p>
   <p class="sub fresh" id="fresh"></p>

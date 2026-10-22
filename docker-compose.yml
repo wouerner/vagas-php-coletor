@@ -60,6 +60,8 @@ services:
       WEB_HOST: 0.0.0.0
       WEB_PORT: "8000"
       VAGAS_MAX_AGE_HOURS: "${VAGAS_MAX_AGE_HOURS:-72}"
+      VAGAS_RECRUITERS_MIN: "${VAGAS_RECRUITERS_MIN:-2}"
+      VAGAS_RECRUITERS_HIDE: "${VAGAS_RECRUITERS_HIDE:-}"
       DATABASE_URL: "mysql://vagas:${MYSQL_PASSWORD:-vagas}@mysql:3306/vagas"
     ports:
       # Para publicar o site na rede, use WEB_BIND=0.0.0.0 (ou um proxy reverso).
