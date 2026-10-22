@@ -490,6 +490,35 @@ class Store:
                if p["jobs"] >= min_jobs and php.is_recruiter(p["headline"])]
         return sorted(out, key=lambda p: (p["jobs"], p["last_posted"]), reverse=True)
 
+    def companies(self, days: int = 90, min_jobs: int = 2) -> list[dict]:
+        """Empresas que mais anunciaram vagas PHP aceitas nos últimos `days` dias (página
+        /empresas), com `min_jobs` ou mais vagas. Agrupa por php.company_key, que também
+        tira as que não dizem quem contrata."""
+        since = dates.utc_iso(dates.now_utc() - timedelta(days=days))
+        companies: dict[str, dict] = {}
+        for r in self.execute(
+                f"""SELECT source, company, workplace, stack,
+                           COALESCE(posted_at, first_seen) AS posted
+                    FROM jobs WHERE relevant = 1 AND dismissed IS NULL AND company IS NOT NULL
+                      AND {DEDUP} AND COALESCE(posted_at, first_seen) >= ?
+                    ORDER BY posted DESC""", (since,)):
+            if not (key := php.company_key(r["company"])):
+                continue
+            c = companies.setdefault(key, {"names": Counter(), "jobs": 0, "last_posted": r["posted"],
+                                           "sources": Counter(), "workplace": Counter(),
+                                           "stack": Counter()})
+            c["names"][r["company"].strip()] += 1
+            c["jobs"] += 1
+            c["sources"][r["source"]] += 1
+            c["workplace"][r["workplace"] or "Não informado"] += 1
+            c["stack"].update(s for s in (r["stack"] or "").split(",") if s and s != "PHP")
+        out = [{"name": c["names"].most_common(1)[0][0], "jobs": c["jobs"],
+                "last_posted": c["last_posted"], "sources": [s for s, _ in c["sources"].most_common()],
+                "workplace": c["workplace"].most_common(),
+                "stack": [s for s, _ in c["stack"].most_common(4)]}
+               for c in companies.values() if c["jobs"] >= min_jobs]
+        return sorted(out, key=lambda c: (c["jobs"], c["last_posted"]), reverse=True)
+
     def start_run(self, source: str) -> int:
         with self.tx():
             return self.execute("INSERT INTO runs (source, started_at) VALUES (?, ?)",

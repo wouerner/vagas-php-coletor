@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Empresas · Vagas PHP</title>
+<meta name="description" content="Empresas que mais anunciam vagas para devs PHP.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='48' ry='26' fill='%23777BB4'/><text x='50' y='60' font-size='30' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>php</text></svg>">
+<style>
+  :root {
+    --bg: #f6f6fa; --surface: #ffffff; --text: #1d1d2b; --muted: #5d6070;
+    --line: #e3e3ec; --accent: #5b5fa0; --accent-soft: #ebecf7; --chip: #f0f0f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13131b; --surface: #1c1c27; --text: #e8e8f0; --muted: #a0a2b4;
+      --line: #2d2d3c; --accent: #a3a7e6; --accent-soft: #2a2b45; --chip: #262634;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 16px 48px; }
+  header { padding: 28px 0 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+  h1 span { color: var(--accent); }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; }
+  nav a { font-size: 14px; padding: 5px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
+  nav a[aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  .lead { color: var(--muted); margin: 4px 0 16px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; }
+  .search { width: 100%; font: inherit; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px;
+            background: var(--surface); color: var(--text); margin-bottom: 12px; }
+  .company { display: grid; grid-template-columns: 30px 1fr auto; gap: 0 12px; align-items: start; }
+  .company .n { width: 26px; height: 26px; border-radius: 50%; background: var(--chip); color: var(--muted);
+                display: grid; place-items: center; font-size: 13px; font-weight: 600; margin-top: 1px; }
+  .company h2 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+  .meta { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .chip { font-size: 12px; padding: 1px 9px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .jobs { text-align: right; }
+  .jobs b { display: block; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .jobs span { color: var(--muted); font-size: 12px; }
+  .about ul { margin: 6px 0 0; padding-left: 20px; }
+  .about li { margin: 4px 0; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Vagas <span>PHP</span> · Empresas</h1>
+    <nav><a href="./">Vagas</a><a href="dashboard">Dashboard</a><a href="empresas" aria-current="page">Empresas</a><a href="recrutadores">Recrutadores</a><a href="regras">Regras</a></nav>
+  </header>
+  <p class="lead">Empresas que mais anunciaram vagas para devs PHP nos últimos <b class="days">90</b> dias.</p>
+
+  <input class="search" type="search" id="q" placeholder="Filtrar por nome ou stack: laravel, remoto…" aria-label="Filtrar empresas">
+  <div id="list"><p class="lead">Carregando…</p></div>
+
+  <section class="card about" aria-labelledby="t-about">
+    <strong id="t-about">Como a lista é feita</strong>
+    <ul>
+      <li>Conta as vagas de portais (LinkedIn Vagas, Gupy, Sólides, Catho...) que passam pelas <a href="regras">regras do site</a>,
+        publicadas nos últimos <span class="days">90</span> dias. A mesma vaga repetida conta uma vez.</li>
+      <li>Entram empresas com <b id="min">2</b> ou mais vagas no período. Nomes escritos de jeitos diferentes
+        (maiúsculas, acentos, LTDA, S.A.) contam como a mesma empresa.</li>
+      <li>Vagas confidenciais e sites de vagas que repostam anúncios de outras empresas ficam de fora.
+        Publicações do LinkedIn também, porque não dizem a empresa.</li>
+    </ul>
+  </section>
+
+  <footer>Consultorias e empresas de alocação aparecem como a empresa que anunciou a vaga.</footer>
+</div>
+
+<script>
+const BR_DATE = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" });
+const SOURCE_NAMES = { linkedin: "LinkedIn", gupy: "Gupy", github: "GitHub", inhire: "InHire", solides: "Sólides",
+                       catho: "Catho", remotar: "Remotar", programathor: "Programathor", coodesh: "Coodesh",
+                       nerdin: "Nerdin", recrutei: "Recrutei", upvagas: "UpVagas" };
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) n[k] = v;
+  n.append(...kids.filter(k => k != null && k !== ""));
+  return n;
+};
+const fold = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+let data;
+
+function card(c, i) {
+  const remote = c.workplace.find(([w]) => w === "Remoto");
+  const meta = ["Última vaga em " + BR_DATE.format(new Date(c.last_posted))];
+  if (remote) meta.push(remote[1] === c.jobs ? "todas remotas" : `${remote[1]} remota${remote[1] > 1 ? "s" : ""}`);
+  const info = el("div", {}, el("h2", {}, c.name), el("p", { className: "meta" }, meta.join(" · ")));
+  const chips = [...c.stack, ...c.sources.map(s => SOURCE_NAMES[s] || s)];
+  info.append(el("div", { className: "chips" }, ...chips.map(s => el("span", { className: "chip" }, s))));
+  if (Date.now() - new Date(c.last_posted) < data.max_age_hours * 3600e3) {
+    const q = new URLSearchParams({ q: c.name });
+    info.append(el("p", { className: "meta" }, el("a", { href: "./?" + q }, "Ver vagas abertas")));
+  }
+  return el("section", { className: "card company" },
+    el("div", { className: "n" }, String(i + 1)), info,
+    el("div", { className: "jobs" }, el("b", {}, String(c.jobs)), el("span", {}, c.jobs === 1 ? "vaga" : "vagas")));
+}
+
+function render() {
+  const box = document.getElementById("list");
+  const words = fold(document.getElementById("q").value).split(/\s+/).filter(Boolean);
+  const shown = data.companies.map((c, i) => [c, i]).filter(([c]) => {
+    const text = fold([c.name, ...c.stack, ...c.sources, ...c.workplace.map(([w]) => w)].join(" "));
+    return words.every(w => text.includes(w));
+  });
+  if (!shown.length) {
+    box.replaceChildren(el("section", { className: "card" }, el("p", { style: "margin:0;color:var(--muted)" },
+      data.companies.length ? "Nenhuma empresa com esse filtro." : "Ainda não há empresas com vagas suficientes no período.")));
+    return;
+  }
+  box.replaceChildren(...shown.map(([c, i]) => card(c, i)));
+}
+
+fetch("api/companies").then(r => r.json()).then(d => {
+  data = d;
+  document.querySelectorAll(".days").forEach(n => { n.textContent = d.days; });
+  document.getElementById("min").textContent = d.min_jobs;
+  render();
+  document.getElementById("q").addEventListener("input", render);
+}).catch(e => {
+  document.getElementById("list").replaceChildren(el("p", { className: "lead" }, "Não foi possível carregar a lista: " + e.message));
+});
+</script>
+</body>
+</html>

@@ -12,6 +12,8 @@ Rotas: /             página (static/index.html)
        /recrutadores tech recruiters que mais publicam vagas PHP (static/recrutadores.html)
        /api/recruiters  a lista: últimos 90 dias, VAGAS_RECRUITERS_MIN vagas ou mais (padrão
                      2), sem os perfis de VAGAS_RECRUITERS_HIDE (URLs, separadas por vírgula)
+       /empresas     empresas que mais anunciam vagas PHP (static/empresas.html)
+       /api/companies  a lista: vagas de portais dos últimos 90 dias, 2 ou mais por empresa
 
 Google Analytics: com VAGAS_GA_ID=G-XXXXXXXXXX as páginas recebem a tag (static/analytics.html,
 com aviso de consentimento). ?print=1 tira a tag (print do dashboard para o post diário).
@@ -143,6 +145,22 @@ async def recruiters(request: Request):
     return JSONResponse({"recruiters": rows, "days": RECRUITERS_DAYS, "min_jobs": RECRUITERS_MIN})
 
 
+COMPANIES_DAYS, COMPANIES_MIN = 90, 2
+
+
+async def companies_page(request: Request):
+    return page(request, "empresas.html")
+
+
+async def companies(request: Request):
+    try:
+        rows = store().companies(COMPANIES_DAYS, COMPANIES_MIN)
+    except ProgrammingError:
+        rows = []
+    return JSONResponse({"companies": rows, "days": COMPANIES_DAYS, "min_jobs": COMPANIES_MIN,
+                         "max_age_hours": dates.MAX_AGE_HOURS})
+
+
 async def stats(request: Request):
     try:
         return JSONResponse(store().stats())
@@ -160,6 +178,8 @@ app = Starlette(routes=[
     Route("/api/rules", rules),
     Route("/recrutadores", recruiters_page),
     Route("/api/recruiters", recruiters),
+    Route("/empresas", companies_page),
+    Route("/api/companies", companies),
 ])
 
 

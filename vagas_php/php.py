@@ -2,6 +2,7 @@
 modalidade, senioridade, contratação e stack PHP para os filtros do site."""
 
 import re
+import unicodedata
 
 # Termos que indicam PHP (a linguagem ou o ecossistema).
 PHP_STACK = {
@@ -242,6 +243,26 @@ def is_recruiter(headline: str | None) -> bool:
     return bool(headline and RECRUITER.search(headline))
 
 
+# Nome de empresa que não diz quem contrata (página /empresas): vaga confidencial e sites
+# de vagas que repostam anúncios de outras empresas no LinkedIn. Acrescente padrões aqui.
+NOT_EMPLOYER = re.compile(
+    r"\b(confidencia(l|is)|sigilos[ao]|n[aã]o divulgad[ao]|jobgether|buscar\s?vagas)\b", re.I)
+# Sufixos societários, ignorados ao agrupar ("XPTO LTDA" e "Xpto" são a mesma empresa).
+COMPANY_SUFFIX = re.compile(
+    r"[\s,.-]+(ltda|me|epp|eireli|s\.?\s?/?a\.?|inc|llc|ltd|gmbh)\.?$", re.I)
+
+
+def company_key(name: str | None) -> str | None:
+    """Chave para agrupar a mesma empresa escrita de jeitos diferentes; None se o nome
+    não identifica quem contrata (NOT_EMPLOYER)."""
+    if not name or NOT_EMPLOYER.search(name):
+        return None
+    name = unicodedata.normalize("NFKD", name.strip())
+    while (stripped := COMPANY_SUFFIX.sub("", name)) != name:
+        name = stripped
+    return re.sub(r"[^a-z0-9]", "", name.encode("ascii", "ignore").decode().lower()) or None
+
+
 def details(title: str | None, *texts: str | None) -> dict:
     """Modalidade, senioridade, contratação e stack, priorizando o título."""
     return {
@@ -341,4 +362,12 @@ RULES = [
              "Recruiter, recrutamento, Talent Acquisition, headhunter... Páginas de vagas e "
              "devs que divulgam vagas não entram.",
      "patterns": _patterns(RECRUITER)},
+
+    {"group": "empresas", "id": "not_employer", "effect": "recusa",
+     "title": "Nome que não diz quem contrata",
+     "text": "A página de empresas soma as vagas de portais dos últimos 90 dias por empresa. "
+             "Vaga confidencial e sites de vagas que repostam anúncios de outras empresas "
+             "ficam de fora dela (as vagas continuam no site). Nomes escritos de jeitos "
+             "diferentes (maiúsculas, acentos, LTDA, ME, S.A.) contam como a mesma empresa.",
+     "patterns": _patterns(NOT_EMPLOYER)},
 ]

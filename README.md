@@ -133,7 +133,12 @@ stack e período (1, 4, 6, 24, 48 ou 72 h; os filtros ficam na URL, para compart
 
 - `GET /api/jobs?q=laravel&source=github&workplace=Remoto&seniority=Pleno&stack=Laravel&hours=24&limit=30&offset=0`
 - `GET /api/stats`
+- `GET /api/companies`
 - `GET /api/recruiters`
+
+**Empresas** (`/empresas`): empresas que mais anunciaram vagas PHP nos portais nos últimos 90
+dias (2 ou mais vagas). Nomes escritos de jeitos diferentes são agrupados (`php.company_key`);
+vagas confidenciais e sites que repostam vagas (`php.NOT_EMPLOYER`) ficam de fora.
 
 **Recrutadores** (`/recrutadores`): tech recruiters que mais publicaram vagas PHP no LinkedIn
 nos últimos 90 dias, reconhecidos pelo headline do autor do post (`php.RECRUITER`). Só entra
