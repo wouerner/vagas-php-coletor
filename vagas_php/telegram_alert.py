@@ -3,7 +3,9 @@ acessar a base) e publica cada uma num chat pelo bot de VAGAS_TELEGRAM_TOKEN.
 
 Os ids já enviados ficam em data/telegram_alert_state.json (só os últimos 500). Cada
 execução envia no máximo `limit` vagas, para não inundar o chat: as mais recentes ainda
-não enviadas, em ordem de publicação.
+não enviadas, em ordem de publicação. Cada envio bem-sucedido (vaga ou resumo semanal)
+também entra em data/telegram_alert_log.json com data/hora (últimas 500 entradas), base
+do relatório diário do canal.
 
 send_weekly manda, uma vez por semana, o mesmo post do LinkedIn (print do dashboard +
 texto de resumo); a semana já enviada fica em data/telegram_digest_state.json."""
@@ -19,14 +21,20 @@ import uuid
 from html import escape
 from pathlib import Path
 
+from . import dates
+
 log = logging.getLogger("vagas_php.telegram_alert")
 
 VAGAS_API_URL = (os.getenv("VAGAS_API_URL") or "https://vagasphp.wouerner.dev").rstrip("/")
 VAGAS_TELEGRAM_TOKEN = os.getenv("VAGAS_TELEGRAM_TOKEN", "")
 VAGAS_TELEGRAM_CHAT_ID = os.getenv("VAGAS_TELEGRAM_CHAT_ID", "")
+# Janela de postagem do alerta, "HH-HH" em horário de Brasília (início incluso, fim não).
+VAGAS_TELEGRAM_ACTIVE_HOURS = os.getenv("VAGAS_TELEGRAM_ACTIVE_HOURS") or "8-19"
 
 STATE_FILE = "telegram_alert_state.json"
 STATE_MAX = 500
+LOG_FILE = "telegram_alert_log.json"
+LOG_MAX = 500
 DIGEST_STATE_FILE = "telegram_digest_state.json"
 CAPTION_MAX = 1024  # limite da legenda de foto no Telegram
 ATTEMPTS = 2
@@ -187,6 +195,7 @@ def send_weekly(data_dir: Path, dry_run: bool = False) -> dict:
         tmp.write_text(json.dumps({"week": week, "at": now.isoformat(timespec="seconds"),
                                    "numbers": numbers}, ensure_ascii=False, indent=1))
         tmp.replace(path)
+        log_append(data_dir, {"kind": "digest", "week": week})
         log.info("Resumo da semana %s enviado.", week)
     return {"numeros": numbers, "semana": week, "ok": ok, "imagem": str(image),
             "dry_run": dry_run}
@@ -208,8 +217,61 @@ def state_save(data_dir: Path, ids: list[str]) -> None:
     tmp.replace(path)
 
 
-def run(data_dir: Path, limit: int = 5, dry_run: bool = False) -> dict:
-    """Envia as vagas ainda não enviadas (no máximo `limit`). dry_run: só imprime."""
+def log_load(data_dir: Path) -> list[dict]:
+    """Entradas de data/telegram_alert_log.json; arquivo ausente ou ilegível: lista vazia."""
+    try:
+        entries = json.loads((data_dir / LOG_FILE).read_text())
+    except (OSError, ValueError):
+        return []
+    return entries if isinstance(entries, list) else []
+
+
+def log_append(data_dir: Path, entry: dict) -> None:
+    """Acrescenta `entry` (com "at" em horário de Brasília) ao log, mantendo só as últimas
+    LOG_MAX entradas. Uma falha ao gravar só vira aviso: não derruba o envio."""
+    entry = {"at": dates.now_utc().astimezone(dates.BRASILIA).isoformat(timespec="seconds"),
+             **entry}
+    try:
+        path = data_dir / LOG_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps((log_load(data_dir) + [entry])[-LOG_MAX:],
+                                  ensure_ascii=False, indent=1))
+        tmp.replace(path)
+    except OSError as e:
+        log.warning("Não foi possível gravar %s: %s", LOG_FILE, e)
+
+
+def active_hours() -> tuple[int, int]:
+    """(início, fim) de VAGAS_TELEGRAM_ACTIVE_HOURS ("8-19")."""
+    try:
+        start, end = (int(x) for x in VAGAS_TELEGRAM_ACTIVE_HOURS.split("-"))
+    except ValueError:
+        raise RuntimeError(f"VAGAS_TELEGRAM_ACTIVE_HOURS inválido: "
+                           f"{VAGAS_TELEGRAM_ACTIVE_HOURS!r} (use HH-HH, ex.: 8-19)")
+    if not (0 <= start <= 23 and 0 <= end <= 24):
+        raise RuntimeError(f"VAGAS_TELEGRAM_ACTIVE_HOURS fora de 0-24: "
+                           f"{VAGAS_TELEGRAM_ACTIVE_HOURS!r}")
+    return start, end
+
+
+def in_window(hour: int, start: int, end: int) -> bool:
+    # start > end atravessa a meia-noite (ex.: 22-6).
+    return start <= hour < end if start <= end else hour >= start or hour < end
+
+
+def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = False) -> dict:
+    """Envia as vagas ainda não enviadas (no máximo `limit`). dry_run: só imprime.
+    Fora de VAGAS_TELEGRAM_ACTIVE_HOURS não envia nada (as vagas ficam pendentes para a
+    próxima execução dentro da janela); force ignora a janela."""
+    if not force:
+        start, end = active_hours()
+        now = dates.now_utc().astimezone(dates.BRASILIA)
+        if not in_window(now.hour, start, end):
+            print(f"Fora do horário de postagem ({now:%H:%M}, janela {start:02d}-{end:02d}); "
+                  "nada enviado.")
+            return {"skipped_window": True, "now": now.strftime("%H:%M"),
+                    "window": f"{start:02d}-{end:02d}", "sent": 0, "dry_run": dry_run}
     if not dry_run and not (VAGAS_TELEGRAM_TOKEN and VAGAS_TELEGRAM_CHAT_ID):
         raise RuntimeError("Defina VAGAS_TELEGRAM_TOKEN e VAGAS_TELEGRAM_CHAT_ID no .env")
     sent_ids = state_load(data_dir)
@@ -236,6 +298,8 @@ def run(data_dir: Path, limit: int = 5, dry_run: bool = False) -> dict:
             break
         sent_ids.append(job["id"])
         state_save(data_dir, sent_ids)  # a cada envio: uma falha depois não reenvia esta
+        log_append(data_dir, {"kind": "job", "id": job["id"], "source": job.get("source"),
+                              "title": job.get("title")})
         sent += 1
         log.info("Vaga enviada: %s (%s)", job["id"], job.get("title"))
         time.sleep(1)

@@ -169,6 +169,17 @@ JSON-LD (`vagas_php/seo.py`). Páginas para buscadores:
 O endereço público usado no canonical e no sitemap vem de `VAGAS_SITE_URL` ou, sem ela, dos
 cabeçalhos `X-Forwarded-*` do proxy.
 
+**Preview social** (LinkedIn, Telegram, WhatsApp): todas as páginas saem com `og:image` e
+`twitter:image` (card `summary_large_image`) apontando para `/og.png`, que serve
+`vagas_php/static/og.png` (1200x630). Para regenerar a imagem:
+
+```bash
+python3 ~/.hermes/scripts/gen_og_image.py vagas_php/static/og.png
+```
+
+O LinkedIn guarda o preview em cache; depois de trocar a imagem, force a releitura no
+[Post Inspector](https://www.linkedin.com/post-inspector/).
+
 **Google Analytics**: com `VAGAS_GA_ID=G-XXXXXXXXXX` as páginas recebem a tag do GA
 (`vagas_php/static/analytics.html`) com aviso de cookies (LGPD, *Consent Mode*): sem aceite,
 o GA não grava cookies. Sem a variável (padrão local), nada é carregado. O print do

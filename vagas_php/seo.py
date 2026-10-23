@@ -18,6 +18,8 @@ from pathlib import Path
 from starlette.requests import Request
 
 SITE_NAME = "Vagas PHP"
+# Preview social (LinkedIn, Telegram, WhatsApp): static/og.png, servida em /og.png.
+OG_IMAGE_ALT = "Vagas PHP — vagas de PHP, Laravel e Symfony"
 STATIC = Path(__file__).resolve().parent / "static"
 SITE_URL = os.getenv("VAGAS_SITE_URL", "").strip().rstrip("/")
 
@@ -44,8 +46,9 @@ def site_url(request: Request) -> str:
 def head(request: Request, title: str, description: str, path: str,
          jsonld: list[dict] | dict | None = None, noindex: bool = False) -> str:
     """Tags do <head>. `path` é o caminho canônico ("/vagas/laravel"), sem query string."""
-    url = site_url(request) + path
-    t, d, u = escape(title), escape(description), escape(url)
+    base = site_url(request)
+    url = base + path
+    t, d, u, img = escape(title), escape(description), escape(url), escape(base + "/og.png")
     tags = [f"<title>{t}</title>",
             f'<meta name="description" content="{d}">',
             f'<link rel="canonical" href="{u}">',
@@ -55,7 +58,14 @@ def head(request: Request, title: str, description: str, path: str,
             f'<meta property="og:title" content="{t}">',
             f'<meta property="og:description" content="{d}">',
             f'<meta property="og:url" content="{u}">',
-            '<meta name="twitter:card" content="summary">']
+            f'<meta property="og:image" content="{img}">',
+            '<meta property="og:image:width" content="1200">',
+            '<meta property="og:image:height" content="630">',
+            f'<meta property="og:image:alt" content="{OG_IMAGE_ALT}">',
+            '<meta name="twitter:card" content="summary_large_image">',
+            f'<meta name="twitter:title" content="{t}">',
+            f'<meta name="twitter:description" content="{d}">',
+            f'<meta name="twitter:image" content="{img}">']
     if noindex:
         tags.append('<meta name="robots" content="noindex">')
     for data in ([jsonld] if isinstance(jsonld, dict) else jsonld or []):

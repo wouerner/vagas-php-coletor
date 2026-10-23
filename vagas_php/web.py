@@ -19,6 +19,7 @@ Rotas: /             página (static/index.html), com as primeiras vagas já no 
        /api/companies  a lista: vagas de portais dos últimos 90 dias, 2 ou mais por empresa
        /sitemap.xml  páginas para buscadores (ver SITEMAP_PROVIDERS)
        /robots.txt   tudo liberado menos /api/, com o endereço do sitemap
+       /og.png       imagem de preview social (og:image / twitter:image), static/og.png
        /mercado-php  números do mercado PHP em texto (mercado.py), e /llms.txt
        /vaga/<seq>-<título>  página de uma vaga de portal, com JobPosting (vaga.py)
 
@@ -832,6 +833,12 @@ async def robots(request: Request):
                     f"Sitemap: {seo.site_url(request)}/sitemap.xml\n", media_type="text/plain")
 
 
+async def og_image(request: Request):
+    """Imagem de preview social (og:image), gerada por gen_og_image.py (ver README)."""
+    return Response((STATIC / "og.png").read_bytes(), media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
 app = Starlette(routes=[
     Route("/", index),
     Route("/api/jobs", jobs),
@@ -848,6 +855,7 @@ app = Starlette(routes=[
     Route("/api/companies", companies),
     Route("/sitemap.xml", sitemap),
     Route("/robots.txt", robots),
+    Route("/og.png", og_image),
     *mercado.routes,  # /mercado-php e /llms.txt
     *vaga.routes,     # /vaga/<seq>-<título>
 ])
