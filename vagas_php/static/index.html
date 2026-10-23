@@ -236,6 +236,9 @@ const el = (tag, attrs = {}, ...children) => {
   return node;
 };
 const safeUrl = url => /^https?:\/\//i.test(url || "") ? url : null;
+// Link para o anúncio original passando por /out, que conta o clique (vaga.out_href no servidor).
+const outHref = (url, job) => "/out?" + new URLSearchParams({
+  url, job: job.id || "", page: location.pathname || "/", source: job.source || "" });
 
 const BRASILIA = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -282,7 +285,7 @@ function card(job) {
 
   // Vaga de portal: o título leva à página da vaga no site (job.path) e o anúncio original
   // fica na linha de baixo. Post do LinkedIn: o título leva ao post.
-  const original = text => el("a", { href: url, target: "_blank", rel: "noopener" }, text);
+  const original = text => el("a", { href: outHref(url, job), target: "_blank", rel: "noopener" }, text);
   const link = job.path ? el("a", { className: "page", href: job.path }, title) : url ? original(title) : title;
   const meta = [who, a && `publicada em ${a.at} (Brasília)`].filter(Boolean).join(" · ");
   const li = el("li", { className: "job" + (a ? " " + a.band : "") },

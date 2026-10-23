@@ -18,6 +18,7 @@ web.py registra `routes` e usa `sitemap_entries()` no sitemap."""
 import re
 from datetime import datetime, timedelta
 from html import escape
+from urllib.parse import urlencode
 
 from pymysql.err import ProgrammingError
 from starlette.requests import Request
@@ -31,6 +32,15 @@ SOURCE_NAMES = {"linkedin": "LinkedIn", "gupy": "Gupy", "github": "GitHub", "inh
                 "solides": "Sólides", "catho": "Catho", "remotar": "Remotar",
                 "programathor": "Programathor", "coodesh": "Coodesh", "nerdin": "Nerdin",
                 "recrutei": "Recrutei", "upvagas": "UpVagas"}
+
+
+def out_href(url: str, job: dict, page: str) -> str:
+    """Link para o anúncio original passando por /out (web.py), que conta o clique. O
+    mesmo formato que outHref() de static/index.html monta no navegador."""
+    return "/out?" + urlencode({"url": url, "job": job.get("id") or "", "page": page or "/",
+                                "source": job.get("source") or ""})
+
+
 EMPLOYMENT_TYPE = {"CLT": "FULL_TIME", "PJ": "CONTRACTOR", "Freelance": "CONTRACTOR"}
 
 UF = {"AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB",
@@ -306,8 +316,9 @@ def job_html(job: dict, is_open_: bool, others: list[dict]) -> str:
         out.append('<div class="chips">' + "".join(
             f'<a class="chip" href="{escape(topic_path(s))}">{escape(s)}</a>' for s in stacks(job))
             + "</div>")
+    here = seo.job_path(job)
     if job.get("url") and is_open_:
-        out.append(f'<p class="apply"><a class="button" href="{escape(job["url"])}" '
+        out.append(f'<p class="apply"><a class="button" href="{escape(out_href(job["url"], job, here))}" '
                    f'rel="nofollow noopener" target="_blank">Candidatar-se no site original '
                    f'({escape(source)})</a></p>')
     if (job.get("description") or "").strip():
@@ -315,7 +326,7 @@ def job_html(job: dict, is_open_: bool, others: list[dict]) -> str:
         out.append(f'<h2>Descrição</h2><div class="description">'
                    f'{description_html(job["description"], markdown=md)}</div>')
     if job.get("url") and not is_open_:
-        out.append(f'<p class="meta">Anúncio original: <a href="{escape(job["url"])}" '
+        out.append(f'<p class="meta">Anúncio original: <a href="{escape(out_href(job["url"], job, here))}" '
                    f'rel="nofollow noopener" target="_blank">{escape(source)}</a></p>')
     out.append("</article>")
     if is_open_:

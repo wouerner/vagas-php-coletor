@@ -56,6 +56,30 @@ def fetch_jobs() -> list[dict]:
     raise RuntimeError(f"Não foi possível ler as vagas de {url}")
 
 
+def out_link(job: dict) -> str:
+    """Link do anúncio pelo /out do site: o clique entra no rastreio. Sem url: ""."""
+    url = (job.get("url") or "").strip()
+    if not url:
+        return ""
+    query = urllib.parse.urlencode({"url": url, "job": job.get("id") or "", "page": "/",
+                                    "source": job.get("source") or ""})
+    return f"{VAGAS_API_URL}/out?{query}"
+
+
+def destiny(url: str) -> str:
+    """Texto visível do link: host sem "www." e o 1º segmento do caminho
+    (ex.: "linkedin.com/jobs"), até 40 caracteres. URL ilegível: a própria URL."""
+    try:
+        parts = urllib.parse.urlsplit(url)
+    except ValueError:
+        return url
+    host = (parts.hostname or "").removeprefix("www.")
+    if not host:
+        return url
+    text = "/".join([host, *[s for s in parts.path.split("/") if s][:1]])
+    return text if len(text) <= 40 else text[:39] + "…"
+
+
 def format(job: dict) -> str:
     """Mensagem da vaga em HTML do Telegram. Campos vazios ficam de fora."""
     def line(emoji: str, *parts) -> str | None:
@@ -64,12 +88,13 @@ def format(job: dict) -> str:
 
     title = (job.get("title") or "").strip()
     stack = ", ".join(s.strip() for s in (job.get("stack") or "").split(",") if s.strip())
+    url = (job.get("url") or "").strip()
     lines = [f"<b>{escape(title)}</b>" if title else None,
              line("🏢", job.get("company")),
              line("📍", job.get("location")),
              line("💼", job.get("workplace"), job.get("seniority"), job.get("contract")),
              line("🐘", stack),
-             line("🔗", job.get("url"))]
+             f'🔗 <a href="{escape(out_link(job))}">{escape(destiny(url))}</a>' if url else None]
     return "\n".join(x for x in lines if x)
 
 

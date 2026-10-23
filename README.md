@@ -143,6 +143,19 @@ stack e período (1, 4, 6, 24, 48 ou 72 h; os filtros ficam na URL, para compart
 - `GET /api/stats`
 - `GET /api/companies`
 - `GET /api/recruiters`
+- `GET /api/clicks?days=7`: cliques nos anúncios originais dos últimos `days` dias (1-365):
+  `{"total": N, "by_job": [[job_id, url, n], ...], "by_source": [[fonte, n], ...],
+  "by_day": [[dia, n], ...]}` (dia em UTC)
+
+**Cliques**: os links para o anúncio original (LinkedIn, Gupy...) nos cards da home, das
+páginas de tema e da página da vaga não apontam direto para a fonte, e sim para
+`/out?url=<url codificada>&job=<id>&page=<caminho>&source=<fonte>`. O `/out` grava o clique
+e responde `302` para `url` (com `Cache-Control: no-store`); `url` vazia ou que não começa com
+`http://`/`https://` volta para a home. Cada clique vira uma linha na tabela `clicks`: quando
+(`at`, ISO UTC), id da vaga (`job_id`), destino (`url`), página do site de onde saiu
+(`page`) e fonte da vaga (`source`). Nada identifica quem clicou (sem IP nem user agent).
+Quem cria a tabela é o coletor; até ele subir com a versão nova, os cliques só geram um
+aviso no log e o redirecionamento funciona igual.
 
 **Empresas** (`/empresas`): empresas que mais anunciaram vagas PHP nos portais nos últimos 90
 dias (2 ou mais vagas). Nomes escritos de jeitos diferentes são agrupados (`php.company_key`);

@@ -22,6 +22,9 @@ Rotas: /             página (static/index.html), com as primeiras vagas já no 
        /og.png       imagem de preview social (og:image / twitter:image), static/og.png
        /mercado-php  números do mercado PHP em texto (mercado.py), e /llms.txt
        /vaga/<seq>-<título>  página de uma vaga de portal, com JobPosting (vaga.py)
+       /out          conta o clique (tabela clicks) e redireciona para o anúncio original
+                     (url, job, page, source); os links externos das vagas passam por aqui
+       /api/clicks   cliques dos últimos `days` dias (padrão 7): total, por vaga, fonte e dia
 
 As páginas saem com título, descrição, canonical e JSON-LD (seo.py) e com o conteúdo já
 renderizado no servidor: robôs que não executam JavaScript leem as vagas. O JavaScript
@@ -34,6 +37,7 @@ Uso: python -m vagas_php.web   (http://WEB_HOST:WEB_PORT/)
 """
 
 import json
+import logging
 import os
 import re
 import unicodedata
@@ -56,6 +60,7 @@ from .store import SOURCES, Store
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("VAGAS_DATA_DIR", ROOT / "data"))
 STATIC = Path(__file__).resolve().parent / "static"
+log = logging.getLogger(__name__)
 
 _store: Store | None = None
 
@@ -143,9 +148,11 @@ def with_path(rows: list[dict]) -> list[dict]:
     return [{**r, "path": seo.job_path(r)} for r in rows]
 
 
-def job_card(job: dict) -> str:
+def job_card(job: dict, page: str = "/") -> str:
+    """`page`: caminho da página que mostra o card, gravado no clique (/out)."""
     e = escape
     url, path = _safe_url(job.get("url")), job.get("path")
+    out = url and vaga.out_href(url, job, page)
     title = e(job.get("title") or "(sem título)")
     who = " · ".join(x for x in (job.get("company"),
                                  job.get("author") if job.get("source") == "post" else None,
@@ -166,12 +173,12 @@ def job_card(job: dict) -> str:
     if path:
         link = f'<a class="page" href="{e(path)}">{title}</a>'
     elif url:
-        link = f'<a href="{e(url)}" target="_blank" rel="noopener">{title}</a>'
+        link = f'<a href="{e(out)}" target="_blank" rel="noopener">{title}</a>'
     else:
         link = title
     meta = e(" · ".join(x for x in (who, a and f"publicada em {a['at']} (Brasília)") if x))
     if path and url:
-        meta += (" · " if meta else "") + (f'<a href="{e(url)}" target="_blank" '
+        meta += (" · " if meta else "") + (f'<a href="{e(out)}" target="_blank" '
                                           f'rel="noopener">ver anúncio original</a>')
     age = (f'<span class="age" title="Vaga {a["label"]}: publicada há {a["text"]}">'
            f'{a["text"]}</span>') if a else ""
@@ -374,7 +381,7 @@ def _theme_html(request: Request, *, title: str, description: str, path: str, h1
                 crumb: str, intro: str, jobs: list[dict], more: str, related: str,
                 jsonld=None, noindex: bool = False, status: int = 200) -> HTMLResponse:
     content = {"h1": escape(h1), "crumb": crumb, "intro": intro,
-               "list": "".join(job_card(j) for j in jobs), "more": more, "related": related}
+               "list": "".join(job_card(j, path) for j in jobs), "more": more, "related": related}
     return HTMLResponse(seo.render(request, "tema.html", title=title, description=description,
                                    path=path, content=content, jsonld=jsonld, noindex=noindex),
                         status_code=status)
@@ -785,6 +792,28 @@ async def stats(request: Request):
         return JSONResponse({"sources": {}, "last_runs": {}, "open_total": 0})
 
 
+# --- cliques no anúncio original --------------------------------------------------------
+
+async def out(request: Request):
+    """Conta o clique e redireciona para o anúncio original. URL que não é http(s): home."""
+    p = request.query_params
+    if not (url := _safe_url(p.get("url"))):
+        return RedirectResponse("/", status_code=302)
+    try:
+        store().log_click(p.get("job"), url, p.get("page"), p.get("source"))
+    except Exception as e:  # base fora do ar: o clique se perde, o redirecionamento não
+        log.warning("clique não gravado (%s): %s", e, url)
+    return RedirectResponse(url, status_code=302, headers={"Cache-Control": "no-store"})
+
+
+async def clicks(request: Request):
+    days = int(_number(request.query_params.get("days"), 7, 1, 365))
+    try:
+        return JSONResponse({**store().click_stats(days), "days": days})
+    except ProgrammingError:  # tabela ainda não criada pelo coletor
+        return JSONResponse({"total": 0, "by_job": [], "by_source": [], "by_day": [], "days": days})
+
+
 # --- sitemap e robots ------------------------------------------------------------------
 # Cada provedor é uma função sem argumentos que devolve [(caminho, lastmod ISO ou None)].
 # Acrescente provedores em SITEMAP_PROVIDERS; caminho repetido vale uma vez (o primeiro).
@@ -856,6 +885,8 @@ app = Starlette(routes=[
     Route("/sitemap.xml", sitemap),
     Route("/robots.txt", robots),
     Route("/og.png", og_image),
+    Route("/out", out),
+    Route("/api/clicks", clicks),
     *mercado.routes,  # /mercado-php e /llms.txt
     *vaga.routes,     # /vaga/<seq>-<título>
 ])

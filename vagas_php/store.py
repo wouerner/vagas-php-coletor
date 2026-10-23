@@ -68,6 +68,17 @@ SCHEMA = [
     error       TEXT,
     INDEX runs_source (source, id)
 )""",
+    # Cliques nos links para o anúncio original (/out do site). O site grava aqui mesmo
+    # com a Store só leitura; quem cria a tabela é o coletor.
+    """CREATE TABLE IF NOT EXISTS clicks (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    at          VARCHAR(40) NOT NULL,  -- ISO UTC, como em runs
+    job_id      VARCHAR(255),          -- id da vaga ("linkedin:123"), quando houver
+    url         TEXT NOT NULL,         -- destino do clique
+    page        VARCHAR(255),          -- página do site de onde saiu o clique
+    source      VARCHAR(32),           -- fonte da vaga, quando houver
+    INDEX clicks_at (at)
+)""",
 ]
 
 # A mesma vaga é anunciada várias vezes (ex.: um ID do LinkedIn por cidade): vale só a
@@ -559,6 +570,33 @@ class Store:
         else:
             rows = self.execute("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (n,))
         return [dict(r) for r in rows]
+
+    def log_click(self, job_id: str | None, url: str, page: str | None,
+                  source: str | None) -> None:
+        """Grava um clique para o anúncio original. Falha na base (tabela ainda não
+        criada pelo coletor, MySQL fora) só vira aviso: o redirecionamento continua."""
+        try:
+            self.execute("INSERT INTO clicks (at, job_id, url, page, source) VALUES (?, ?, ?, ?, ?)",
+                         (now_iso(), (job_id or None) and job_id[:255], url,
+                          (page or None) and page[:255], (source or None) and source[:32]))
+        except pymysql.MySQLError as e:
+            log.warning("clique não gravado (%s): %s", e, url)
+
+    def click_stats(self, days: int = 7) -> dict:
+        """Cliques dos últimos `days` dias: total, por vaga, por fonte e por dia (UTC)."""
+        since = dates.utc_iso(dates.now_utc() - timedelta(days=days))
+        total = self.execute("SELECT count(*) FROM clicks WHERE at >= ?", (since,)).fetchone()[0]
+        by_job = self.execute(
+            "SELECT job_id, url, count(*) n FROM clicks WHERE at >= ? "
+            "GROUP BY job_id, url ORDER BY n DESC", (since,))
+        by_source = self.execute(
+            "SELECT source, count(*) n FROM clicks WHERE at >= ? GROUP BY source ORDER BY n DESC",
+            (since,))
+        by_day = self.execute(
+            "SELECT left(at, 10) day, count(*) FROM clicks WHERE at >= ? GROUP BY day ORDER BY day",
+            (since,))
+        return {"total": total, "by_job": [list(r) for r in by_job],
+                "by_source": [list(r) for r in by_source], "by_day": [list(r) for r in by_day]}
 
     def last_ok_start(self, source: str) -> str | None:
         row = self.execute("SELECT started_at FROM runs WHERE source = ? AND ok = 1 "
