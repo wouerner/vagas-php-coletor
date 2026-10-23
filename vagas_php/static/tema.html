@@ -85,6 +85,21 @@
   .themes { margin-top: 28px; }
   .themes h2 { font-size: 16px; margin: 0 0 8px; }
   footer { color: var(--muted); font-size: 12px; padding: 28px 0 40px; text-align: center; }
+  /* Celular: menos coisa em volta, mais espaço para as vagas. */
+  @media (max-width: 700px) {
+    header { padding: 16px 0 4px; display: block; }
+    header nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 8px -16px 0; padding: 0 16px; }
+    header nav::-webkit-scrollbar { display: none; }
+    header nav a { flex: none; padding: 10px 14px; }
+    header nav { mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+    .intro p + p { font-size: 13px; }
+    h1 { font-size: 22px; }
+    #list { gap: 8px; }
+    .job { padding: 12px 14px; border-left-width: 4px; }
+    .job .when { display: none; }
+    .job .meta a { display: inline-block; padding: 4px 0; }
+    .job:has(a.page) details { display: none; }
+  }
 </style>
 </head>
 <body>

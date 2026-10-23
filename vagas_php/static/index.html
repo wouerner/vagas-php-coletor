@@ -45,16 +45,30 @@
   .tg { display: inline-flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; margin-top: 10px;
         font-size: 14px; padding: 7px 14px; border-radius: 12px; background: var(--accent-soft); }
   .tg a { font-weight: 600; overflow-wrap: anywhere; }
+  .tg-short { display: none; }
   .stats { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; font-size: 13px; color: var(--muted); }
   .stats b { color: var(--text); }
 
-  form { position: sticky; top: 0; z-index: 1; background: var(--bg); padding: 12px 0;
+  /* Acima dos links dos cards (z-index 1), que senão passam por cima no scroll. */
+  form { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 12px 0;
          display: grid; gap: 8px; grid-template-columns: 1fr repeat(4, auto); }
   input, select, button { font: inherit; color: var(--text); background: var(--surface);
          border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
   input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .sources { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
-  .sources label { cursor: pointer; font-size: 13px; padding: 4px 10px; border-radius: 999px;
+  /* No celular os seletores e as fontes ficam atrás do botão Filtros; no desktop o painel
+     some do layout e os campos ficam direto na grade do formulário. */
+  .panel { display: contents; }
+  .filters-btn { display: none; cursor: pointer; align-items: center; gap: 6px; }
+  .filters-btn .count { font-size: 12px; font-weight: 600; min-width: 20px; padding: 0 6px; border-radius: 999px;
+         color: var(--surface); background: var(--accent); text-align: center; }
+  .filters-btn[aria-expanded=true] { border-color: var(--accent); color: var(--accent); }
+  /* Chegaram vagas com o painel fechado (o "Ao vivo" fica dentro dele). */
+  .filters-btn[data-news]::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .stats .period { display: none; }
+  .empty button { cursor: pointer; margin-left: 6px; }
+  .sources-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+  .sources { display: contents; }
+  .sources label { position: relative; cursor: pointer; font-size: 13px; padding: 4px 10px; border-radius: 999px;
          background: var(--chip); border: 1px solid transparent; user-select: none; }
   .sources input { position: absolute; opacity: 0; pointer-events: none; }
   .sources input:checked + span { color: var(--accent); font-weight: 600; }
@@ -130,9 +144,42 @@
   .themes a.zero { color: var(--muted); background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
   footer { color: var(--muted); font-size: 12px; padding: 24px 0 40px; text-align: center; }
 
+  /* Celular: menos coisa em volta, mais espaço para as vagas. */
   @media (max-width: 700px) {
-    form { grid-template-columns: 1fr 1fr; }
-    form > input[type=search] { grid-column: 1 / -1; }
+    header { padding: 16px 0 4px; }
+    .top { display: block; }
+    h1 { font-size: 22px; }
+    header nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 8px -16px 0; padding: 0 16px; }
+    header nav::-webkit-scrollbar { display: none; }
+    header nav a { flex: none; padding: 10px 14px; }
+    input, select, .filters-btn { min-height: 44px; }
+    .sources label { padding: 8px 12px; }
+    .sub, .legend { display: none; }
+    .tg { display: block; margin-top: 8px; padding: 0; background: none; font-size: 13px; color: var(--muted);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stats { margin-top: 4px; font-size: 12px; gap: 0 12px; }
+    .stats .period { display: inline; }
+    .tg-long { display: none; }
+    .tg-short { display: inline; }
+    /* Esmaece a borda direita das faixas roláveis: há mais itens além dela. */
+    header nav, .panel .sources { mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+
+    form { grid-template-columns: 1fr auto; padding: 8px 0; gap: 8px; }
+    .filters-btn { display: inline-flex; }
+    .panel { display: none; grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 8px; }
+    form.open .panel { display: grid; }
+    .sources-row { grid-column: 1 / -1; display: grid; gap: 8px; }
+    .panel .sources { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px; }
+    .panel .sources::-webkit-scrollbar { display: none; }
+    .sources label, .live { flex: none; }
+    .live { margin-left: 0; justify-self: start; }
+
+    #list { gap: 8px; }
+    .job { padding: 12px 14px; border-left-width: 4px; }
+    .job .when { display: none; }
+    .job .meta a { display: inline-block; padding: 4px 0; }  /* longe do resto do card, que leva à página */
+    /* O card leva à página da vaga, que tem a descrição inteira. */
+    .job:has(a.page) details { display: none; }
   }
 </style>
 </head>
@@ -144,7 +191,7 @@
       <nav><a href="/" aria-current="page">Vagas</a><a href="/dashboard">Dashboard</a><a href="/empresas">Empresas</a><a href="/recrutadores">Recrutadores</a><a href="/mercado-php">Mercado</a><a href="/regras">Regras</a></nav>
     </div>
     <p class="sub">Engenharia de software com PHP, Laravel e Symfony: vagas do LinkedIn, Gupy, Sólides, Catho, Remotar, Programathor, Coodesh e de empresas que usam a InHire, publicações de recrutadores e issues de repositórios de vagas no GitHub. Só vagas publicadas nas últimas 72 horas (horário de Brasília).</p>
-    <p class="tg">Receba as vagas de PHP no seu Telegram <a href="https://t.me/vagas_php" rel="noopener">t.me/vagas_php</a></p>
+    <p class="tg"><span class="tg-long">Receba as vagas de PHP no Telegram</span><span class="tg-short">Vagas no Telegram</span>: <a href="https://t.me/vagas_php" rel="noopener">t.me/vagas_php</a></p>
     <div class="stats" id="stats"><!--ssr:stats--></div>
     <div class="legend" aria-label="Cores por idade da vaga">
       <span style="--c: var(--age-new)">nova (até 6 h)</span>
@@ -155,7 +202,10 @@
   </header>
 
   <form id="filters" role="search">
-    <input type="search" name="q" placeholder="Buscar: laravel, remoto, empresa…" aria-label="Buscar">
+    <input type="search" name="q" placeholder="Buscar vaga, stack, empresa…" aria-label="Buscar">
+    <button type="button" class="filters-btn" id="filters-btn" aria-expanded="false" aria-controls="panel">
+      Filtros<span class="count" id="filters-count" hidden></span></button>
+    <div class="panel" id="panel">
     <select name="workplace" aria-label="Modalidade">
       <option value="">Modalidade</option><option>Remoto</option><option>Híbrido</option><option>Presencial</option>
     </select>
@@ -174,6 +224,7 @@
       <option value="48">Últimas 48 horas</option>
       <option value="72" selected>Últimas 72 horas</option>
     </select>
+    <div class="sources-row">
     <div class="sources" role="radiogroup" aria-label="Fonte">
       <label><input type="radio" name="source" value="" checked><span>Todas as fontes</span></label>
       <label><input type="radio" name="source" value="linkedin"><span>Vagas LinkedIn</span></label>
@@ -189,10 +240,12 @@
       <label><input type="radio" name="source" value="inhire"><span>InHire</span></label>
       <label><input type="radio" name="source" value="post"><span>Publicações LinkedIn</span></label>
       <label><input type="radio" name="source" value="github"><span>GitHub</span></label>
+    </div>
       <button type="button" class="live" id="live" data-state="loading"
               title="Atualiza sozinho a cada minuto. Clique para atualizar agora.">
         <span class="dot" aria-hidden="true"></span><span id="live-text">Carregando…</span>
       </button>
+    </div>
     </div>
     <div class="tick" aria-hidden="true"><span id="tick"></span></div>
   </form>
@@ -287,13 +340,13 @@ function card(job) {
   // fica na linha de baixo. Post do LinkedIn: o título leva ao post.
   const original = text => el("a", { href: outHref(url, job), target: "_blank", rel: "noopener" }, text);
   const link = job.path ? el("a", { className: "page", href: job.path }, title) : url ? original(title) : title;
-  const meta = [who, a && `publicada em ${a.at} (Brasília)`].filter(Boolean).join(" · ");
+  const when = a && el("span", { className: "when" }, (who ? " · " : "") + `publicada em ${a.at} (Brasília)`);
   const li = el("li", { className: "job" + (a ? " " + a.band : "") },
     el("div", { className: "head" },
       el("h2", {}, link),
       a && el("span", { className: "age", title: `Vaga ${a.label}: publicada há ${a.text}` }, a.text)),
-    el("div", { className: "meta" }, meta,
-      job.path && url && meta ? " · " : null, job.path && url ? original("ver anúncio original") : null),
+    el("div", { className: "meta" }, who, when,
+      job.path && url && (who || when) ? " · " : null, job.path && url ? original("ver anúncio original") : null),
     tags);
   li.dataset.id = job.id;
   if (job.description) {
@@ -354,9 +407,16 @@ async function load(mode = "reset") {
     const data = await res.json();
     if (mine !== seq) return;  // resposta de uma busca antiga
     const added = render(data.jobs, { append: mode === "more", auto });
+    // Filtro novo com a página rolada: volta para o começo da lista, logo abaixo dos filtros.
+    const listTop = list.getBoundingClientRect().top, formBottom = form.getBoundingClientRect().bottom;
+    if (mode === "reset" && listTop < formBottom) window.scrollBy(0, listTop - formBottom - 8);
     offset = mode === "more" ? offset + data.jobs.length : data.jobs.length;
     more.hidden = !data.has_more;
-    if (!list.children.length) list.append(el("li", { className: "empty" }, "Nenhuma vaga encontrada com esses filtros."));
+    if (!list.children.length) {
+      const clear = el("button", { type: "button" }, "Limpar filtros");
+      clear.addEventListener("click", clearFilters);
+      list.append(el("li", { className: "empty" }, "Nenhuma vaga encontrada com esses filtros. ", clear));
+    }
     updated(added);
   } catch (e) {
     if (mine !== seq) return;
@@ -385,6 +445,7 @@ function updated(added) {
   if (added) {
     const msg = added === 1 ? "1 vaga nova" : `${added} vagas novas`;
     setLive("news", `${msg} · ${at}`);
+    if (!form.classList.contains("open")) filtersBtn.dataset.news = "";
     announce.textContent = msg;
     if (document.hidden) unseen += added;
   } else {
@@ -423,6 +484,8 @@ async function loadStats() {
     box.replaceChildren(el("span", {}, el("b", {}, String(open)), " vagas abertas na base"));
     const runs = Object.values(s.last_runs || {}).filter(r => r && r.ok).map(r => r.finished_at).sort();
     if (runs.length) box.append(el("span", {}, "última coleta " + ago(runs[runs.length - 1])));
+    box.append(el("span", { className: "period" }));
+    showPeriod();
   } catch (e) { /* estatística é opcional */ }
 }
 
@@ -431,6 +494,41 @@ for (const [k, v] of new URLSearchParams(location.search)) {
   const field = form.elements[k];
   if (field) field.value = v;
 }
+
+// Botão Filtros (celular): abre o painel e mostra quantos filtros estão fora do padrão.
+const filtersBtn = document.getElementById("filters-btn");
+const filtersCount = document.getElementById("filters-count");
+function countFilters() {
+  const n = ["workplace", "seniority", "stack", "source"].filter(k => form.elements[k].value).length
+    + (form.elements.hours.value !== "72");
+  filtersCount.textContent = n;
+  filtersCount.hidden = !n;
+  filtersBtn.setAttribute("aria-label", n ? `Filtros, ${n} ativo${n > 1 ? "s" : ""}` : "Filtros");
+}
+const showPeriod = () => document.querySelectorAll(".stats .period").forEach(s =>
+  s.textContent = form.elements.hours.selectedOptions[0].textContent.toLowerCase());
+function togglePanel(open = !form.classList.contains("open")) {
+  form.classList.toggle("open", open);
+  filtersBtn.setAttribute("aria-expanded", open);
+  if (open) delete filtersBtn.dataset.news;
+}
+filtersBtn.addEventListener("click", () => togglePanel());
+// Escolheu um seletor no celular: fecha o painel para mostrar as vagas. Fonte não fecha,
+// para dar para ir trocando e comparar.
+form.addEventListener("change", e => {
+  if (e.target.tagName === "SELECT" && matchMedia("(max-width: 700px)").matches) togglePanel(false);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && form.classList.contains("open")) { togglePanel(false); filtersBtn.focus(); }
+});
+// Não usa form.reset(): ele volta aos valores que o servidor marcou a partir da URL.
+function clearFilters() {
+  for (const [k, v] of [["q", ""], ["workplace", ""], ["seniority", ""], ["stack", ""], ["hours", "72"], ["source", ""]])
+    form.elements[k].value = v;
+  countFilters(); showPeriod(); load("reset");
+}
+countFilters();
+form.addEventListener("input", () => { countFilters(); showPeriod(); });
 
 let timer;
 form.addEventListener("input", e => {

@@ -176,7 +176,9 @@ def job_card(job: dict, page: str = "/") -> str:
         link = f'<a href="{e(out)}" target="_blank" rel="noopener">{title}</a>'
     else:
         link = title
-    meta = e(" · ".join(x for x in (who, a and f"publicada em {a['at']} (Brasília)") if x))
+    meta = e(who)
+    if a:  # some no celular, onde o selo de idade basta
+        meta += f'<span class="when">{" · " if who else ""}publicada em {e(a["at"])} (Brasília)</span>'
     if path and url:
         meta += (" · " if meta else "") + (f'<a href="{e(out)}" target="_blank" '
                                           f'rel="noopener">ver anúncio original</a>')
@@ -493,6 +495,9 @@ async def index(request: Request):
     runs = sorted(r["finished_at"] for r in st["last_runs"].values() if r and r["ok"])
     if runs:
         stats_html += f"<span>última coleta {escape(_ago(runs[-1]) or '')}</span>"
+    hours = p.get("hours") if p.get("hours") in ("1", "4", "6", "24", "48") else "72"
+    stats_html += f'<span class="period">últim{"a" if hours == "1" else "as"} {hours} hora{"s" * (hours != "1")}</span>'
+
     counts = _theme_counts(open_jobs())  # contagem dos temas: sempre sem filtro
     singles = [t for t in THEMES.values() if t["group"] != "Combinações"]
     themes_html = _theme_links(singles, counts) + '<a href="/vagas">Todos os temas</a>'
