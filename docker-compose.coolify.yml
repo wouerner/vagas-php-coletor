@@ -21,7 +21,10 @@ services:
       MCP_PORT: "8000"
       LINKEDIN_HEADLESS: "false"
       VAGAS_SESSION_DIR: /app/.session
-      DATABASE_URL: ${DATABASE_URL:?defina DATABASE_URL}
+      # No build o DATABASE_URL não existe (e o build não usa a base); na execução o
+      # Coolify injeta o valor real da aplicação, que vence a interpolação. Por isso
+      # :- (default vazio) e não :? (falhar se vazio).
+      DATABASE_URL: ${DATABASE_URL:-}
       LINKEDIN_EMAIL: ${LINKEDIN_EMAIL}
       LINKEDIN_PASSWORD: ${LINKEDIN_PASSWORD}
       VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
@@ -90,7 +93,7 @@ services:
       WEB_HOST: 0.0.0.0
       WEB_PORT: "8000"
       VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
-      DATABASE_URL: ${DATABASE_URL:?defina DATABASE_URL}
+      DATABASE_URL: ${DATABASE_URL:-}
     volumes:
       - vagas-data:/app/data
     healthcheck:
