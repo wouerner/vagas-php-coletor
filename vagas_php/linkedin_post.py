@@ -79,6 +79,14 @@ COMPOSER_EDITOR = ("[componentkey=ShareBox_textEditor][contenteditable=true], "
                    "div.ql-editor[contenteditable=true], "
                    "div[role=textbox][contenteditable=true]")
 COMPOSER_BOXES = ("dialog[open]", "#interop-outlet", "body")
+MEDIA_BUTTON = re.compile(r"^(Adicionar mídia|Add media|Mídia|Media)$")
+NEXT_BUTTON = re.compile(r"^(Avançar|Next)$")
+# Miniatura da imagem anexada: data: na caixa antiga, blob: na nova (out/2026: <figure>
+# com componentkey; o avatar do cabeçalho também é <figure>, mas sem componentkey).
+ATTACHED_IMAGE = "img[src^='data:image'], img[src^='blob:'], figure[componentkey] img"
+# Botão de remover a mídia: caixa antiga "Remover conteúdo de mídia"; na nova, o par de
+# botões sobre a miniatura tem aria-label "Edit" e "Close" (em inglês, mesmo em pt-BR).
+REMOVE_MEDIA = re.compile(r"^(Remover conteúdo de mídia|Remove media)")
 
 
 def find_composer(page, timeout: int = 20000):
@@ -103,6 +111,46 @@ def find_composer(page, timeout: int = 20000):
         page.wait_for_timeout(500)
 
 
+def image_attached(composer) -> bool:
+    """True se a caixa de publicação tem a miniatura carregada ou o botão de remover a mídia."""
+    loaded = composer.locator(ATTACHED_IMAGE).evaluate_all(
+        "els => els.some(i => i.complete && i.naturalWidth > 0 && i.getBoundingClientRect().width > 0)")
+    if loaded or composer.get_by_role("button", name=REMOVE_MEDIA).count():
+        return True
+    return bool(composer.get_by_role("button", name="Edit", exact=True).count()
+                and composer.get_by_role("button", name="Close", exact=True).count())
+
+
+def attach_image(page, box, composer, image: Path, timeout: int = 60000) -> None:
+    """Escolhe a imagem em "Mídia", passa pela etapa "Editor" (outro <dialog>, com
+    "Avançar") se ela aparecer e espera a miniatura na caixa. Tenta duas vezes; sem a
+    miniatura, RuntimeError (nada publicado)."""
+    nxt = box.get_by_role("button", name=NEXT_BUTTON)
+    for attempt in (1, 2):
+        with page.expect_file_chooser(timeout=15000) as chooser:
+            composer.get_by_role("button", name=MEDIA_BUTTON).first.click()
+        chooser.value.set_files(str(image))
+        deadline = time.monotonic() + timeout / 1000
+        while time.monotonic() < deadline:
+            try:
+                if nxt.last.is_visible():  # etapa "Editor": "Avançar" volta para a caixa
+                    nxt.last.click()
+                    nxt.last.wait_for(state="hidden", timeout=30000)
+                    deadline = time.monotonic() + 30  # upload da miniatura
+                elif image_attached(composer):
+                    log.info("Imagem anexada (tentativa %d)", attempt)
+                    return
+            except PlaywrightError as e:  # diálogo trocando no meio da consulta
+                log.debug("Anexo da imagem: %s", e)
+            page.wait_for_timeout(500)
+        # Sem miniatura e sem etapa "Editor": se o botão "Mídia" sumiu, há mídia pela
+        # metade na caixa; outra tentativa poderia anexar a imagem duas vezes.
+        if nxt.last.is_visible() or not composer.get_by_role("button", name=MEDIA_BUTTON).count():
+            break
+        log.warning("Imagem não anexou em %ds (tentativa %d)", timeout // 1000, attempt)
+    raise RuntimeError("A imagem não foi anexada; nada publicado.")
+
+
 def publish(body: str, image: Path, out_dir: Path, headless: bool = True,
             dry_run: bool = False) -> None:
     """Abre a caixa de publicação, escreve o texto, anexa a imagem, confere e publica
@@ -119,21 +167,28 @@ def publish(body: str, image: Path, out_dir: Path, headless: bool = True,
         editor.click()
         page.keyboard.press("Control+A")  # rascunho restaurado de uma tentativa anterior
         page.keyboard.press("Backspace")
+        page.wait_for_timeout(500)
+        # Só a caixa com o editor: com a etapa "Editor" da imagem há dois dialog[open], e a
+        # prévia dela não conta como imagem anexada.
+        composer = box.filter(has=page.locator(COMPOSER_EDITOR))
+        # Imagem antes do texto: uma URL no texto (o convite do Telegram) vira prévia de
+        # link, e com ela o LinkedIn tira o botão "Mídia" da caixa (é prévia ou mídia).
+        try:
+            attach_image(page, box, composer, image)
+        except Exception:
+            page.screenshot(path=str(out_dir / "preview.png"))
+            raise
+        editor.click()
+        page.keyboard.press("Control+End")
         for i, line in enumerate(body.split("\n")):
             if i:
                 page.keyboard.press("Enter")
             if line:
                 page.keyboard.insert_text(line)
-        page.wait_for_timeout(1000)
-        with page.expect_file_chooser(timeout=15000) as chooser:
-            box.get_by_role("button", name=re.compile(r"^(Adicionar mídia|Add media|Mídia|Media)$")).click()
-        chooser.value.set_files(str(image))
-        # Etapa "Editor" da imagem: "Avançar" volta para a caixa com a imagem anexada.
-        box.get_by_role("button", name=re.compile(r"^(Avançar|Next)$")).click(timeout=30000)
-        page.wait_for_timeout(3000)
+        page.wait_for_timeout(3000)  # prévia de link, se o LinkedIn tentar trocar a imagem
         page.screenshot(path=str(out_dir / "preview.png"))
-        # Miniatura da imagem anexada: data: na caixa antiga, blob: na nova.
-        attached = box.locator("img[src^='data:image'], img[src^='blob:']")
+        # A miniatura fica abaixo do texto, fora da área visível do editor.
+        attached = composer.locator(ATTACHED_IMAGE)
         if attached.count():
             attached.last.scroll_into_view_if_needed(timeout=5000)
         page.screenshot(path=str(out_dir / "preview-imagem.png"))
@@ -142,8 +197,7 @@ def publish(body: str, image: Path, out_dir: Path, headless: bool = True,
         first_line, last_line = body.split("\n")[0], body.rstrip().split("\n")[-1]
         if typed.count(first_line) != 1 or last_line not in typed:
             raise RuntimeError("O texto na caixa de publicação não confere; nada publicado.")
-        removable = box.get_by_role("button", name=re.compile(r"^(Remover conteúdo de mídia|Remove media)"))
-        if not (removable.count() or attached.count()):
+        if not image_attached(composer):
             raise RuntimeError("A imagem não foi anexada; nada publicado.")
         if dry_run:
             # Caixa antiga: Esc pede confirmação. Nova (<dialog>): "Fechar" pede confirmação.

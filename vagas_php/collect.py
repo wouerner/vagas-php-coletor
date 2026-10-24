@@ -349,7 +349,7 @@ def post_to_job(post: Post) -> dict:
     else:
         jid = "post:h:" + hashlib.sha1(f"{post.author}|{text[:300]}".encode()).hexdigest()[:20]
     return {
-        "id": jid, "source": "post", "relevant": php.is_php_hiring_post(text),
+        "id": jid, "source": "post", "relevant": php.is_php_hiring_post(text, post.author),
         "title": _post_title(text), "company": None, "url": post.url,
         "author": post.author, "author_url": post.author_url,
         "author_headline": post.headline, "description": text,
@@ -373,11 +373,12 @@ def search_hiring_posts(bot: LinkedInBot, date_posted: str) -> list[Post]:
         posted = dates.from_relative(p.time)
         if not (posted and posted > oldest):
             return False
-        verdict = php.post_verdict(p.text or p.raw_text)
+        verdict = php.post_verdict(p.text or p.raw_text, p.author)
         # Recusados que falam de PHP também são guardados (fora do site): a página
         # /regras conta quantos cada regra barrou, e mudanças no filtro valem para eles
-        # (reclassify). Posts de quem procura emprego não.
-        if verdict not in php.POST_OK and verdict not in ("post_no_php", "job_seeker"):
+        # (reclassify). Posts de quem procura emprego e do próprio site não.
+        if verdict not in php.POST_OK and verdict not in ("post_no_php", "job_seeker",
+                                                          "self_author"):
             rejected.setdefault(key(p), p)
         return verdict in php.POST_OK
 
@@ -411,8 +412,8 @@ def import_post(store: Store, url: str) -> dict:
     ident = next((m for t in (url, canonical, page) for m in POST_ID.finditer(t)
                   if m.group(1) == "share"), None) \
         or POST_ID.search(canonical) or POST_ID.search(url) or POST_ID.search(page)
-    verdict = php.post_verdict(text)
     author = post.get("author") or {}
+    verdict = php.post_verdict(text, author.get("name"))
     job = {"id": f"post:urn:li:{ident.group(1)}:{ident.group(2)}" if ident else
            "post:h:" + hashlib.sha1(f"{author.get('name')}|{text[:300]}".encode()).hexdigest()[:20],
            "source": "post", "relevant": verdict in php.POST_OK, "title": _post_title(text),
@@ -420,7 +421,7 @@ def import_post(store: Store, url: str) -> dict:
            "author_url": author.get("url"), "author_headline": author.get("jobTitle"),
            "description": text,
            "posted_at": dates.normalize(post.get("datePublished")), **php.details(None, text)}
-    saved = verdict not in ("post_no_php", "job_seeker")
+    saved = verdict not in ("post_no_php", "job_seeker", "self_author")
     if saved:
         store.save_jobs([job])
     rule = next((r for r in php.RULES if r["id"] == verdict), {})

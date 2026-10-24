@@ -128,6 +128,14 @@ Com `VAGAS_LINKEDIN_DAILY_POST=true`, o serviço publica todo dia às `VAGAS_LIN
 O resumo semanal do [canal do Telegram](https://t.me/vagas_php) (`telegram-digest`) é este
 mesmo post: o mesmo print do dashboard e o mesmo texto.
 
+Os alertas de vagas novas do canal saem de `python -m vagas_php telegram-alert`, que lê a
+API pública do site e envia, por padrão, uma mensagem por vaga (no máximo `--limit`, 5).
+Com `--batch`, todas as vagas pendentes vão numa mensagem só (título em negrito e, abaixo,
+empresa · local · modalidade · senioridade · stack e o link); se a mensagem passar do limite
+de 4096 caracteres do Telegram, as mais antigas ficam para a próxima execução. A janela
+`VAGAS_TELEGRAM_ACTIVE_HOURS` (padrão `8-19`, horário de Brasília) e o `--force` valem nos
+dois modos; `--dry-run` só imprime, sem enviar nem gravar o estado.
+
 Antes de publicar, confere se o texto aparece uma vez só (o LinkedIn pode restaurar um
 rascunho) e se a imagem foi anexada; se não, não publica. No máximo um post por dia: se
 falhar, tenta de novo a cada 30 min, até 3 vezes, nas 3 h seguintes ao horário. Prévia,

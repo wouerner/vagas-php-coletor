@@ -3,7 +3,8 @@ acessar a base) e publica cada uma num chat pelo bot de VAGAS_TELEGRAM_TOKEN.
 
 Os ids já enviados ficam em data/telegram_alert_state.json (só os últimos 500). Cada
 execução envia no máximo `limit` vagas, para não inundar o chat: as mais recentes ainda
-não enviadas, em ordem de publicação. Cada envio bem-sucedido (vaga ou resumo semanal)
+não enviadas, em ordem de publicação. No modo agrupado (batch) vai UMA mensagem com todas
+as pendentes que couberem no limite do Telegram (format_digest). Cada envio bem-sucedido (vaga ou resumo semanal)
 também entra em data/telegram_alert_log.json com data/hora (últimas 500 entradas), base
 do relatório diário do canal.
 
@@ -37,6 +38,10 @@ LOG_FILE = "telegram_alert_log.json"
 LOG_MAX = 500
 DIGEST_STATE_FILE = "telegram_digest_state.json"
 CAPTION_MAX = 1024  # limite da legenda de foto no Telegram
+# Limite de sendMessage. O Telegram conta o texto já sem as tags; aqui conta o HTML inteiro,
+# então a mensagem que cabe fica bem abaixo do limite real.
+MESSAGE_MAX = 4096
+INDENT = "    "  # recuo dos detalhes de cada vaga no resumo agrupado
 ATTEMPTS = 2
 HEADERS = {"User-Agent": "vagas-php"}
 
@@ -96,6 +101,44 @@ def format(job: dict) -> str:
              line("🐘", stack),
              f'🔗 <a href="{escape(out_link(job))}">{escape(destiny(url))}</a>' if url else None]
     return "\n".join(x for x in lines if x)
+
+
+def digest_fit(jobs: list[dict]) -> tuple[str, int]:
+    """(mensagem, quantas vagas couberam) do resumo agrupado: as vagas do fim saem até a
+    mensagem caber em MESSAGE_MAX. Lista vazia: ("", 0)."""
+    if not jobs:
+        return "", 0
+    today = dates.now_utc().astimezone(dates.BRASILIA)
+    head = [f"<b>🐘 Vagas PHP</b> — {today:%d/%m}", "",
+            "Vagas de PHP, Laravel e Symfony publicadas nas últimas horas:"]
+    blocks = []
+    for job in jobs:
+        stack = ", ".join(s.strip() for s in (job.get("stack") or "").split(",") if s.strip())
+        details = " · ".join(escape(str(p).strip()) for p in (
+            job.get("company"), job.get("location"), job.get("workplace"),
+            job.get("seniority"), stack) if p and str(p).strip())
+        title = (job.get("title") or "").strip()
+        url = (job.get("url") or "").strip()
+        lines = [f"<b>{escape(title)}</b>" if title else None,
+                 f"{INDENT}{details}" if details else None,
+                 f'{INDENT}🔗 <a href="{escape(out_link(job))}">{escape(destiny(url))}</a>'
+                 if url else None]
+        blocks.append("\n".join(x for x in lines if x))
+    n = len(blocks)
+    while n:
+        text = "\n".join(head) + "\n\n" + "\n\n".join(blocks[:n])
+        if len(text) <= MESSAGE_MAX:
+            break
+        n -= 1
+    if n < len(blocks):
+        log.warning("Resumo agrupado acima de %d caracteres: couberam %d de %d vagas.",
+                    MESSAGE_MAX, n, len(blocks))
+    return (text, n) if n else ("", 0)
+
+
+def format_digest(jobs: list[dict]) -> str:
+    """UMA mensagem em HTML do Telegram com a lista de vagas (cabe em MESSAGE_MAX)."""
+    return digest_fit(jobs)[0]
 
 
 def send(token: str, chat_id: str, text: str) -> dict:
@@ -285,8 +328,11 @@ def in_window(hour: int, start: int, end: int) -> bool:
     return start <= hour < end if start <= end else hour >= start or hour < end
 
 
-def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = False) -> dict:
+def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = False,
+        batch: bool = False) -> dict:
     """Envia as vagas ainda não enviadas (no máximo `limit`). dry_run: só imprime.
+    batch: UMA mensagem com todas as pendentes (format_digest), sem `limit`; as que não
+    couberem no limite do Telegram ficam pendentes para a próxima execução.
     Fora de VAGAS_TELEGRAM_ACTIVE_HOURS não envia nada (as vagas ficam pendentes para a
     próxima execução dentro da janela); force ignora a janela."""
     if not force:
@@ -306,12 +352,14 @@ def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = Fal
     # Sem link a mensagem não serve: vagas sem url (ex.: as de publicações) ficam de fora.
     pending = [j for j in unsent if (j.get("url") or "").strip()]
     skipped = len(unsent) - len(pending)
-    batch = list(reversed(pending[:limit]))  # as mais recentes, a mais antiga primeiro
+    if batch:
+        return run_batch(data_dir, jobs, pending, skipped, dry_run)
+    to_send = list(reversed(pending[:limit]))  # as mais recentes, a mais antiga primeiro
     log.info("%d vagas na API, %d ainda não enviadas (%d ignoradas sem URL); enviando %d%s.",
-             len(jobs), len(pending), skipped, len(batch), " (simulação)" if dry_run else "")
+             len(jobs), len(pending), skipped, len(to_send), " (simulação)" if dry_run else "")
 
     sent = 0
-    for job in batch:
+    for job in to_send:
         text = format(job)
         if dry_run:
             print(f"--- {job['id']}\n{text}\n")
@@ -332,3 +380,34 @@ def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = Fal
         print(f"{skipped} vaga(s) ignorada(s) por falta de URL.")
     return {"api": len(jobs), "pending": len(pending), "sent": sent, "skipped": skipped,
             "dry_run": dry_run}
+
+
+def run_batch(data_dir: Path, jobs: list[dict], pending: list[dict], skipped: int,
+              dry_run: bool) -> dict:
+    """Modo agrupado de run: uma só mensagem com as vagas pendentes (mais recentes primeiro;
+    as mais antigas saem se passar do limite) e todas as enviadas gravadas no estado e no log."""
+    text, n = digest_fit(pending)
+    included = pending[:n]
+    log.info("%d vagas na API, %d ainda não enviadas (%d ignoradas sem URL); enviando %d "
+             "numa mensagem só (%d caracteres)%s.", len(jobs), len(pending), skipped, n,
+             len(text), " (simulação)" if dry_run else "")
+    result = {"api": len(jobs), "pending": len(pending), "sent": 0, "skipped": skipped,
+              "batch": True, "included": n, "chars": len(text), "dry_run": dry_run}
+    if not included:
+        return result
+    if dry_run:
+        print(f"--- mensagem única: {n} vaga(s), {len(text)} caracteres\n{text}\n")
+        print(f"{skipped} vaga(s) ignorada(s) por falta de URL.")
+        return result
+    resp = send(VAGAS_TELEGRAM_TOKEN, VAGAS_TELEGRAM_CHAT_ID, text)
+    if not resp.get("ok"):
+        # Nada gravado: as vagas ficam pendentes e voltam na próxima execução.
+        log.error("Telegram recusou o resumo agrupado: %s", resp.get("description"))
+        return result
+    sent_ids = state_load(data_dir) + [j["id"] for j in included]
+    state_save(data_dir, sent_ids)
+    for job in included:
+        log_append(data_dir, {"kind": "job", "id": job["id"], "source": job.get("source"),
+                              "title": job.get("title"), "batch": True})
+    log.info("Resumo agrupado enviado com %d vaga(s).", n)
+    return {**result, "sent": n}

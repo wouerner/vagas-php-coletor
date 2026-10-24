@@ -87,6 +87,29 @@ AGGREGATOR = [
 ]
 AGGREGATOR_RES = [re.compile(rx, re.I) for rx in AGGREGATOR]
 AGGREGATOR_MIN = 3
+# Autor de post que é agregador de vagas, pelo NOME de quem publicou: páginas e
+# consultorias que republicam anúncios genéricos de outras empresas, sem curadoria (e
+# que ficam velhos). Não contratam: o anúncio que interessa é o de quem contrata. O
+# critério é o nome denunciar o agregador ("Vagas Remotas", "DEVagas", "Jobs Brasil",
+# "Recrutei Empregos"...) ou ser de página/consultoria conhecida que só repassa vaga. Nome
+# de pessoa nunca entra aqui: um padrão só vale se não casa com nome de gente ("vagas?" e
+# "jobs?" sem \b no começo pegam "DEVagas", "AloVagas!" e "MangaJobs", e nome de pessoa
+# não tem essas palavras). Os nomes são comparados sem acento. Acrescente padrões aqui.
+AGGREGATOR_AUTHOR = [
+    r"vagas?\b", r"jobs?\b", r"\bempregos?\b", r"\bemprega\b",
+    r"\bcandidat[ae] a[ií]\b", r"\bcaderno nacional\b", r"\brecrut(ei|a)\b",
+    r"\bhunting\b", r"\bespecialistas em recrutamento\b", r"\bconsultoria de gente\b",
+    r"\bassessoria de carreira\b", r"\bassessoria\b", r"^impulso$",
+]
+AGGREGATOR_AUTHOR_RE = re.compile("|".join(f"({rx})" for rx in AGGREGATOR_AUTHOR), re.I)
+# O dono do site: o post diário no LinkedIn (linkedin_post.py) cita vagas PHP e voltaria
+# na busca de publicações. O site não se auto-coleta.
+SELF_AUTHOR = {
+    "names": [r"^wouerner\b"],
+    "urls": [r"linkedin\.com/in/wouerner/?$"],
+}
+SELF_AUTHOR_RE = re.compile("|".join(f"({rx})" for rx in SELF_AUTHOR["names"]), re.I)
+SELF_AUTHOR_URL_RE = re.compile("|".join(f"({rx})" for rx in SELF_AUTHOR["urls"]), re.I)
 HASHTAG_OR_URL = re.compile(r"(#\w+|hashtag\s*#?\w+|https?://\S+)", re.I)
 JOB_SEEKER = re.compile(
     r"(#opentowork|open to work|estou (em busca|buscando|procurando|dispon[ií]vel)|"
@@ -196,8 +219,28 @@ def is_aggregator(text: str) -> bool:
     return sum(bool(rx.search(text)) for rx in AGGREGATOR_RES) >= AGGREGATOR_MIN
 
 
-def post_verdict(text: str | None) -> str:
-    """Por que um post do LinkedIn entra ou não: um id de RULES. Entram os de POST_OK."""
+def _plain_name(name: str | None) -> str:
+    """Nome sem acentos e espaços nas pontas ("Emprega São José" -> "Emprega Sao Jose")."""
+    name = unicodedata.normalize("NFKD", (name or "").strip())
+    return name.encode("ascii", "ignore").decode()
+
+
+def is_aggregator_author(author: str | None) -> bool:
+    """Quem publicou é agregador de vagas (AGGREGATOR_AUTHOR), pelo nome."""
+    return bool(author and AGGREGATOR_AUTHOR_RE.search(_plain_name(author)))
+
+
+def is_self_author(author: str | None, author_url: str | None = None) -> bool:
+    """Quem publicou é o dono do site (SELF_AUTHOR), pelo nome ou pelo perfil."""
+    return bool((author and SELF_AUTHOR_RE.search(_plain_name(author)))
+                or (author_url and SELF_AUTHOR_URL_RE.search(author_url.split("?")[0])))
+
+
+def post_verdict(text: str | None, author: str | None = None) -> str:
+    """Por que um post do LinkedIn entra ou não: um id de RULES. Entram os de POST_OK.
+    O autor (nome de quem publicou) barra os posts do próprio site e os de agregadores."""
+    if is_self_author(author):
+        return "self_author"
     if not text:
         return "post_no_php"
     body = HASHTAG_OR_URL.sub(" ", text)
@@ -206,6 +249,10 @@ def post_verdict(text: str | None) -> str:
         return "post_no_php"
     if is_aggregator(text):
         return "aggregator"
+    # Agregador barra antes de julgar o texto: o anúncio pode ser bom, mas não é de quem
+    # contrata.
+    if is_aggregator_author(author):
+        return "aggregator_author"
     # "Estou em busca de pessoas..." é recrutador, não alguém procurando emprego.
     if JOB_SEEKER.search(text) and not RECRUITING.search(text):
         return "job_seeker"
@@ -218,12 +265,13 @@ def post_verdict(text: str | None) -> str:
     return "hiring_weak" if _job_ad_shape(text) else "no_hiring"
 
 
-def is_php_hiring_post(text: str | None) -> bool:
+def is_php_hiring_post(text: str | None, author: str | None = None) -> bool:
     """Post do LinkedIn que anuncia vaga PHP: cita PHP no texto junto de um cargo de
     desenvolvimento, ou mais de uma vez (hashtags e links não contam: posts genéricos
-    enchem de #php #java...); não é lista de vagas/grupos (AGGREGATOR) nem de alguém
+    enchem de #php #java...); não é lista de vagas/grupos (AGGREGATOR), nem de agregador
+    de vagas (AGGREGATOR_AUTHOR) ou do próprio site (SELF_AUTHOR), nem de alguém
     procurando emprego; e tem sinal claro de contratação."""
-    return post_verdict(text) in POST_OK
+    return post_verdict(text, author) in POST_OK
 
 
 # Recrutador "em busca de pessoas" para uma vaga: o texto parece de quem procura emprego.
@@ -308,6 +356,12 @@ RULES = [
      "text": "O que não se encaixa nas regras acima: a busca dos sites é ampla e traz vagas "
              "de outras linguagens.", "patterns": []},
 
+    {"group": "posts", "id": "self_author", "effect": "recusa",
+     "title": "Post do próprio site",
+     "text": "Os posts do dono do site no LinkedIn (o post diário com as vagas) citam vagas "
+             "PHP e voltariam na busca: o site não coleta a si mesmo. Vale pelo nome ou pelo "
+             "perfil de quem publicou.",
+     "patterns": _patterns(SELF_AUTHOR["names"], SELF_AUTHOR["urls"])},
     {"group": "posts", "id": "post_no_php", "effect": "recusa",
      "title": "Não fala de PHP",
      "text": "O texto precisa citar PHP (ou framework/plataforma PHP, inclusive WordPress, "
@@ -322,6 +376,14 @@ RULES = [
              f"contratação: queremos o anúncio da vaga, não a propaganda do grupo. Uma menção "
              f"só (\"entre no nosso grupo do Telegram\" no fim de um anúncio) não barra.",
      "patterns": _patterns(AGGREGATOR)},
+    {"group": "posts", "id": "aggregator_author", "effect": "recusa",
+     "title": "Publicado por agregador de vagas",
+     "text": "Páginas e consultorias que republicam anúncios genéricos de outras empresas, "
+             "sem curadoria (\"Vagas Remotas\", \"DEVagas\", \"Jobs Brasil\", \"Recrutei "
+             "Empregos\"...): não são quem contrata, e as vagas costumam chegar velhas. O "
+             "bloqueio é pelo nome de quem publicou (sem acentos), não pelo texto, e vale "
+             "antes de julgar o anúncio. Nomes de pessoas não são bloqueados.",
+     "patterns": _patterns(AGGREGATOR_AUTHOR)},
     {"group": "posts", "id": "job_seeker", "effect": "recusa",
      "title": "Pessoa procurando emprego",
      "text": "Posts de quem procura vaga (#opentowork, \"estou em busca de oportunidade\"...) "

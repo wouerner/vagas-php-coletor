@@ -310,13 +310,17 @@ class Store:
         return new
 
     def reclassify(self, source: str, classify) -> list[str]:
-        """Reaplica o filtro (classify(description) -> bool) às vagas já salvas de uma
-        fonte, para mudanças no filtro valerem também para o que já foi coletado.
+        """Reaplica o filtro (classify(description, author) -> bool) às vagas já salvas
+        de uma fonte, para mudanças no filtro valerem também para o que já foi coletado
+        (inclusive o bloqueio por autor: agregadores e o próprio site saem do site).
         Retorna os ids que mudaram."""
-        rows = self.execute("SELECT id, description, relevant FROM jobs WHERE source = ?",
-                               (source,)).fetchall()
-        changed = [(int(bool(classify(r["description"]))), r["id"]) for r in rows
-                   if bool(classify(r["description"])) != bool(r["relevant"])]
+        rows = self.execute("SELECT id, description, author, relevant FROM jobs "
+                               "WHERE source = ?", (source,)).fetchall()
+        changed = []
+        for r in rows:
+            ok = bool(classify(r["description"], r["author"]))
+            if ok != bool(r["relevant"]):
+                changed.append((int(ok), r["id"]))
         with self.tx():
             self.executemany("UPDATE jobs SET relevant = ? WHERE id = ?", changed)
         return [job_id for _, job_id in changed]
@@ -480,10 +484,11 @@ class Store:
         """Quantas vagas/posts da base cada regra de filtro decidiu (página /regras) e as
         descartadas à mão. Posts recusados na busca nem chegam à base: não entram aqui."""
         counts = Counter()
-        for source, title, description, relevant in self.execute(
-                "SELECT source, title, description, relevant FROM jobs WHERE dismissed IS NULL"):
+        for source, title, description, author, relevant in self.execute(
+                "SELECT source, title, description, author, relevant FROM jobs "
+                "WHERE dismissed IS NULL"):
             if source == "post":
-                counts[php.post_verdict(description)] += 1
+                counts[php.post_verdict(description, author)] += 1
             else:  # etiquetas do GitHub não ficam na base: aceitas por elas = php_title
                 verdict = php.job_verdict(title, description)
                 counts["php_title" if relevant and verdict not in php.JOB_OK else verdict] += 1

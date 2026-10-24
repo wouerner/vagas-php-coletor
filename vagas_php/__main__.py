@@ -4,7 +4,7 @@
   python -m vagas_php migrate-sqlite data/vagas.db       # copia a base SQLite antiga para o MySQL
   python -m vagas_php post [--dry-run] [--show]           # post diário no LinkedIn (print de VAGAS_DASHBOARD_URL)
   python -m vagas_php post --probe [--show]               # diagnóstico da caixa de publicação (não publica)
-  python -m vagas_php telegram-alert [--dry-run] [--limit 5] [--force]  # vagas novas da API pública no Telegram
+  python -m vagas_php telegram-alert [--dry-run] [--limit 5] [--force] [--batch]  # vagas novas da API pública no Telegram
   python -m vagas_php telegram-digest [--dry-run]         # resumo semanal no Telegram (mesmo post do LinkedIn)
 """
 
@@ -68,7 +68,9 @@ def main() -> int:
     t.add_argument("--limit", type=int, default=5, help="máximo de vagas por execução")
     t.add_argument("--force", action="store_true",
                    help="ignora a janela de VAGAS_TELEGRAM_ACTIVE_HOURS (uso manual/teste)")
-    d = sub.add_parser("telegram-digest",
+    t.add_argument("--batch", action="store_true",
+                   help="agrupa todas as vagas pendentes numa mensagem só (ignora --limit)")
+    d =sub.add_parser("telegram-digest",
                        help="envia ao Telegram o resumo semanal (print do dashboard + texto do "
                             "post do LinkedIn); uma vez por semana")
     d.add_argument("--dry-run", action="store_true",
@@ -90,7 +92,7 @@ def main() -> int:
         from . import telegram_alert
         try:
             print(telegram_alert.run(DATA_DIR, limit=args.limit, dry_run=args.dry_run,
-                                     force=args.force))
+                                     force=args.force, batch=args.batch))
         except RuntimeError as e:
             print(f"telegram-alert: erro: {e}", file=sys.stderr)
             return 1
