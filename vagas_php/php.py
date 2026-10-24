@@ -75,6 +75,20 @@ NOT_HIRING = [
     r"\boportunidade de (aprender|aprendizado|crescimento pessoal)\b",
 ]
 NOT_HIRING_RE = re.compile("|".join(f"({rx})" for rx in NOT_HIRING), re.I)
+# Vitrine de projeto: alguém mostrando o sistema/app/portfólio que está desenvolvendo ou
+# desenvolveu ("Estou desenvolvendo o SITF, uma plataforma criada para... divulgação de
+# vagas"). Barra até sinal forte de contratação, a menos que o texto recrute de fato
+# (RECRUITING: "candidate-se", "envie seu currículo"...). Acrescente padrões aqui.
+SHOWCASE = [
+    r"\bestou desenvolvendo\b", r"\b(em|na) fase (final )?de desenvolvimento\b",
+    r"\bainda n[aã]o foi (oficialmente )?lan[cç]ad[oa]\b",
+    r"\bprojeto (pessoal|acad[eê]mico|de faculdade|de estudos?|integrador)\b", r"\bTCC\b",
+    r"\bmeu (projeto|sistema|app|aplicativo|portf[oó]lio|saas)\b",
+    r"\b(plataforma|sistema|aplica[cç][aã]o|app) (web )?(criad[oa]|desenvolvid[oa]) "
+    r"(para|por mim)\b",
+    r"\bdesenvolvi (um|uma|o|a) (sistema|plataforma|app|aplicativo|site|projeto)\b",
+]
+SHOWCASE_RE = re.compile("|".join(f"({rx})" for rx in SHOWCASE), re.I)
 # Divulgação de grupos/canais/comunidades de vagas, sem curadoria ("Vagas T.I. - Remotas",
 # "nosso Discord"...): barrada mesmo com sinal forte de contratação. Uma menção só é comum
 # no rodapé de anúncios de verdade ("entre no grupo do Telegram"), então precisa de
@@ -256,6 +270,9 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
     # "Estou em busca de pessoas..." é recrutador, não alguém procurando emprego.
     if JOB_SEEKER.search(text) and not RECRUITING.search(text):
         return "job_seeker"
+    # Quem mostra o próprio projeto pode citar "divulgação de vagas" sem contratar ninguém.
+    if SHOWCASE_RE.search(text) and not RECRUITING.search(text):
+        return "showcase"
     if HIRING.search(text):
         return "hiring_strong"
     if not HIRING_WEAK.search(text):
@@ -391,6 +408,14 @@ RULES = [
              "recrutador (\"estou em busca de pessoas\", \"candidate-se\"...) não conta como "
              "procura de emprego.",
      "patterns": _patterns(JOB_SEEKER)},
+    {"group": "posts", "id": "showcase", "effect": "recusa",
+     "title": "Vitrine de projeto pessoal",
+     "text": "Posts de quem mostra o próprio projeto, sistema, app ou portfólio (\"estou "
+             "desenvolvendo\", \"meu projeto\", \"TCC\"...) não são anúncios, mesmo que o "
+             "projeto fale de vagas (\"plataforma para divulgação de vagas\"). Se o texto "
+             "também recruta (\"candidate-se\", \"envie seu currículo\", \"contratamos\"...), "
+             "vale como anúncio.",
+     "patterns": _patterns(SHOWCASE)},
     {"group": "posts", "id": "hiring_strong", "effect": "aceita",
      "title": "Sinal forte de contratação",
      "text": "\"Vaga para\", \"contratando\", \"estamos buscando\", \"candidate-se\", "

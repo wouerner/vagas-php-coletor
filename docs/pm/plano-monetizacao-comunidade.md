@@ -154,6 +154,8 @@ Esforço: **S** < 1 dia · **M** 1–3 dias · **L** 1–2 semanas.
 | `VBP-005` | Revisar termos/intervalo das fontes que não rendem (coodesh, inhire, programathor, recrutei, upvagas) | M | Cada fonte com vaga nova em 7 dias, ou justificativa para desligar |
 | `VBP-006` | Captura de salário nas fontes que permitem (meta: > 20% das vagas) | M | % de vagas com salário medido; regra de extração documentada |
 | `VBP-007` | Higiene do dev local (reativar coletor) | S | Dev com vagas; dev/prod emparelhados |
+| `VBP-008` | Watchlist de ATS (Lever/Greenhouse/Ashby): coletar por lista fixa de empresas, via API pública (`api.lever.co/v0/postings/<empresa>?mode=json`). **Gatilho:** só implementar quando houver ≥ 5 empresas contratando PHP no Brasil por ATS. Avaliado em 24/10/2026: das 9 empresas testadas no Lever, só a Bluelight tinha PHP para BR, e ela já chega via UpVagas. Candidatas a anotar: `bluelightconsulting`, `brafton`, `ciandt`, `oowlish` (`jobgether` é agregador, fica fora) | M | Lista com ≥ 5 empresas; deduplicação da mesma vaga publicada em várias cidades (Bluelight publica ~100 cópias); vaga com `createdAt` antigo não entra como nova |
+| `VBP-009` | Dedupe de vagas republicadas no site: quando uma fonte (ex.: UpVagas) republica a mesma vaga com id novo, mesma empresa + título normalizado dentro de 14 dias conta como a mesma vaga, mantendo o `first_seen` original (hoje volta ao topo como nova e infla "novas em 24 h"). O Telegram já faz esse dedupe desde 24/10/2026 (`telegram_alert.content_key`) | M | A vaga republicada não volta ao topo da home; contagem de novas em 24 h não conta a cópia; teste com os ids upvagas 7194/7210/7224 da Bluelight |
 
 ### Épico 1 — Canal próprio (P1)
 

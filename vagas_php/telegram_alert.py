@@ -8,21 +8,34 @@ as pendentes que couberem no limite do Telegram (format_digest). Cada envio bem-
 também entra em data/telegram_alert_log.json com data/hora (últimas 500 entradas), base
 do relatório diário do canal.
 
+Além do id, há dedupe por conteúdo: a mesma vaga às vezes volta com outro id (ex.: a
+UpVagas republica uma cópia por cidade da mesma vaga do Lever). A chave (content_key) é a
+empresa normalizada (php.company_key; sem empresa, o autor) + o título normalizado (sem
+acento, minúsculo, sem pontuação e sem refs tipo "REF#123"). Vaga cuja chave já foi
+enviada nos últimos DEDUPE_DAYS dias (pelo `at`/`key` do log) não sai, mas o id entra no
+estado para não ser reavaliada; no mesmo lote, só a mais recente de cada chave sai. Sem
+empresa nem autor não há chave: vale só o id. Entradas antigas do log, sem `key`, contam
+só pelo título normalizado. Log ilegível derruba a execução (tratá-lo como vazio
+reenviaria tudo).
+
 send_weekly manda, uma vez por semana, o mesmo post do LinkedIn (print do dashboard +
 texto de resumo); a semana já enviada fica em data/telegram_digest_state.json."""
 
 import json
 import logging
 import os
+import re
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from datetime import datetime, timedelta
 from html import escape
 from pathlib import Path
 
-from . import dates
+from . import dates, php
 
 log = logging.getLogger("vagas_php.telegram_alert")
 
@@ -44,6 +57,9 @@ MESSAGE_MAX = 4096
 INDENT = "    "  # recuo dos detalhes de cada vaga no resumo agrupado
 ATTEMPTS = 2
 HEADERS = {"User-Agent": "vagas-php"}
+DEDUPE_DAYS = 14  # janela do dedupe por conteúdo (content_key)
+# Referência de vaga no título: "REF#123", "Ref. 0086E", "ref: AB-12"...
+TITLE_REF = re.compile(r"\bref\b\.?\s*[#:]?\s*[a-z0-9-]*\d[a-z0-9-]*", re.IGNORECASE)
 
 
 def fetch_jobs() -> list[dict]:
@@ -286,12 +302,18 @@ def state_save(data_dir: Path, ids: list[str]) -> None:
 
 
 def log_load(data_dir: Path) -> list[dict]:
-    """Entradas de data/telegram_alert_log.json; arquivo ausente ou ilegível: lista vazia."""
+    """Entradas de data/telegram_alert_log.json; arquivo ausente: lista vazia. Ilegível ou
+    fora do formato: exceção (o dedupe depende dele; vazio reenviaria tudo)."""
+    path = data_dir / LOG_FILE
     try:
-        entries = json.loads((data_dir / LOG_FILE).read_text())
-    except (OSError, ValueError):
+        entries = json.loads(path.read_text())
+    except FileNotFoundError:
         return []
-    return entries if isinstance(entries, list) else []
+    except (OSError, ValueError) as e:
+        raise RuntimeError(f"{path} ilegível; corrija ou restaure antes de rodar: {e}") from e
+    if not isinstance(entries, list):
+        raise RuntimeError(f"{path} fora do formato (esperava uma lista)")
+    return entries
 
 
 def log_append(data_dir: Path, entry: dict) -> None:
@@ -308,6 +330,68 @@ def log_append(data_dir: Path, entry: dict) -> None:
         tmp.replace(path)
     except OSError as e:
         log.warning("Não foi possível gravar %s: %s", LOG_FILE, e)
+
+
+def _plain(text: str | None) -> str:
+    """Sem acento, minúsculo, só [a-z0-9] e espaços simples."""
+    text = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode()
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", text.lower()).split())
+
+
+def title_key(title: str | None) -> str:
+    """Título normalizado para o dedupe: _plain sem as refs (TITLE_REF)."""
+    title = unicodedata.normalize("NFKD", title or "").encode("ascii", "ignore").decode()
+    return _plain(TITLE_REF.sub(" ", title))
+
+
+def content_key(job: dict) -> str | None:
+    """"empresa|título" normalizados (empresa por php.company_key; sem ela, o autor).
+    None sem empresa nem autor, ou sem título: aí vale só o id."""
+    who = php.company_key(job.get("company")) or _plain(job.get("author")).replace(" ", "")
+    title = title_key(job.get("title"))
+    return f"{who}|{title}" if who and title else None
+
+
+def recent_keys(entries: list[dict], days: int = DEDUPE_DAYS) -> tuple[set[str], set[str]]:
+    """(chaves, títulos) das vagas enviadas nos últimos `days` dias. Entradas antigas, sem
+    "key", só têm o título (o log não guardava a empresa): entram em `títulos`. Entrada com
+    `at` ilegível conta como recente (na dúvida, não reenvia)."""
+    since = dates.now_utc() - timedelta(days=days)
+    keys, titles = set(), set()
+    for e in entries:
+        if not isinstance(e, dict) or e.get("kind") != "job":
+            continue
+        try:
+            at = datetime.fromisoformat(e.get("at") or "")
+            if at.tzinfo is None:
+                at = at.replace(tzinfo=dates.BRASILIA)
+            if at < since:
+                continue
+        except (TypeError, ValueError):
+            pass
+        if "key" in e:
+            if e["key"]:
+                keys.add(e["key"])
+        elif title := title_key(e.get("title")):
+            titles.add(title)
+    return keys, titles
+
+
+def dedupe(pending: list[dict], entries: list[dict]) -> tuple[list[dict], list[dict]]:
+    """(vagas a enviar, duplicadas). Duplicada: chave enviada nos últimos DEDUPE_DAYS dias
+    (recent_keys) ou repetida no lote (`pending` vem da mais recente para a mais antiga:
+    fica a primeira)."""
+    keys, titles = recent_keys(entries)
+    keep, dups = [], []
+    for job in pending:
+        key = content_key(job)
+        if key and (key in keys or key.split("|", 1)[1] in titles):
+            dups.append(job)
+            continue
+        if key:
+            keys.add(key)
+        keep.append(job)
+    return keep, dups
 
 
 def active_hours() -> tuple[int, int]:
@@ -352,11 +436,20 @@ def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = Fal
     # Sem link a mensagem não serve: vagas sem url (ex.: as de publicações) ficam de fora.
     pending = [j for j in unsent if (j.get("url") or "").strip()]
     skipped = len(unsent) - len(pending)
+    pending, dups = dedupe(pending, log_load(data_dir))
+    for job in dups:
+        log.info("Vaga repetida (mesma empresa e título nos últimos %d dias ou no lote), "
+                 "não enviada: %s (%s)", DEDUPE_DAYS, job["id"], job.get("title"))
+    if dups and not dry_run:
+        # O id entra no estado para a vaga não ser reavaliada a cada execução.
+        sent_ids += [j["id"] for j in dups]
+        state_save(data_dir, sent_ids)
     if batch:
-        return run_batch(data_dir, jobs, pending, skipped, dry_run)
+        return run_batch(data_dir, jobs, pending, skipped, len(dups), dry_run)
     to_send = list(reversed(pending[:limit]))  # as mais recentes, a mais antiga primeiro
-    log.info("%d vagas na API, %d ainda não enviadas (%d ignoradas sem URL); enviando %d%s.",
-             len(jobs), len(pending), skipped, len(to_send), " (simulação)" if dry_run else "")
+    log.info("%d vagas na API, %d ainda não enviadas (%d ignoradas sem URL, %d repetidas); "
+             "enviando %d%s.", len(jobs), len(pending), skipped, len(dups), len(to_send),
+             " (simulação)" if dry_run else "")
 
     sent = 0
     for job in to_send:
@@ -372,32 +465,33 @@ def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = Fal
         sent_ids.append(job["id"])
         state_save(data_dir, sent_ids)  # a cada envio: uma falha depois não reenvia esta
         log_append(data_dir, {"kind": "job", "id": job["id"], "source": job.get("source"),
-                              "title": job.get("title")})
+                              "title": job.get("title"), "key": content_key(job)})
         sent += 1
         log.info("Vaga enviada: %s (%s)", job["id"], job.get("title"))
         time.sleep(1)
     if dry_run:
-        print(f"{skipped} vaga(s) ignorada(s) por falta de URL.")
+        print(f"{skipped} vaga(s) ignorada(s) por falta de URL; {len(dups)} repetida(s).")
     return {"api": len(jobs), "pending": len(pending), "sent": sent, "skipped": skipped,
-            "dry_run": dry_run}
+            "duplicates": len(dups), "dry_run": dry_run}
 
 
 def run_batch(data_dir: Path, jobs: list[dict], pending: list[dict], skipped: int,
-              dry_run: bool) -> dict:
+              duplicates: int, dry_run: bool) -> dict:
     """Modo agrupado de run: uma só mensagem com as vagas pendentes (mais recentes primeiro;
     as mais antigas saem se passar do limite) e todas as enviadas gravadas no estado e no log."""
     text, n = digest_fit(pending)
     included = pending[:n]
-    log.info("%d vagas na API, %d ainda não enviadas (%d ignoradas sem URL); enviando %d "
-             "numa mensagem só (%d caracteres)%s.", len(jobs), len(pending), skipped, n,
-             len(text), " (simulação)" if dry_run else "")
+    log.info("%d vagas na API, %d ainda não enviadas (%d ignoradas sem URL, %d repetidas); "
+             "enviando %d numa mensagem só (%d caracteres)%s.", len(jobs), len(pending),
+             skipped, duplicates, n, len(text), " (simulação)" if dry_run else "")
     result = {"api": len(jobs), "pending": len(pending), "sent": 0, "skipped": skipped,
-              "batch": True, "included": n, "chars": len(text), "dry_run": dry_run}
+              "duplicates": duplicates, "batch": True, "included": n, "chars": len(text),
+              "dry_run": dry_run}
     if not included:
         return result
     if dry_run:
         print(f"--- mensagem única: {n} vaga(s), {len(text)} caracteres\n{text}\n")
-        print(f"{skipped} vaga(s) ignorada(s) por falta de URL.")
+        print(f"{skipped} vaga(s) ignorada(s) por falta de URL; {duplicates} repetida(s).")
         return result
     resp = send(VAGAS_TELEGRAM_TOKEN, VAGAS_TELEGRAM_CHAT_ID, text)
     if not resp.get("ok"):
@@ -408,6 +502,7 @@ def run_batch(data_dir: Path, jobs: list[dict], pending: list[dict], skipped: in
     state_save(data_dir, sent_ids)
     for job in included:
         log_append(data_dir, {"kind": "job", "id": job["id"], "source": job.get("source"),
-                              "title": job.get("title"), "batch": True})
+                              "title": job.get("title"), "key": content_key(job),
+                              "batch": True})
     log.info("Resumo agrupado enviado com %d vaga(s).", n)
     return {**result, "sent": n}
