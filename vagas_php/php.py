@@ -46,15 +46,20 @@ HIRING = re.compile(
     r"contratando|contratamos|contrata-se|estamos (buscando|procurando|contratando|em busca)|"
     r"buscamos|procuramos|oportunidade (incr[ií]vel|100%)|"
     # "está procurando" só vale se não for falando com quem procura emprego ("quem está
-    # procurando emprego...", "está procurando trabalho?").
-    r"(est[aá]|que) (buscando|procurando|contratando|em busca)(?! (de )?(um |uma |nova |novo )?"
-    r"(emprego|trabalho|vaga|oportunidade|recoloca|recolocação|uma recoloca))|"
+    # procurando emprego...", "está procurando uma nova oportunidade?"): até 2 palavras
+    # qualificadoras antes ("uma nova", "um novo", "uma boa").
+    r"(est[aá]|que) (buscando|procurando|contratando|em busca)(?! (de )?"
+    r"((um|uma|nov[oa]s?|bo[ma]s?|outr[oa]s?|melhor|primeir[oa]) ){0,2}"
+    r"(emprego|trabalho|vaga|oportunidade|recoloca))|"
     r"busca (uma pessoa|um\(a\)|um profissional)|"
     # "divulgação" sozinha aparece em outros assuntos ("divulgação de vulnerabilidades").
     r"divulga(ndo|[cç][aã]o) (de |da |das |desta |dessa |essa |esta |uma |a |as )?"
     r"(nova |nossa )?(vagas?|oportunidades?)\b|candidate-se|candidatar-se|inscreva-se|envie (seu )?curr[ií]culo|"
-    r"me chama no privado|repassando vagas|hiring|we'?re hiring|job opening|open position|"
-    r"join (our|the) team)", re.I)
+    # "hiring" sozinho aparece em posts sobre contratação ("Something I've noticed in
+    # hiring..."); só as formas de anúncio valem (#hiring é sinal fraco, em HIRING_WEAK).
+    r"me chama no privado|repassando vagas|we['’]?re hiring|we are hiring|"
+    r"\b(is|are|now|currently|actively) hiring\b|\bhiring (for|a|an)\b|job opening|"
+    r"open position|join (our|the) team)", re.I)
 HIRING_WEAK = re.compile(
     r"(oportunidades? (para|de|novas|abertas)|vagas (de|para)|processo seletivo|"
     r"(seguem|continuam|est[aã]o) abertas|#vagas?\w*|#hiring|#emprego|"
@@ -101,6 +106,21 @@ AGGREGATOR = [
 ]
 AGGREGATOR_RES = [re.compile(rx, re.I) for rx in AGGREGATOR]
 AGGREGATOR_MIN = 3
+# Lista de vagas montada por terceiros ("🚨 5 VAGAS HOME OFFICE:", "Confira essas 7
+# vagas..."): várias vagas de empresas e áreas diferentes, cada uma com o próprio link de
+# candidatura. Vale com JOB_LIST_MIN chamadas de candidatura seguidas de link (na mesma
+# linha ou na seguinte), ou com um cabeçalho "N vagas" (N >= JOB_LIST_MIN) e JOB_LIST_MIN
+# links. Um anúncio de verdade tem um link só. Acrescente padrões aqui.
+JOB_LIST_APPLY = [
+    r"candidate-se", r"candidatura", r"inscri[cç][aã]o", r"inscreva-se", r"aplique",
+    r"apply( here| now)?",
+]
+JOB_LIST_APPLY_RE = re.compile(
+    r"\b(" + "|".join(JOB_LIST_APPLY) + r")\b[^\w\n]*(\n[^\w\n]*)?https?://", re.I)
+JOB_LIST_HEADER = [r"\b(\d+) (novas )?vagas\b", r"\b(essas|estas|as) (\d+) vagas\b"]
+JOB_LIST_HEADER_RES = [re.compile(rx, re.I) for rx in JOB_LIST_HEADER]
+JOB_LIST_MIN = 3
+URL_RE = re.compile(r"https?://", re.I)
 # Autor de post que é agregador de vagas, pelo NOME de quem publicou: páginas e
 # consultorias que republicam anúncios genéricos de outras empresas, sem curadoria (e
 # que ficam velhos). Não contratam: o anúncio que interessa é o de quem contrata. O
@@ -113,7 +133,8 @@ AGGREGATOR_AUTHOR = [
     r"vagas?\b", r"jobs?\b", r"\bempregos?\b", r"\bemprega\b",
     r"\bcandidat[ae] a[ií]\b", r"\bcaderno nacional\b", r"\brecrut(ei|a)\b",
     r"\bhunting\b", r"\bespecialistas em recrutamento\b", r"\bconsultoria de gente\b",
-    r"\bassessoria de carreira\b", r"\bassessoria\b", r"^impulso$",
+    r"\bassessoria de carreira\b", r"\bassessoria\b", r"^impulso$", r"\bcomunidade\b",
+    r"^home office$",
 ]
 AGGREGATOR_AUTHOR_RE = re.compile("|".join(f"({rx})" for rx in AGGREGATOR_AUTHOR), re.I)
 # O dono do site: o post diário no LinkedIn (linkedin_post.py) cita vagas PHP e voltaria
@@ -233,6 +254,16 @@ def is_aggregator(text: str) -> bool:
     return sum(bool(rx.search(text)) for rx in AGGREGATOR_RES) >= AGGREGATOR_MIN
 
 
+def is_job_list(text: str) -> bool:
+    """Lista de vagas (JOB_LIST_*): várias chamadas de candidatura com link, ou cabeçalho
+    "N vagas" com vários links."""
+    if len(JOB_LIST_APPLY_RE.findall(text)) >= JOB_LIST_MIN:
+        return True
+    header = any(int(re.search(r"\d+", m.group(0)).group(0)) >= JOB_LIST_MIN
+                 for rx in JOB_LIST_HEADER_RES for m in rx.finditer(text))
+    return header and len(URL_RE.findall(text)) >= JOB_LIST_MIN
+
+
 def _plain_name(name: str | None) -> str:
     """Nome sem acentos e espaços nas pontas ("Emprega São José" -> "Emprega Sao Jose")."""
     name = unicodedata.normalize("NFKD", (name or "").strip())
@@ -263,6 +294,8 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
         return "post_no_php"
     if is_aggregator(text):
         return "aggregator"
+    if is_job_list(text):
+        return "job_list"
     # Agregador barra antes de julgar o texto: o anúncio pode ser bom, mas não é de quem
     # contrata.
     if is_aggregator_author(author):
@@ -285,7 +318,8 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
 def is_php_hiring_post(text: str | None, author: str | None = None) -> bool:
     """Post do LinkedIn que anuncia vaga PHP: cita PHP no texto junto de um cargo de
     desenvolvimento, ou mais de uma vez (hashtags e links não contam: posts genéricos
-    enchem de #php #java...); não é lista de vagas/grupos (AGGREGATOR), nem de agregador
+    enchem de #php #java...); não é divulgação de grupos (AGGREGATOR) nem lista de vagas
+    de terceiros (JOB_LIST_*), nem de agregador
     de vagas (AGGREGATOR_AUTHOR) ou do próprio site (SELF_AUTHOR), nem de alguém
     procurando emprego; e tem sinal claro de contratação."""
     return post_verdict(text, author) in POST_OK
@@ -393,11 +427,21 @@ RULES = [
              f"contratação: queremos o anúncio da vaga, não a propaganda do grupo. Uma menção "
              f"só (\"entre no nosso grupo do Telegram\" no fim de um anúncio) não barra.",
      "patterns": _patterns(AGGREGATOR)},
+    {"group": "posts", "id": "job_list", "effect": "recusa",
+     "title": "Lista de vagas montada por terceiros",
+     "text": f"Posts que listam várias vagas, cada uma com o próprio link de candidatura "
+             f"(\"🚨 5 VAGAS HOME OFFICE\", \"Confira essas 7 vagas...\"): {JOB_LIST_MIN} ou "
+             f"mais chamadas de candidatura (\"Candidate-se:\", \"Inscrição:\", \"Apply:\"...) "
+             f"seguidas de link, ou um cabeçalho \"N vagas\" ({JOB_LIST_MIN} ou mais) com "
+             f"{JOB_LIST_MIN} ou mais links. Vale mesmo quando o texto tem sinal de "
+             f"contratação: queremos o anúncio de quem contrata, não listas montadas por "
+             f"terceiros, sem curadoria. Um anúncio com um link só não barra.",
+     "patterns": _patterns([JOB_LIST_APPLY_RE.pattern], JOB_LIST_HEADER)},
     {"group": "posts", "id": "aggregator_author", "effect": "recusa",
      "title": "Publicado por agregador de vagas",
-     "text": "Páginas e consultorias que republicam anúncios genéricos de outras empresas, "
-             "sem curadoria (\"Vagas Remotas\", \"DEVagas\", \"Jobs Brasil\", \"Recrutei "
-             "Empregos\"...): não são quem contrata, e as vagas costumam chegar velhas. O "
+     "text": "Páginas, comunidades e consultorias que republicam anúncios genéricos de outras "
+             "empresas, sem curadoria (\"Vagas Remotas\", \"DEVagas\", \"Jobs Brasil\", "
+             "\"Recrutei Empregos\", \"Comunidade ...\", \"Home Office\"...): não são quem contrata, e as vagas costumam chegar velhas. O "
              "bloqueio é pelo nome de quem publicou (sem acentos), não pelo texto, e vale "
              "antes de julgar o anúncio. Nomes de pessoas não são bloqueados.",
      "patterns": _patterns(AGGREGATOR_AUTHOR)},
@@ -420,8 +464,11 @@ RULES = [
      "title": "Sinal forte de contratação",
      "text": "\"Vaga para\", \"contratando\", \"estamos buscando\", \"candidate-se\", "
              "\"envie seu currículo\", \"we're hiring\"... \"Está procurando\" não vale quando "
-             "vem seguido de emprego, trabalho, vaga ou oportunidade: aí o post fala com quem "
-             "procura emprego (\"quem está procurando emprego sabe...\"), não anuncia vaga.",
+             "vem seguido de emprego, trabalho, vaga ou oportunidade, mesmo com até 2 palavras "
+             "no meio (\"uma nova oportunidade\", \"um novo emprego\"): aí o post fala com quem "
+             "procura emprego (\"quem está procurando emprego sabe...\"), não anuncia vaga. "
+             "\"Hiring\" sozinho também não vale (aparece em posts sobre contratação), só em "
+             "forma de anúncio: \"we're hiring\", \"now hiring\", \"hiring a/for\"...",
      "patterns": _patterns(HIRING)},
     {"group": "posts", "id": "other_subject", "effect": "recusa",
      "title": "Outro assunto",
