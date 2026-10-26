@@ -20,6 +20,7 @@ Rotas: /             página (static/index.html), com as primeiras vagas já no 
        /sitemap.xml  páginas para buscadores (ver SITEMAP_PROVIDERS)
        /robots.txt   tudo liberado menos /api/, com o endereço do sitemap
        /og.png       imagem de preview social (og:image / twitter:image), static/og.png
+       /webmcp.js    ferramentas de leitura para agentes de IA (WebMCP), static/webmcp.js
        /mercado-php  números do mercado PHP em texto (mercado.py), e /llms.txt
        /vaga/<seq>-<título>  página de uma vaga de portal, com JobPosting (vaga.py)
        /out          conta o clique (tabela clicks) e redireciona para o anúncio original
@@ -873,6 +874,12 @@ async def og_image(request: Request):
                     headers={"Cache-Control": "public, max-age=86400"})
 
 
+async def webmcp_js(request: Request):
+    """Ferramentas de leitura para agentes de IA (WebMCP), static/webmcp.js."""
+    return Response((STATIC / "webmcp.js").read_bytes(), media_type="application/javascript",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
 app = Starlette(routes=[
     Route("/", index),
     Route("/api/jobs", jobs),
@@ -890,6 +897,7 @@ app = Starlette(routes=[
     Route("/sitemap.xml", sitemap),
     Route("/robots.txt", robots),
     Route("/og.png", og_image),
+    Route("/webmcp.js", webmcp_js),
     Route("/out", out),
     Route("/api/clicks", clicks),
     *mercado.routes,  # /mercado-php e /llms.txt

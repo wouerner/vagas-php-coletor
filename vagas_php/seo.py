@@ -78,12 +78,15 @@ def head(request: Request, title: str, description: str, path: str,
 def render(request: Request, name: str, *, title: str, description: str, path: str,
            content: dict[str, str] | None = None, jsonld=None, noindex: bool = False) -> str:
     """HTML de static/<name> com o <head> de head(), as marcas <!--ssr:nome--> trocadas
-    pelo HTML de `content` (já escapado por quem chama) e a tag do GA (fora de ?print=1)."""
+    pelo HTML de `content` (já escapado por quem chama), a tag do GA e o /webmcp.js
+    (ferramentas para agentes de IA, WebMCP), esses dois fora de ?print=1."""
     html = _OLD_HEAD.sub("", (STATIC / name).read_text())
     tags = head(request, title, description, path, jsonld, noindex)
     html = html.replace("</head>", tags + "\n</head>", 1)
     for key, value in (content or {}).items():
         html = html.replace(f"<!--ssr:{key}-->", value)
+    if "print" not in request.query_params:
+        html = html.replace("</head>", '<script defer src="/webmcp.js"></script>\n</head>', 1)
     if GA_ID and "print" not in request.query_params:
         tag = (STATIC / "analytics.html").read_text().replace("{GA_ID}", GA_ID)
         html = html.replace("</head>", tag + "</head>", 1)

@@ -210,6 +210,7 @@ Esforço: **S** < 1 dia · **M** 1–3 dias · **L** 1–2 semanas.
 | `VBP-601` | Documentar a API/MCP pública (OpenAPI ou README) | M | Documento publicado |
 | `VBP-602` | Camada de histórico além de 72 h para licenciados | M | Endpoint com janela estendida |
 | `VBP-603` | Chave de acesso e limite de uso por cliente | M | Cliente testa com chave |
+| `VBP-604` | **WebMCP:** registrar o origin trial do Chrome para `vagasphp.wouerner.dev` e colar o token no `<meta http-equiv="origin-trial">`. O site já registra 4 ferramentas de leitura (`/webmcp.js`: `buscar_vagas`, `estatisticas_mercado`, `regras_de_curadoria`, `empresas_que_contratam`), seguindo o rascunho do W3C de 20/10/2026 — API só imperativa (`document.modelContext.registerTool`); não existe API declarativa de formulário, então **não** adicione `toolname`/`tooldescription`. Sem o token, nada roda no Chrome estável de visitante. *Só o dono pode registrar (conta Google).* **Gatilho:** subir de prioridade quando aparecer tráfego de agente no GA (em 30 dias: 1 sessão de "AI Assistant") | S | Token no `<meta>`; ferramentas visíveis no painel Application → WebMCP do DevTools |
 
 ### Épico 7 — Retenção: assinatura de candidatos (P2)
 
