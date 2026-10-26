@@ -51,6 +51,8 @@ from urllib.parse import urlencode
 import uvicorn
 from pymysql.err import ProgrammingError
 from starlette.applications import Starlette
+from starlette.datastructures import MutableHeaders
+from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
@@ -864,7 +866,10 @@ async def sitemap(request: Request):
 
 
 async def robots(request: Request):
-    return Response(f"User-agent: *\nAllow: /\nDisallow: /api/\n\n"
+    # Sem "Disallow: /api/": bloquear por robots.txt impede o Googlebot de buscar os dados
+    # que a home usa para renderizar (aviso no Search Console). O JSON fica fora do índice
+    # pelo header X-Robots-Tag (ver NoIndexAPI), não por bloqueio.
+    return Response(f"User-agent: *\nAllow: /\n\n"
                     f"Sitemap: {seo.site_url(request)}/sitemap.xml\n", media_type="text/plain")
 
 
@@ -878,6 +883,22 @@ async def webmcp_js(request: Request):
     """Ferramentas de leitura para agentes de IA (WebMCP), static/webmcp.js."""
     return Response((STATIC / "webmcp.js").read_bytes(), media_type="application/javascript",
                     headers={"Cache-Control": "public, max-age=86400"})
+
+
+class NoIndexAPI:
+    """Respostas /api/* levam X-Robots-Tag: noindex: o Googlebot busca (a home precisa
+    delas para renderizar) mas não indexa o JSON."""
+    def __init__(self, app): self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not scope.get("path", "").startswith("/api/"):
+            return await self.app(scope, receive, send)
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                MutableHeaders(scope=message).setdefault("X-Robots-Tag", "noindex")
+            await send(message)
+        await self.app(scope, receive, send_wrapper)
 
 
 app = Starlette(routes=[
@@ -902,7 +923,7 @@ app = Starlette(routes=[
     Route("/api/clicks", clicks),
     *mercado.routes,  # /mercado-php e /llms.txt
     *vaga.routes,     # /vaga/<seq>-<título>
-])
+], middleware=[Middleware(NoIndexAPI)])
 
 
 if __name__ == "__main__":
