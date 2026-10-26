@@ -22,6 +22,11 @@ SITE_NAME = "Vagas PHP"
 OG_IMAGE_ALT = "Vagas PHP — vagas de PHP, Laravel e Symfony"
 STATIC = Path(__file__).resolve().parent / "static"
 SITE_URL = os.getenv("VAGAS_SITE_URL", "").strip().rstrip("/")
+# Origin trial do WebMCP no Chrome (ferramentas para agentes de IA em /webmcp.js e no
+# formulário com toolname="buscar_vagas"). Vale para a origem
+# https://vagasphp.wouerner.dev:443 e EXPIRA em 30/03/2027: renove em
+# https://developer.chrome.com/origintrials (My Registrations → RENEW) e troque o valor.
+ORIGIN_TRIAL_TOKEN = "Al3MGFS0iReChsApDiW3EqWDw0SGKwYuvJLUhNbcBBwb59xWGv3u57zYpE6bVYtKbcfIFGIzdaXA1UT0FYPRIQ0AAABVeyJvcmlnaW4iOiJodHRwczovL3ZhZ2FzcGhwLndvdWVybmVyLmRldjo0NDMiLCJmZWF0dXJlIjoiV2ViTUNQIiwiZXhwaXJ5IjoxODA2MzY0ODAwfQ=="
 
 log = logging.getLogger(__name__)
 GA_ID = os.getenv("VAGAS_GA_ID", "").strip()
@@ -66,6 +71,8 @@ def head(request: Request, title: str, description: str, path: str,
             f'<meta name="twitter:title" content="{t}">',
             f'<meta name="twitter:description" content="{d}">',
             f'<meta name="twitter:image" content="{img}">']
+    if ORIGIN_TRIAL_TOKEN:
+        tags.insert(0, f'<meta http-equiv="origin-trial" content="{ORIGIN_TRIAL_TOKEN}">')
     if noindex:
         tags.append('<meta name="robots" content="noindex">')
     for data in ([jsonld] if isinstance(jsonld, dict) else jsonld or []):

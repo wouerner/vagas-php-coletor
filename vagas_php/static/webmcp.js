@@ -1,10 +1,23 @@
 // Ferramentas de leitura para agentes de IA (WebMCP, rascunho do W3C de 20/10/2026:
 // https://webmachinelearning.github.io/webmcp/). Servido em /webmcp.js e incluído por
 // seo.render() fora de ?print=1. Sem WebMCP no navegador, não faz nada.
-// A API do rascunho é só imperativa: document.modelContext.registerTool({name, title,
-// description, inputSchema (objeto), execute, annotations}). Não há API declarativa
-// (nada de atributos toolname/tooldescription em <form>, nem SubmitEvent.agentInvoked/
-// respondWith): não reintroduza. As 4 ferramentas valem em toda página, home inclusive.
+// O rascunho do W3C só descreve a API imperativa, mas o Chrome (origin trial a partir do
+// 149) tem DUAS APIs, e as duas valem aqui:
+// - Imperativa: document.modelContext.registerTool({name, title, description,
+//   inputSchema (objeto), execute, annotations}), usada abaixo.
+// - Declarativa: atributos toolname/tooldescription no <form>. EXISTE: o <form id="filters">
+//   da home é anotado com toolname="buscar_vagas". Não remova.
+//   Fontes: doc WebMCP do Chrome, seção "Use WebMCP APIs" (atualizada em 07/10/2026):
+//   "There are two APIs… Imperative API… Declarative API: Add annotations to a standard
+//   HTML forms to create a WebMCP tool."; doc do Lighthouse "Registered WebMCP tools"
+//   (atualizada em 21/09/2026): "Declarative API: Add `toolname` and `tooldescription`
+//   attributes directly to your `<form>` elements."
+// O que NÃO existe é SubmitEvent.agentInvoked/respondWith: nada de listener de submit.
+// As 4 ferramentas são registradas em toda página, home inclusive. Na home, buscar_vagas
+// coincide com a ferramenta declarativa do formulário; o nome é único por página, então o
+// Chrome rejeita o registerTool duplicado e o .catch(() => {}) engole a rejeição. Isso é
+// esperado, não é erro: a busca fica com a versão declarativa e as outras 3 seguem
+// imperativas. Nas demais páginas, as 4 são imperativas.
 // Cada ferramenta lê a API do próprio site (mesma origem) e devolve JSON enxuto: o agente
 // paga por token. Nenhuma escreve nada.
 (() => {
