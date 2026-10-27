@@ -51,13 +51,15 @@ def collect_linkedin(store: Store, hours: float) -> dict:
                 details_failed += 1  # tenta de novo na próxima coleta
                 log.warning("Detalhes da vaga %s: %s", job.id, e)
             time.sleep(1.5)
+        info = php.details(job.title, job.location, description)
         jobs.append({
             "id": jid, "source": "linkedin",
             "relevant": php.is_php_job(job.title, description),
             "title": job.title, "company": job.company, "location": job.location,
-            "salary": job.salary, "url": job.url, "description": description,
+            "url": job.url, "description": description,
             "posted_at": dates.from_date(job.posted_date, job.posted),
-            **php.details(job.title, job.location, description),
+            # Salário da fonte primeiro; o citado no texto só quando ela não informa.
+            **info, "salary": job.salary or info["salary"],
         })
     new = store.save_jobs(jobs)
     return {"found": len(jobs), "relevant": sum(j["relevant"] for j in jobs), "new": new,
@@ -106,12 +108,13 @@ def collect_solides(store: Store, since: datetime) -> dict:
             "id": f"solides:{job.id}", "source": "solides",
             "relevant": php.is_php_job(job.title, job.description),
             "title": job.title, "company": job.company, "location": job.location,
-            "salary": job.salary, "url": job.url, "description": job.description,
+            "url": job.url, "description": job.description,
             "posted_at": dates.from_date(job.published),
-            # Modalidade, contratação e senioridade vêm da própria Sólides.
+            # Modalidade, contratação, senioridade e salário vêm da própria Sólides.
             **info, **{k: v for k, v in (
                 ("workplace", job.workplace), ("contract", job.contract),
                 ("seniority", php._first(php.SENIORITY, job.seniority))) if v},
+            "salary": job.salary or info["salary"],
         })
     new = store.save_jobs(jobs)
     return {"found": len(jobs), "relevant": sum(j["relevant"] for j in jobs), "new": new}
@@ -148,10 +151,11 @@ def _jobposting_jobs(store: Store, source: str, candidates, details, delay: floa
             "id": f"{source}:{job_id}", "source": source,
             "relevant": php.is_php_job(job["title"], job["description"]),
             "title": job["title"] or title, "company": job["company"],
-            "location": job["location"], "salary": job["salary"], "url": url,
+            "location": job["location"], "url": url,
             "description": job["description"], "posted_at": dates.from_date(job["published"]),
-            # Modalidade e contratação do próprio portal, quando informadas.
+            # Modalidade, contratação e salário do próprio portal, quando informados.
             **info, **{k: job[k] for k in ("workplace", "contract") if job[k]},
+            "salary": job["salary"] or info["salary"],
         })
         time.sleep(delay)
     new = store.save_jobs(jobs)
@@ -224,9 +228,10 @@ def collect_upvagas(store: Store, since: datetime) -> dict:
         jobs.append({
             "id": f"upvagas:{j.id}", "source": "upvagas",
             "relevant": php.is_php_job(j.title, j.description),
-            "title": j.title, "company": j.company, "location": j.location, "salary": j.salary,
+            "title": j.title, "company": j.company, "location": j.location,
             "url": j.url, "description": j.description, "posted_at": dates.normalize(j.published),
             **info, **{k: getattr(j, k) for k in ("workplace", "contract") if getattr(j, k)},
+            "salary": j.salary or info["salary"],
         })
     new = store.save_jobs(jobs)
     return {"found": len(jobs), "relevant": sum(j["relevant"] for j in jobs), "new": new}
@@ -247,7 +252,8 @@ def collect_remotar(store: Store, since: datetime) -> dict:
         jobs.append({**job, "source": "remotar",
                      "relevant": php.is_php_job(job["title"], job["description"]),
                      "posted_at": dates.normalize(job["posted_at"]),
-                     **info, **({"workplace": job["workplace"]} if job["workplace"] else {})})
+                     **info, **({"workplace": job["workplace"]} if job["workplace"] else {}),
+                     "salary": job["salary"] or info["salary"]})
     new = store.save_jobs(jobs)
     return {"found": len(jobs), "relevant": sum(j["relevant"] for j in jobs), "new": new}
 

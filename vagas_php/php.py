@@ -172,6 +172,46 @@ CONTRACT = [
     ("PJ", re.compile(r"\bpj\b", re.I)),
     ("Freelance", re.compile(r"\b(freela(ncer?)?|contractor)\b", re.I)),
 ]
+# Salário citado no texto ("💰 Remuneração: R$ 5.800,00 (Bruto Mensal)", "Salário entre
+# R$ 2.000,00 e R$ 3.000,00"), gravado no formato que vaga.SALARY lê: "R$ 5.800",
+# "R$ 2.000 a R$ 3.000", "US$ 7.083 por mês" (sem centavos; real sem período é mensal).
+# Só vale valor na mesma linha de uma palavra de contexto. A linha com contexto que diz
+# não ter valor ("a combinar", "competitivo"...) encerra a busca, mesmo citando R$ (é
+# desconto ou benefício, não salário). Valor isolado depois de "até" ou "a partir de" é
+# teto ou piso, não o salário: fica de fora. Acrescente padrões aqui.
+SALARY_CONTEXT = [
+    r"sal[aá]rios?", r"remunera[cç][aã]o", r"faixa salarial", r"piso", r"salary",
+    r"rango salarial",
+]
+SALARY_CONTEXT_RE = re.compile(r"\b(" + "|".join(SALARY_CONTEXT) + r")\b", re.I)
+# Moeda: R$, ou dólar escrito US$, USD, "USD $" ou $ sozinho (nunca colado a letra, para não
+# pegar o $ de R$). Milhar por ponto (8.801) ou, só em dólar, por vírgula como no inglês
+# (85,000): em reais a vírgula é centavo (5.800,00), e "R$ 1,600" é ambíguo e fica de fora
+# (_salary_in). Valor seguido de mil/k/M ("$150M in annual bookings") não é salário.
+SALARY_VALUE = (r"(R\$|US\$|\bUSD(?:\s?\$)?|(?<![a-z$])\$)\s?"
+                r"(\d{1,3}(?:\.\d{3})+|\d{1,3}(?:,\d{3})+|\d+)(?:[.,]\d{2})?"
+                r"(?![\d.,]*\d|\s*(?:mil|k|m)\b)")
+SALARY_RANGE_SEP = [r"a", r"e", r"at[eé]", r"-", r"–"]
+SALARY_RE = re.compile(
+    SALARY_VALUE + r"(?:\s*(?:" + "|".join(SALARY_RANGE_SEP) + r")\s*" + SALARY_VALUE + r")?",
+    re.I)
+SALARY_PERIOD = [
+    ("por mês", r"(bruto )?mensal|por m[eê]s|ao m[eê]s|/m[eê]s|per month|monthly"),
+    ("por ano", r"por ano|anual|ao ano|/ano|per year|annual|yearly"),
+    ("por hora", r"por hora|/hora|hora|per hour|hourly"),
+]
+SALARY_PERIOD_RES = [(label, re.compile(r"^\W{0,3}(" + rx + r")\b", re.I))
+                     for label, rx in SALARY_PERIOD]
+SALARY_REJECT = [
+    r"a combinar", r"a convenir", r"combinar", r"a definir", r"ser[aá] informad[ao]",
+    r"informad[ao] na entrevista", r"informar na entrevista", r"compat[ií]vel com o mercado",
+    r"competitiv[oa]s?", r"confidencial",
+]
+SALARY_REJECT_RE = re.compile(r"\b(" + "|".join(SALARY_REJECT) + r")\b", re.I)
+# Valor logo antes ou logo depois destas palavras não é salário ("desconto de R$ 1,00").
+SALARY_NOT_PAY_RE = re.compile(r"(desconto( de)?|n[oa]s? benef[ií]cios?)\W{0,3}$", re.I)
+SALARY_NOT_PAY_AFTER_RE = re.compile(r"^\W{0,3}(n[oa]s? benef[ií]cios?)\b", re.I)
+SALARY_BOUND_RE = re.compile(r"\b(at[eé]|a partir de|acima de|up to)\W{0,3}$", re.I)
 
 
 def _first(rules, *texts) -> str | None:
@@ -362,13 +402,60 @@ def company_key(name: str | None) -> str | None:
     return re.sub(r"[^a-z0-9]", "", name.encode("ascii", "ignore").decode().lower()) or None
 
 
+def _amount(digits: str) -> str:
+    return f"{int(re.sub(r'[.,]', '', digits)):,}".replace(",", ".")
+
+
+def _currency(symbol: str) -> str:
+    return "R$" if symbol.upper() == "R$" else "US$"
+
+
+def _salary_in(line: str) -> str | None:
+    """Salário da linha (que já tem palavra de contexto), no formato de vaga.SALARY."""
+    for m in SALARY_RE.finditer(line):
+        before, after = line[:m.start()], line[m.end():]
+        if SALARY_NOT_PAY_RE.search(before) or SALARY_NOT_PAY_AFTER_RE.search(after):
+            continue
+        cur, low, high = _currency(m.group(1)), m.group(2), m.group(4)
+        if high and _currency(m.group(3)) != cur:  # não mistura moedas
+            high = None
+        if cur == "R$" and "," in low + (high or ""):  # vírgula de milhar só em dólar
+            continue
+        if not high and SALARY_BOUND_RE.search(before):
+            continue
+        out = f"{cur} {_amount(low)}"
+        if high and _amount(high) != _amount(low):
+            out += f" a {cur} {_amount(high)}"
+        period = next((label for label, rx in SALARY_PERIOD_RES if rx.search(after)), None)
+        if cur == "US$" and not period:  # dólar sem período o vaga.py descarta
+            continue
+        if period and not (cur == "R$" and period == "por mês"):
+            out += f" {period}"
+        return out
+    return None
+
+
+def salary_from_text(title: str | None, *texts: str | None) -> str | None:
+    """Salário citado no texto, priorizando o título; None se o texto não informa valor."""
+    for text in (title, *texts):
+        for line in (text or "").splitlines():
+            if not SALARY_CONTEXT_RE.search(line):
+                continue
+            if SALARY_REJECT_RE.search(line):
+                return None
+            if found := _salary_in(line):
+                return found
+    return None
+
+
 def details(title: str | None, *texts: str | None) -> dict:
-    """Modalidade, senioridade, contratação e stack, priorizando o título."""
+    """Modalidade, senioridade, contratação, stack e salário, priorizando o título."""
     return {
         "workplace": _first(WORKPLACE, title, *texts),
         "seniority": _first(SENIORITY, title) or _first(SENIORITY, *texts),
         "contract": _first(CONTRACT, title, *texts),
         "stack": ",".join(stack(title, *texts)) or None,
+        "salary": salary_from_text(title, *texts),
     }
 
 
