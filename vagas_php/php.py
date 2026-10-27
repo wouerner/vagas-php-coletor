@@ -40,11 +40,21 @@ NOT_DEV = re.compile(
 # os fracos aparecem também em posts sobre outros assuntos ("uma oportunidade de aprender",
 # "grupos com vagas de TI", "processo seletivo da faculdade") e só valem com estrutura de
 # vaga (requisitos, benefícios, contratação...) e sem contexto de outro assunto.
+# "buscamos" sozinho aparece em outros assuntos ("buscamos desenvolver funcionalidades",
+# "buscamos melhorar"): só vale com alvo de pessoa/cargo ("buscamos um profissional",
+# "Buscamos Desenvolvedor(a) Pleno", "buscamos alguém") ou como título de lista de
+# requisitos ("O que buscamos?", "buscamos:", "Buscamos experiência com").
+BUSCAMOS = (
+    r"buscamos ((apenas|agora|hoje|tamb[eé]m|sempre) )?((um|uma|un|una|um\(a\)|un/a|a) )?((nov[oa]s?|bo[ma]s?) )?"
+    r"(pessoas?|profissiona(l|is)|desenvolvedor|desarrollador|devs?\b|programador|"
+    r"talentos?|candidat|analistas?|engenheir|especialistas?|colaborador|estagi[aá]ri|"
+    r"tech lead|algu[eé]m|alguien|quem|perfil|experi[eê]ncia|para (o|a) (desafio|vaga|time|equipe))"
+    r"|buscamos\s*[:?]")
 HIRING = re.compile(
     r"(\bvaga (para|de|aberta|dispon|home|remota|h[ií]brida|presencial|tech|ti\b|100%)|"
     r"\bvagas (aberta|dispon|home|remota|h[ií]brida|presencial|tech)|nova vaga|"
     r"contratando|contratamos|contrata-se|estamos (buscando|procurando|contratando|em busca)|"
-    r"buscamos|procuramos|oportunidade (incr[ií]vel|100%)|"
+    rf"{BUSCAMOS}|procuramos|oportunidade (incr[ií]vel|100%)|"
     # "está procurando" só vale se não for falando com quem procura emprego ("quem está
     # procurando emprego...", "está procurando uma nova oportunidade?"): até 2 palavras
     # qualificadoras antes ("uma nova", "um novo", "uma boa").
@@ -92,8 +102,27 @@ SHOWCASE = [
     r"\b(plataforma|sistema|aplica[cç][aã]o|app) (web )?(criad[oa]|desenvolvid[oa]) "
     r"(para|por mim)\b",
     r"\bdesenvolvi (um|uma|o|a) (sistema|plataforma|app|aplicativo|site|projeto)\b",
+    # Aluno mostrando trabalho de curso ("Gostaria de compartilhar um projeto que desenvolvi
+    # durante o curso técnico em Desenvolvimento de Sistemas, no Senai... Nosso grupo,
+    # formado por mim, ..."). Acrescente padrões aqui.
+    r"\bprojeto que (eu )?(desenvolvi|desenvolvemos|criei|criamos|fiz|fizemos)\b",
+    r"\b(desenvolvi|desenvolvemos) (durante|no|na) (o |a )?(curso|faculdade|gradua[cç][aã]o|disciplina)\b",
+    r"\btrabalho de conclus[aã]o\b",
+    r"\bnosso grupo,? (formado|composto|escolheu|desenvolveu|apresentou)\b",
+    r"\bnossa equipe (escolheu|desenvolveu|apresentou)\b",
+    r"\bapresentad[oa] pel[oa] (professor|professora|orientador|orientadora)\b",
+    r"\bgostaria de compartilhar (um|o|meu|nosso) projeto\b",
+    r"\bprojeto (da|de|do) (faculdade|curso|TCC|semestre)\b",
+    r"\bfeira de (ci[eê]ncias|tecnologia)\b",
 ]
 SHOWCASE_RE = re.compile("|".join(f"({rx})" for rx in SHOWCASE), re.I)
+# Formação/instituição (Senai, "curso técnico"...) não é sinal de vitrine: aparece em
+# anúncio real como requisito ("curso técnico em Informática pelo Senai"), e recusar vaga
+# de verdade custa mais que deixar passar uma vitrine.
+
+
+def is_showcase(text: str) -> bool:
+    return bool(SHOWCASE_RE.search(text))
 # Divulgação de grupos/canais/comunidades de vagas, sem curadoria ("Vagas T.I. - Remotas",
 # "nosso Discord"...): barrada mesmo com sinal forte de contratação. Uma menção só é comum
 # no rodapé de anúncios de verdade ("entre no grupo do Telegram"), então precisa de
@@ -344,7 +373,7 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
     if JOB_SEEKER.search(text) and not RECRUITING.search(text):
         return "job_seeker"
     # Quem mostra o próprio projeto pode citar "divulgação de vagas" sem contratar ninguém.
-    if SHOWCASE_RE.search(text) and not RECRUITING.search(text):
+    if is_showcase(text) and not RECRUITING.search(text):
         return "showcase"
     if HIRING.search(text):
         return "hiring_strong"
@@ -369,7 +398,7 @@ def is_php_hiring_post(text: str | None, author: str | None = None) -> bool:
 RECRUITING = re.compile(
     r"(candidate-se|candidatar-se|inscreva-se|envie (seu )?curr[ií]culo|estou conduzindo|"
     r"(em busca|procurando|buscando) (de )?(pessoas|profissionais|talentos|candidat)|"
-    r"buscamos|contratamos|estamos contratando|apply here|we'?re hiring)", re.I)
+    rf"{BUSCAMOS}|contratamos|estamos contratando|apply here|we'?re hiring)", re.I)
 
 
 # Headline (o texto abaixo do nome) de quem trabalha com recrutamento: página /recrutadores.
