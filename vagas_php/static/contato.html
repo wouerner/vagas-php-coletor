@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contato · Vagas PHP</title>
+<meta name="description" content="Como falar com quem mantém o Vagas PHP.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='48' ry='26' fill='%23777BB4'/><text x='50' y='60' font-size='30' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>php</text></svg>">
+<style>
+  :root {
+    --bg: #f6f6fa; --surface: #ffffff; --text: #1d1d2b; --muted: #5d6070;
+    --line: #e3e3ec; --accent: #5b5fa0; --accent-soft: #ebecf7; --chip: #f0f0f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13131b; --surface: #1c1c27; --text: #e8e8f0; --muted: #a0a2b4;
+      --line: #2d2d3c; --accent: #a3a7e6; --accent-soft: #2a2b45; --chip: #262634;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 16px 48px; }
+  header { padding: 28px 0 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between; }
+  .brand { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
+  .brand span { color: var(--accent); }
+  h1 { margin: 10px 0 0; font-size: 24px; line-height: 1.25; letter-spacing: -0.02em; }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; }
+  nav a { font-size: 14px; padding: 9px 14px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--chip); }
+  .lead { color: var(--muted); margin: 4px 0 20px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; }
+  .card p { margin: 6px 0 0; }
+  .card ul { margin: 6px 0 0; padding-left: 20px; }
+  .card li { margin: 4px 0; }
+  .linkedin { font-size: 17px; font-weight: 600; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/">Vagas <span>PHP</span></a>
+    <nav><a href="/">Vagas</a><a href="/dashboard">Dashboard</a><a href="/empresas">Empresas</a><a href="/recrutadores">Recrutadores</a><a href="/mercado-php">Mercado</a><a href="/regras">Regras</a></nav>
+  </header>
+  <h1>Contato</h1>
+  <p class="lead">O Vagas PHP é um agregador curado de vagas PHP. As vagas vêm da coleta automática de portais
+    (LinkedIn, Gupy, Sólides, Catho...) e de publicações anunciando vagas, e passam por
+    <a href="/regras">regras de curadoria publicadas</a>.</p>
+
+  <section class="card" aria-labelledby="t-how">
+    <strong id="t-how">Como falar comigo</strong>
+    <p>Mande uma mensagem direta no LinkedIn:</p>
+    <p class="linkedin"><a href="https://www.linkedin.com/in/wouerner/" target="_blank" rel="noopener">linkedin.com/in/wouerner</a></p>
+  </section>
+
+  <section class="card" aria-labelledby="t-what">
+    <strong id="t-what">Para que serve o contato</strong>
+    <ul>
+      <li><b>Vaga em destaque ou patrocínio:</b> para anunciar uma vaga com destaque no site.</li>
+      <li><b>Correção ou remoção:</b> uma vaga com dado errado, que já fechou, que não é de PHP ou que você quer tirar do site.
+        Mande o link da vaga.</li>
+      <li><b>Fonte nova:</b> um portal, empresa ou repositório de vagas que ainda não coletamos.</li>
+    </ul>
+  </section>
+
+  <footer>Respostas e correções de vaga são feitas à mão, em geral em até 2 dias úteis.</footer>
+</div>
+
+</body>
+</html>

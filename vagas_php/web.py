@@ -17,6 +17,7 @@ Rotas: /             página (static/index.html), com as primeiras vagas já no 
                      2), sem os perfis de VAGAS_RECRUITERS_HIDE (URLs, separadas por vírgula)
        /empresas     empresas que mais anunciam vagas PHP (static/empresas.html)
        /api/companies  a lista: vagas de portais dos últimos 90 dias, 2 ou mais por empresa
+       /contato      como falar com o dono do site: mensagem no LinkedIn (static/contato.html)
        /sitemap.xml  páginas para buscadores (ver SITEMAP_PROVIDERS)
        /robots.txt   tudo liberado menos /api/, com o endereço do sitemap
        /og.png       imagem de preview social (og:image / twitter:image), static/og.png
@@ -793,6 +794,16 @@ async def companies(request: Request):
                          "min_jobs": COMPANIES_MIN, "max_age_hours": dates.MAX_AGE_HOURS})
 
 
+async def contato_page(request: Request):
+    html = seo.render(
+        request, "contato.html", path="/contato",
+        title="Contato: vaga em destaque, correções e sugestões | Vagas PHP",
+        description="Fale com quem mantém o Vagas PHP pelo LinkedIn para anunciar uma vaga em "
+                    "destaque, corrigir ou remover uma vaga, ou sugerir uma fonte nova.",
+        jsonld=seo.breadcrumbs(request, ("Vagas PHP", "/"), ("Contato", "/contato")))
+    return HTMLResponse(html)
+
+
 async def stats(request: Request):
     try:
         return JSONResponse(store().stats())
@@ -826,7 +837,7 @@ async def clicks(request: Request):
 # Cada provedor é uma função sem argumentos que devolve [(caminho, lastmod ISO ou None)].
 # Acrescente provedores em SITEMAP_PROVIDERS; caminho repetido vale uma vez (o primeiro).
 
-PAGES = ("/", "/vagas", "/dashboard", "/empresas", "/recrutadores", "/regras", "/mercado-php")
+PAGES = ("/", "/vagas", "/dashboard", "/empresas", "/recrutadores", "/regras", "/mercado-php", "/contato")
 
 
 def _newest(jobs: list[dict]) -> str | None:
@@ -915,6 +926,7 @@ app = Starlette(routes=[
     Route("/api/recruiters", recruiters),
     Route("/empresas", companies_page),
     Route("/api/companies", companies),
+    Route("/contato", contato_page),
     Route("/sitemap.xml", sitemap),
     Route("/robots.txt", robots),
     Route("/og.png", og_image),
