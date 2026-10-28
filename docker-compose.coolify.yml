@@ -70,6 +70,12 @@ services:
       VAGAS_GITHUB_REPOS: ${VAGAS_GITHUB_REPOS:-phpdevbr/vagas,backend-br/vagas}
       VAGAS_GITHUB_INTERVAL_HOURS: ${VAGAS_GITHUB_INTERVAL_HOURS:-1}
       GITHUB_TOKEN: ${GITHUB_TOKEN-}
+      # Indexing API (vagas_php/indexing.py): JSON da conta de serviço em base64. Precisa
+      # estar aqui: o serviço só recebe as variáveis listadas neste arquivo, mesmo as que
+      # existem no painel do Coolify. Vazio: um aviso no log e nada é enviado ao Google.
+      VAGAS_INDEXING_SA_B64: ${VAGAS_INDEXING_SA_B64:-}
+      VAGAS_INDEXING_ENABLED: ${VAGAS_INDEXING_ENABLED:-true}
+      VAGAS_SITE_URL: ${VAGAS_SITE_URL:-}
     ports:
       - "127.0.0.1:${MCP_PUBLISH_PORT:-8766}:8000"     # MCP
       - "127.0.0.1:${NOVNC_PUBLISH_PORT:-6081}:6080"   # noVNC, para o login do LinkedIn
