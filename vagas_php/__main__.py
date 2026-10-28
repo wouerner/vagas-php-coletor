@@ -6,6 +6,7 @@
   python -m vagas_php post --probe [--show]               # diagnóstico da caixa de publicação (não publica)
   python -m vagas_php telegram-alert [--dry-run] [--limit 5] [--force] [--batch]  # vagas novas da API pública no Telegram
   python -m vagas_php telegram-digest [--dry-run]         # resumo semanal no Telegram (mesmo post do LinkedIn)
+  python -m vagas_php indexing-push [--limit 50] [--dry-run] [--force]  # vagas abertas na Google Indexing API
 """
 
 import argparse
@@ -75,6 +76,14 @@ def main() -> int:
                             "post do LinkedIn); uma vez por semana")
     d.add_argument("--dry-run", action="store_true",
                    help="gera a imagem e imprime o texto sem enviar e sem gravar o estado")
+    ix = sub.add_parser("indexing-push",
+                        help="publica na Google Indexing API as vagas abertas ainda não "
+                             "anunciadas (mesmas URLs do sitemap)")
+    ix.add_argument("--limit", type=int, default=50, help="máximo de URLs por execução")
+    ix.add_argument("--dry-run", action="store_true",
+                    help="lista as URLs que seriam publicadas, sem chamar a API e sem gravar")
+    ix.add_argument("--force", action="store_true",
+                    help="publica de novo as já enviadas com sucesso nas últimas 24 h")
     args = parser.parse_args()
 
     if args.cmd == "telegram-digest":
@@ -121,6 +130,12 @@ def main() -> int:
         return migrate_sqlite.run(store, args.path, force=args.force)
     if args.cmd == "list":
         return list_jobs(store, args)
+    if args.cmd == "indexing-push":
+        from . import indexing
+        result = indexing.publish(indexing.open_urls(store), limit=args.limit,
+                                  dry_run=args.dry_run, force=args.force, store=store)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
     sources = SOURCES if args.source == "all" else (args.source,)
     status = 0
     for source in sources:

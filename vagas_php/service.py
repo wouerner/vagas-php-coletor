@@ -25,7 +25,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
-from . import collect, dates, linkedin_post, php
+from . import collect, dates, indexing, linkedin_post, php
 from .store import SOURCES, Store
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -194,6 +194,9 @@ class Service:
         self.daily_post_days = _days(os.getenv("VAGAS_LINKEDIN_POST_DAYS", "0-6"))
         self.daily_post_tries: dict[str, list[datetime]] = {}
         self.daily_post_running = False
+        # Google Indexing API depois de cada coleta OK (indexing.py).
+        self.indexing = _env_bool("VAGAS_INDEXING_ENABLED", True)
+        self.indexing_running = False
 
     async def collect(self, source: str, origin: str) -> dict:
         """Coleta uma fonte agora, desde a última coleta OK dela."""
@@ -215,7 +218,27 @@ class Service:
                 self.running.discard(source)
                 self._write_schedule()
             log.info("Coleta %s (%s): %s", source, origin, result)
+            self._indexing_push()
             return result
+
+    def _indexing_push(self) -> None:
+        """Publica na Indexing API as vagas abertas, numa thread, sem esperar: falha aqui
+        nunca vira falha da coleta. Uma rodada por vez; a próxima coleta dispara de novo."""
+        if not self.indexing or self.indexing_running:
+            return
+        self.indexing_running = True
+
+        def push():
+            try:
+                indexing.publish(indexing.open_urls(self.store), store=self.store)
+            except Exception as e:
+                log.warning("Indexing API falhou (%s: %s)", e.__class__.__name__, e)
+            finally:
+                self.indexing_running = False
+
+        task = asyncio.create_task(asyncio.to_thread(push))
+        self._tasks.add(task)  # mantém referência até terminar
+        task.add_done_callback(self._tasks.discard)
 
     # --- agendador -----------------------------------------------------------
 

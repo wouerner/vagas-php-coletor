@@ -79,6 +79,15 @@ SCHEMA = [
     source      VARCHAR(32),           -- fonte da vaga, quando houver
     INDEX clicks_at (at)
 )""",
+    # Google Indexing API (indexing.py): última tentativa de publicar cada URL de vaga.
+    # A chave é VARCHAR (o MySQL não aceita TEXT como chave primária sem prefixo).
+    """CREATE TABLE IF NOT EXISTS indexing_log (
+    url         VARCHAR(512) COLLATE utf8mb4_bin PRIMARY KEY, -- URL absoluta da página da vaga
+    pushed_at   VARCHAR(40) NOT NULL,  -- ISO UTC, como em runs
+    status      VARCHAR(32) NOT NULL,  -- ok | erro | sem_permissao | quota
+    detail      TEXT,                  -- mensagem do Google na falha
+    INDEX indexing_log_status (status, pushed_at)
+)""",
 ]
 
 # A mesma vaga é anunciada várias vezes (ex.: um ID do LinkedIn por cidade): vale só a
