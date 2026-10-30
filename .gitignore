@@ -4,3 +4,6 @@
 data/
 __pycache__/
 .claude/settings.local.json
+web/vendor/
+web/.phpunit.cache/
+.pytest_cache/

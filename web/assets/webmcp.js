@@ -26,7 +26,7 @@
     (typeof navigator !== "undefined" && navigator && navigator.modelContext) || null;
   if (!ctx || typeof ctx.registerTool !== "function") return;
 
-  const SITE = "https://vagasphp.wouerner.dev";
+  const SITE = location.origin;  // o próprio site (forks não apontam para o original)
   const WORKPLACES = ["Remoto", "Híbrido", "Presencial"];
   const SENIORITIES = ["Estágio", "Júnior", "Pleno", "Sênior", "Especialista"];
   const STACKS = ["Laravel", "Symfony", "CodeIgniter", "CakePHP", "Yii", "Laminas/Zend",

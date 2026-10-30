@@ -1,3 +1,5 @@
+# Monorepo: coletor em Python (collector/, serviço vagas-php) e site em PHP (web/, serviço
+# web). Os dois conversam só pelo MySQL (docs/contrato-base.md).
 # Portas publicadas (todas mudam por variável; veja o README):
 #   site 8780, MCP 8766, noVNC 6081, VNC 5901, MySQL 3307
 services:
@@ -21,9 +23,10 @@ services:
       timeout: 5s
       retries: 30
 
+  # Coletor (Python): coleta agendada, filtro, MCP, post diário e Indexing API.
   vagas-php:
-    build: .
-    image: vagas-php
+    build: ./collector
+    image: vagas-php-collector
     command: ["serve"]
     restart: unless-stopped
     depends_on:
@@ -47,27 +50,27 @@ services:
       # Perfil do Chromium com a sessão do LinkedIn (fonte post e post diário). Para usar
       # outro diretório, defina LINKEDIN_SESSION_PATH.
       - ${LINKEDIN_SESSION_PATH:-./.session}:/app/.session
-      - ./data:/app/data           # config e agenda do coletor, posts diários (vagas no MySQL)
+      - ./data:/app/data           # config do coletor e posts diários (vagas no MySQL)
 
+  # Site (PHP 8.5 + Apache): lê o MySQL do coletor; só grava os cliques.
   web:
-    image: vagas-php
-    command: ["web"]
+    build: ./web
+    image: vagas-php-web
     restart: unless-stopped
-    user: "${UID:-1000}:${GID:-1000}"
-    depends_on: [vagas-php]
+    depends_on:
+      mysql: {condition: service_healthy}
     environment:
       TZ: America/Sao_Paulo
-      WEB_HOST: 0.0.0.0
-      WEB_PORT: "8000"
       VAGAS_MAX_AGE_HOURS: "${VAGAS_MAX_AGE_HOURS:-72}"
       VAGAS_RECRUITERS_MIN: "${VAGAS_RECRUITERS_MIN:-2}"
       VAGAS_RECRUITERS_HIDE: "${VAGAS_RECRUITERS_HIDE:-}"
+      VAGAS_GA_ID: "${VAGAS_GA_ID:-}"
+      VAGAS_SITE_URL: "${VAGAS_SITE_URL:-}"
+      VAGAS_ORIGIN_TRIAL: "${VAGAS_ORIGIN_TRIAL:-}"
       DATABASE_URL: "mysql://vagas:${MYSQL_PASSWORD:-vagas}@mysql:3306/vagas"
     ports:
       # Para publicar o site na rede, use WEB_BIND=0.0.0.0 (ou um proxy reverso).
       - "${WEB_BIND:-127.0.0.1}:${WEB_PUBLISH_PORT:-8780}:8000"   # http://localhost:8780
-    volumes:
-      - ./data:/app/data           # agenda das coletas (schedule.json) para o dashboard
 
 volumes:
   mysql-data:

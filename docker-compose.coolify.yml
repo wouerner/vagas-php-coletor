@@ -1,5 +1,7 @@
 # Deploy no Coolify (build pack "Docker Compose", Docker Compose Location:
-# /docker-compose.coolify.yml). Diferenças para o docker-compose.yml local:
+# /docker-compose.coolify.yml). Monorepo: o serviço vagas-php é o coletor (collector/,
+# Python) e o web é o site (web/, PHP); conversam só pelo MySQL (docs/contrato-base.md).
+# Diferenças para o docker-compose.yml local:
 #   - sem arquivo .env montado: as variáveis são editadas na aba Environment Variables;
 #   - MySQL 8 em outro servidor: DATABASE_URL=mysql://usuario:senha@host:3306/base
 #     (obrigatória; senha com caracteres especiais vai codificada, ex.: @ -> %40);
@@ -9,7 +11,7 @@
 #     senha!) ficam só no 127.0.0.1 do servidor: use túnel SSH.
 services:
   vagas-php:
-    build: .
+    build: ./collector
     command: ["serve"]
     restart: unless-stopped
     user: pwuser
@@ -84,26 +86,20 @@ services:
       - linkedin-session:/app/.session
 
   web:
-    build: .
-    command: ["web"]
+    build: ./web
     restart: unless-stopped
-    user: pwuser
-    depends_on: [vagas-php]
     environment:
       SERVICE_URL_WEB_8000:          # o Coolify gera/usa o domínio do site
       VAGAS_GA_ID: ${VAGAS_GA_ID:-}  # Google Analytics (G-XXXXXXXXXX); vazio: sem GA
       VAGAS_SITE_URL: ${VAGAS_SITE_URL:-}  # endereço público (canonical, sitemap); vazio: do proxy
+      VAGAS_ORIGIN_TRIAL: ${VAGAS_ORIGIN_TRIAL:-}  # token do origin trial do WebMCP (Chrome); vazio: sem
       VAGAS_RECRUITERS_MIN: ${VAGAS_RECRUITERS_MIN:-2}   # /recrutadores: mínimo de vagas em 90 dias
       VAGAS_RECRUITERS_HIDE: ${VAGAS_RECRUITERS_HIDE:-}  # perfis que pediram para sair (URLs, vírgula)
       TZ: America/Sao_Paulo
-      WEB_HOST: 0.0.0.0
-      WEB_PORT: "8000"
       VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
       DATABASE_URL: ${DATABASE_URL:-}
-    volumes:
-      - vagas-data:/app/data
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/stats')"]
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8000/api/stats') === false ? 1 : 0);"]
       interval: 30s
       timeout: 5s
       retries: 3

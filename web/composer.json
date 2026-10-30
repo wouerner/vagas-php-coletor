@@ -1,0 +1,32 @@
+{
+    "name": "wouerner/vagas-php-web",
+    "description": "Site do Vagas PHP: lista as vagas PHP que o coletor (collector/, em Python) grava no MySQL.",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.5",
+        "ext-intl": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "VagasPhp\\": "src/"
+        }
+    },
+    "scripts": {
+        "serve": "php -S 127.0.0.1:8780 -t public public/index.php",
+        "test": "pest"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "require-dev": {
+        "pestphp/pest": "^5.3"
+    }
+}

@@ -1,0 +1,82 @@
+[
+  {
+    "job": {
+      "seq": 1,
+      "source": "gupy",
+      "title": "Desenvolvedor(a) PHP Sênior"
+    },
+    "path": "/vaga/1-desenvolvedor-a-php-senior"
+  },
+  {
+    "job": {
+      "seq": 42,
+      "source": "linkedin",
+      "title": "Pessoa Desenvolvedora Back-end — Laravel | 100% Remoto"
+    },
+    "path": "/vaga/42-pessoa-desenvolvedora-back-end-laravel-100-remoto"
+  },
+  {
+    "job": {
+      "seq": 7,
+      "source": "github",
+      "title": "[Remoto] Dev PHP Pleno @ Empresa / São Paulo"
+    },
+    "path": "/vaga/7-remoto-dev-php-pleno-empresa-sao-paulo"
+  },
+  {
+    "job": {
+      "seq": 8,
+      "source": "catho",
+      "title": null
+    },
+    "path": "/vaga/8-vaga"
+  },
+  {
+    "job": {
+      "seq": 9,
+      "source": "catho",
+      "title": "🚀 Vaga 💜"
+    },
+    "path": "/vaga/9-vaga"
+  },
+  {
+    "job": {
+      "seq": 10,
+      "source": "inhire",
+      "title": "Engenheiro de Software Especialista em Arquitetura de Sistemas Distribuídos com PHP, Symfony e Kafka"
+    },
+    "path": "/vaga/10-engenheiro-de-software-especialista-em-arquitetura-de-sistemas-distrib"
+  },
+  {
+    "job": {
+      "seq": 11,
+      "source": "solides",
+      "title": "ESTÁGIO EM DESENVOLVIMENTO — AÇÃO & INOVAÇÃO"
+    },
+    "path": "/vaga/11-estagio-em-desenvolvimento-acao-inovacao"
+  },
+  {
+    "job": {
+      "seq": 12,
+      "source": "post",
+      "title": "Vaga PHP"
+    },
+    "path": null
+  },
+  {
+    "job": {
+      "seq": null,
+      "source": "gupy",
+      "title": "Sem seq"
+    },
+    "path": null
+  },
+  {
+    "job": {
+      "seq": 13,
+      "source": "remotar",
+      "title": "Ｆｕｌｌ ｗｉｄｔｈ ﬁ ligature"
+    },
+    "path": "/vaga/13-full-width-fi-ligature"
+  }
+]

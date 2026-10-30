@@ -1,8 +1,19 @@
 # vagas-php
 
 Coleta e lista **vagas de engenharia de software com PHP** (PHP, Laravel, Symfony,
-CodeIgniter, Hyperf...): Python + Playwright em Docker, servidor MCP, coleta agendada e
-MySQL 8, com um site para navegar pelas vagas.
+CodeIgniter, Hyperf...). Monorepo com duas partes que conversam só pelo MySQL 8:
+
+| Pasta | Linguagem | O que faz |
+|---|---|---|
+| [`web/`](web/) | **PHP 8.5** (sem framework, PDO, Pest) | o site, a API JSON, o sitemap e as páginas para buscadores |
+| [`collector/`](collector/) | Python + Playwright | coleta agendada das fontes, filtro de PHP, servidor MCP, post diário, alertas do Telegram e Google Indexing API |
+
+**Por que duas linguagens?** O site é PHP, como o público dele. O coletor ficou em Python
+por causa do navegador automatizado: o Playwright não tem binding oficial para PHP, e é ele
+que lê as publicações do LinkedIn (seletores por papel de acessibilidade, perfil
+persistente do Chromium). As outras fontes são HTTP puro e poderiam ser portadas; PRs são
+bem-vindos. O contrato entre as duas partes (tabelas, colunas e `site_meta`) está em
+[docs/contrato-base.md](docs/contrato-base.md).
 
 Canal no Telegram: [t.me/vagas_php](https://t.me/vagas_php) — alertas de vagas em tempo real
 e um resumo semanal toda segunda às 10h.
@@ -39,7 +50,7 @@ horário de Brasília no site. Precisão de cada fonte:
 - **publicações**: o LinkedIn mostra "18 h", "2 d"...; "3 d" já fica de fora.
 
 Tudo vai para o MySQL (`DATABASE_URL`), mas só aparece no site o que passa no filtro de PHP
-(`vagas_php/php.py`):
+(`collector/vagas_php/php.py`):
 
 - **vagas de portais e issues**: PHP/framework no título ou nas etiquetas; ou título de
   desenvolvimento com PHP citado 2+ vezes na descrição (uma menção só costuma ser
@@ -63,7 +74,8 @@ ou número do post): a vaga sai do site, da API e do MCP e não volta em novas c
 publicações), na ordem em que são aplicadas, com as expressões usadas, quantos
 itens da base cada uma decidiu e a lista do que foi descartado à mão, com o motivo. Ela é
 gerada de `php.RULES` (`GET /api/rules`), que lê as mesmas constantes do filtro: ao mudar
-uma regra, atualize o texto dela em `RULES`.
+uma regra, atualize o texto dela em `RULES`. O coletor grava as regras e a contagem na
+base (`site_meta`) na subida e depois de cada coleta; o site só as mostra.
 
 Issues fechadas no GitHub ficam marcadas como encerradas e saem do site.
 
@@ -117,7 +129,7 @@ claude mcp add --transport http vagas-php http://localhost:8766/mcp   # ou use o
 
 Com `VAGAS_LINKEDIN_DAILY_POST=true`, o serviço publica todo dia às `VAGAS_LINKEDIN_POST_TIME`
 (horário de Brasília, padrão 09:00), nos dias de `VAGAS_LINKEDIN_POST_DAYS` (0 = segunda ...
-6 = domingo), um post na conta da sessão do bot (`vagas_php/linkedin_post.py`):
+6 = domingo), um post na conta da sessão do bot (`collector/vagas_php/linkedin_post.py`):
 
 - imagem: print do topo do dashboard (números, vagas por site e vagas novas por dia);
 - texto: resumo do dia (vagas abertas, novas em 24 h, remotas, empresas), fontes, filtro,
@@ -142,7 +154,27 @@ falhar, tenta de novo a cada 30 min, até 3 vezes, nas 3 h seguintes ao horário
 imagem, texto e confirmação de cada dia ficam em `data/linkedin_posts/AAAA-MM-DD/`, e o
 histórico em `data/linkedin_posts.json`.
 
-## Site
+## Site (PHP)
+
+O site fica em [`web/`](web/): PHP 8.5 sem framework (um roteador pequeno, PDO e templates
+HTML com marcas `<!--ssr:nome-->`), servido por Apache na imagem Docker. Para rodar fora do
+Docker, com o MySQL do compose no ar:
+
+```bash
+cd web
+composer install
+DATABASE_URL=mysql://vagas:vagas@127.0.0.1:3307/vagas composer serve   # http://127.0.0.1:8780
+composer test                                                         # Pest
+```
+
+| Arquivo | |
+|---|---|
+| `web/src/Site.php` | rotas, home, temas, empresas, recrutadores, regras, sitemap, `/out` |
+| `web/src/Vaga.php` | página de cada vaga (`/vaga/<número>-<título>`) e o JSON-LD `JobPosting` |
+| `web/src/Mercado.php` | `/mercado-php` e `/llms.txt` |
+| `web/src/Repo.php` | as consultas SQL |
+| `web/src/Seo.php` | `<head>` (título, canonical, Open Graph, JSON-LD) e o endereço das vagas |
+| `web/templates/` | as páginas (HTML, CSS e JavaScript de cada uma) |
 
 `http://localhost:8780`: busca por texto e filtros de fonte, modalidade, senioridade,
 stack e período (1, 4, 6, 24, 48 ou 72 h; os filtros ficam na URL, para compartilhar). API em JSON:
@@ -176,33 +208,31 @@ quem tem `VAGAS_RECRUITERS_MIN` vagas ou mais (padrão 2). Quem pedir para sair 
 
 **Busca (Google e assistentes de IA)**: as páginas saem já renderizadas no servidor (robôs
 que não executam JavaScript leem as vagas), com título, descrição, canonical, Open Graph e
-JSON-LD (`vagas_php/seo.py`). Páginas para buscadores:
+JSON-LD (`web/src/Seo.php`). Páginas para buscadores:
 
 - `/vagas` e `/vagas/<tema>`: vagas abertas por stack, modalidade, senioridade e algumas
   combinações (`/vagas/laravel-remoto`, `/vagas/php-junior`...), com um resumo em números;
-  os temas saem de `php.py` (`THEMES` em `web.py`).
+  os temas saem da taxonomia do filtro (`php.py`), que o coletor grava em `site_meta`
+  (`web/src/Themes.php`).
 - `/vaga/<número>-<título>`: uma página por vaga de portal, com JSON-LD `JobPosting` (Google
   for Jobs) enquanto está aberta; depois de 72 h ela fica com `noindex` e sugere vagas
-  parecidas (`vaga.py`). Posts do LinkedIn não ganham página.
-- `/mercado-php`: números do mercado PHP em texto, para citar (`mercado.py`).
+  parecidas (`web/src/Vaga.php`). Posts do LinkedIn não ganham página. O endereço é
+  contrato com o coletor, que o anuncia ao Google (Indexing API): os dois lados testam
+  contra `contracts/job_paths.json`.
+- `/mercado-php`: números do mercado PHP em texto, para citar (`web/src/Mercado.php`).
 - `/sitemap.xml`, `/robots.txt` e `/llms.txt`.
 
 O endereço público usado no canonical e no sitemap vem de `VAGAS_SITE_URL` ou, sem ela, dos
-cabeçalhos `X-Forwarded-*` do proxy.
+cabeçalhos `X-Forwarded-*` do proxy. As ferramentas do WebMCP (`/webmcp.js`) só rodam no
+Chrome com o token do *origin trial* da sua origem em `VAGAS_ORIGIN_TRIAL`.
 
 **Preview social** (LinkedIn, Telegram, WhatsApp): todas as páginas saem com `og:image` e
 `twitter:image` (card `summary_large_image`) apontando para `/og.png`, que serve
-`vagas_php/static/og.png` (1200x630). Para regenerar a imagem:
-
-```bash
-python3 ~/.hermes/scripts/gen_og_image.py vagas_php/static/og.png
-```
-
-O LinkedIn guarda o preview em cache; depois de trocar a imagem, force a releitura no
+`web/assets/og.png` (1200x630). O LinkedIn guarda o preview em cache; depois de trocar a imagem, force a releitura no
 [Post Inspector](https://www.linkedin.com/post-inspector/).
 
 **Google Analytics**: com `VAGAS_GA_ID=G-XXXXXXXXXX` as páginas recebem a tag do GA
-(`vagas_php/static/analytics.html`) com aviso de cookies (LGPD, *Consent Mode*): sem aceite,
+(`web/templates/analytics.html`) com aviso de cookies (LGPD, *Consent Mode*): sem aceite,
 o GA não grava cookies. Sem a variável (padrão local), nada é carregado. O print do
 dashboard para o post diário abre `?print=1`, que fica sem a tag.
 
@@ -216,9 +246,9 @@ de cada fonte. Os números vêm de `GET /api/dashboard?days=14`.
 
 Para mostrar a defasagem dos dados, o topo do dashboard traz a
 **última e a próxima captura**, e a tabela de saúde mostra a próxima coleta de cada fonte,
-já ajustada à janela de horário. O coletor grava a agenda em `data/schedule.json` a cada
-minuto. Se o arquivo ficar mais de 5 min sem atualizar, o dashboard avisa que o coletor
-parece parado.
+já ajustada à janela de horário. O coletor grava a agenda na base (`site_meta`, nome
+`schedule`) a cada minuto. Se ela ficar mais de 5 min sem atualizar, o dashboard avisa que
+o coletor parece parado.
 
 ## Base de dados (MySQL 8)
 
@@ -227,8 +257,8 @@ As vagas e as execuções ficam num MySQL 8.0.19+ apontado por
 codificada, ex.: `@` -> `%40`). Bancos gerenciados (Vultr, RDS...) exigem TLS: acrescente
 `?ssl-mode=REQUIRED` (cifra a conexão) ou `?ssl-mode=VERIFY_CA&ssl-ca=/caminho/ca.pem`
 (também valida o certificado). O coletor cria as tabelas na subida e espera até 2 min o
-banco aceitar conexões; o site só lê. Em `data/` continuam só os arquivos do coletor
-(`config.json`, `schedule.json`, posts diários).
+banco aceitar conexões; o site só lê (e grava os cliques). Em `data/` continuam só os
+arquivos do coletor (`config.json`, posts diários).
 
 No `docker-compose.yml` local o MySQL sobe junto (serviço `mysql`, volume `mysql-data`,
 porta `127.0.0.1:3307` para inspecionar) e a `DATABASE_URL` já vem pronta.
@@ -256,8 +286,10 @@ Use `docker-compose.coolify.yml`:
 4. Em *Environment Variables* preencha `DATABASE_URL` (obrigatória), `LINKEDIN_EMAIL`, `LINKEDIN_PASSWORD` e o
    que quiser mudar (os padrões são os do `.env.example`). As publicações (`post`)
    começam **desligadas** (`VAGAS_POSTS_ENABLED=false`).
-5. No serviço `web`, defina o domínio com `https://` (ex.: `https://vagas.seudominio.com`).
-   A porta interna 8000 vem de `SERVICE_URL_WEB_8000` no compose.
+5. No serviço `web` (o site em PHP), defina o domínio com `https://` (ex.:
+   `https://vagas.seudominio.com`). A porta interna 8000 vem de `SERVICE_URL_WEB_8000` no
+   compose. O site precisa de `DATABASE_URL` e, se usar, `VAGAS_GA_ID`, `VAGAS_SITE_URL` e
+   `VAGAS_ORIGIN_TRIAL`.
 6. Deploy. As vagas ficam no MySQL; a sessão do LinkedIn e os arquivos do coletor nos
    volumes `linkedin-session` e `vagas-data`.
 
@@ -279,7 +311,17 @@ http://localhost:6081/vnc.html e conclua o login. Depois ligue `VAGAS_POSTS_ENAB
 ```bash
 docker compose run --rm vagas-php collect all          # ou uma fonte: linkedin | gupy | remotar | ... | post
 docker compose run --rm vagas-php list --q laravel --hours 24
+docker compose run --rm vagas-php site-data            # regrava o que o site precisa do filtro
 ```
+
+## Testes
+
+```bash
+cd web && composer install && composer test                                   # site (Pest)
+cd collector && pip install -r requirements.txt -r requirements-dev.txt && pytest   # coletor
+```
+
+O CI (`.github/workflows/ci.yml`) roda os dois a cada push e pull request.
 
 ## Observações
 
@@ -295,7 +337,7 @@ docker compose run --rm vagas-php list --q laravel --hours 24
   automático com checagem anti-robô), **InfoJobs** e **GeekHunter** (o robots.txt proíbe
   a coleta das vagas).
 - O LinkedIn muda o HTML com frequência; se a fonte `post` parar de trazer resultados,
-  os seletores ficam em `vagas_php/bot.py`.
+  os seletores ficam em `collector/vagas_php/bot.py`.
 
 ## Licença
 

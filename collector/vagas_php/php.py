@@ -202,7 +202,7 @@ CONTRACT = [
     ("Freelance", re.compile(r"\b(freela(ncer?)?|contractor)\b", re.I)),
 ]
 # Salário citado no texto ("💰 Remuneração: R$ 5.800,00 (Bruto Mensal)", "Salário entre
-# R$ 2.000,00 e R$ 3.000,00"), gravado no formato que vaga.SALARY lê: "R$ 5.800",
+# R$ 2.000,00 e R$ 3.000,00"), gravado no formato que Vaga::SALARY do site (web/src/Vaga.php) lê: "R$ 5.800",
 # "R$ 2.000 a R$ 3.000", "US$ 7.083 por mês" (sem centavos; real sem período é mensal).
 # Só vale valor na mesma linha de uma palavra de contexto. A linha com contexto que diz
 # não ter valor ("a combinar", "competitivo"...) encerra a busca, mesmo citando R$ (é
@@ -440,7 +440,7 @@ def _currency(symbol: str) -> str:
 
 
 def _salary_in(line: str) -> str | None:
-    """Salário da linha (que já tem palavra de contexto), no formato de vaga.SALARY."""
+    """Salário da linha (que já tem palavra de contexto), no formato de Vaga::SALARY do site (web/src/Vaga.php)."""
     for m in SALARY_RE.finditer(line):
         before, after = line[:m.start()], line[m.end():]
         if SALARY_NOT_PAY_RE.search(before) or SALARY_NOT_PAY_AFTER_RE.search(after):
@@ -456,7 +456,7 @@ def _salary_in(line: str) -> str | None:
         if high and _amount(high) != _amount(low):
             out += f" a {cur} {_amount(high)}"
         period = next((label for label, rx in SALARY_PERIOD_RES if rx.search(after)), None)
-        if cur == "US$" and not period:  # dólar sem período o vaga.py descarta
+        if cur == "US$" and not period:  # dólar sem período o site descarta (web/src/Vaga.php)
             continue
         if period and not (cur == "R$" and period == "por mês"):
             out += f" {period}"

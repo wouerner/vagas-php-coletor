@@ -31,8 +31,6 @@ from .store import SOURCES, Store
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("VAGAS_DATA_DIR", ROOT / "data"))
 CONFIG_PATH = DATA_DIR / "config.json"
-# Próximas coletas, para o site (outro processo) mostrar a defasagem dos dados.
-SCHEDULE_PATH = DATA_DIR / "schedule.json"
 RETRY_AFTER_ERROR = timedelta(minutes=30)
 # Post diário no LinkedIn (print do dashboard): tentativas dentro desta janela após o horário.
 DAILY_POST_WINDOW = timedelta(hours=3)
@@ -179,6 +177,8 @@ class Service:
         if changed := self.store.reclassify_jobs():
             log.info("Filtro de vagas reaplicado: %d mudaram (%s)", len(changed),
                      ", ".join(changed[:20]) + ("..." if len(changed) > 20 else ""))
+        # O site (PHP) não roda o filtro: recebe pronto o que precisa dele.
+        self.store.publish_site_data()
         self.config = Config.load()
         self.headless = _env_bool("LINKEDIN_HEADLESS", True)
         self.browser = ThreadPoolExecutor(max_workers=1, thread_name_prefix="browser")
@@ -218,8 +218,17 @@ class Service:
                 self.running.discard(source)
                 self._write_schedule()
             log.info("Coleta %s (%s): %s", source, origin, result)
+            await asyncio.to_thread(self._publish_site_data)
             self._indexing_push()
             return result
+
+    def _publish_site_data(self) -> None:
+        """Atualiza na base o que o site precisa do filtro (Store.publish_site_data); falha
+        aqui nunca vira falha da coleta."""
+        try:
+            self.store.publish_site_data()
+        except Exception as e:
+            log.warning("Dados do site não atualizados (%s: %s)", e.__class__.__name__, e)
 
     def _indexing_push(self) -> None:
         """Publica na Indexing API as vagas abertas, numa thread, sem esperar: falha aqui
@@ -335,7 +344,8 @@ class Service:
                  self.next_run[source].isoformat(timespec="minutes"))
 
     def _write_schedule(self) -> None:
-        """Grava as próximas coletas (já ajustadas à janela de horário) para o site."""
+        """Grava na base (site_meta "schedule") as próximas coletas, já ajustadas à janela
+        de horário, para o dashboard do site mostrar a defasagem dos dados."""
         now = datetime.now().astimezone()
         sources = {}
         for source, cfg in self.config.sources.items():
@@ -346,13 +356,11 @@ class Service:
                 "next_run": cfg.next_active(max(nxt, now)).isoformat(timespec="seconds")
                 if cfg.enabled and nxt else None,
             }
-        tmp = SCHEDULE_PATH.with_suffix(".tmp")
         try:
-            tmp.write_text(json.dumps({"updated_at": now.isoformat(timespec="seconds"),
-                                       "sources": sources}))
-            tmp.replace(SCHEDULE_PATH)
-        except OSError as e:
-            log.warning("Não foi possível gravar %s: %s", SCHEDULE_PATH, e)
+            self.store.set_meta("schedule", {"updated_at": now.isoformat(timespec="seconds"),
+                                             "sources": sources})
+        except Exception as e:
+            log.warning("Agenda das coletas não gravada: %s", e)
 
     def _next_runs(self) -> dict:
         return {s: t.isoformat(timespec="minutes") for s, t in self.next_run.items()}
@@ -463,6 +471,7 @@ def build_server(service: Service) -> MCPServer:
         rows = service.store.dismiss(ref, reason, undo)
         if not rows:
             raise ToolError(f"Nenhuma vaga encontrada para {ref!r}")
+        service._publish_site_data()  # contagem por regra da página /regras
         return {"dismissed": not undo, "jobs": rows}
 
     return mcp
@@ -470,6 +479,7 @@ def build_server(service: Service) -> MCPServer:
 
 async def main() -> None:
     load_dotenv(ROOT / ".env")
+    load_dotenv(ROOT.parent / ".env")  # monorepo: .env na raiz, fora do contêiner
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     service = Service()
     scheduler = asyncio.create_task(service.scheduler())

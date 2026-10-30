@@ -1,8 +1,9 @@
 """Google Indexing API: avisa o Google das páginas de vaga (JobPosting) abertas.
 
 É a via oficial e rápida para páginas com JobPosting: o Google rastreia a URL publicada em
-minutos, sem esperar o sitemap. As URLs vêm da mesma fonte do sitemap
-(vaga.sitemap_entries), para os dois nunca divergirem.
+minutos, sem esperar o sitemap. As URLs são as do sitemap do site (web/, em PHP): vagas
+abertas de portais, em /vaga/<seq>-<título>. O endereço é contrato entre os dois lados
+(job_path aqui, Seo::jobPath no site; os dois testam contra contracts/job_paths.json).
 
 Credencial (conta de serviço, escopo indexing), na ordem:
   VAGAS_INDEXING_SA_B64           JSON da conta de serviço em base64, numa linha
@@ -22,7 +23,11 @@ import base64
 import json
 import logging
 import os
+import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
+
+from . import dates
 
 log = logging.getLogger(__name__)
 
@@ -123,11 +128,29 @@ class GooglePublisher:
         raise PublishError(f"HTTP {r.status_code}: {message}")
 
 
+def slugify(text: str | None, limit: int = 70) -> str:
+    """"Desenvolvedor(a) PHP Sênior" -> "desenvolvedor-a-php-senior"."""
+    text = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "-", text).strip("-")[:limit].rstrip("-") or "vaga"
+
+
+def job_path(job: dict) -> str | None:
+    """Página da vaga no site (/vaga/<seq>-<título>), só para vagas de portais."""
+    if job.get("source") == "post" or not job.get("seq"):
+        return None
+    return f"/vaga/{job['seq']}-{slugify(job.get('title'))}"
+
+
 def open_urls(store) -> list[str]:
     """URLs absolutas das vagas abertas: as mesmas páginas de vaga do sitemap."""
-    from . import vaga
+    from .store import DEDUP
     base = (os.getenv("VAGAS_SITE_URL") or SITE_URL).strip().rstrip("/")
-    return [base + path for path, _ in vaga.sitemap_entries(store)]
+    rows = store.execute(
+        f"""SELECT seq, source, title, COALESCE(posted_at, first_seen) AS posted FROM jobs
+            WHERE source != 'post' AND relevant = 1 AND dismissed IS NULL
+              AND closed_at IS NULL AND COALESCE(posted_at, first_seen) >= ? AND {DEDUP}
+            ORDER BY posted DESC""", (dates.cutoff(),))
+    return [base + job_path(dict(r)) for r in rows]
 
 
 def _recent_ok(store, since: str) -> set[str]:

@@ -41,6 +41,7 @@ def history_readable(path: Path) -> bool:
 
 def main() -> int:
     load_dotenv(ROOT / ".env")
+    load_dotenv(ROOT.parent / ".env")  # monorepo: .env na raiz, fora do contêiner
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description="Vagas de engenharia de software com PHP.")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -84,6 +85,8 @@ def main() -> int:
                     help="lista as URLs que seriam publicadas, sem chamar a API e sem gravar")
     ix.add_argument("--force", action="store_true",
                     help="publica de novo as já enviadas com sucesso nas últimas 24 h")
+    sub.add_parser("site-data", help="grava na base o que o site precisa do filtro (regras, "
+                                     "taxonomia, empresa e recrutador de cada vaga)")
     args = parser.parse_args()
 
     if args.cmd == "telegram-digest":
@@ -130,6 +133,10 @@ def main() -> int:
         return migrate_sqlite.run(store, args.path, force=args.force)
     if args.cmd == "list":
         return list_jobs(store, args)
+    if args.cmd == "site-data":
+        store.publish_site_data()
+        print("site_meta e colunas derivadas atualizados")
+        return 0
     if args.cmd == "indexing-push":
         from . import indexing
         result = indexing.publish(indexing.open_urls(store), limit=args.limit,
@@ -145,6 +152,7 @@ def main() -> int:
         except (LoginError, RuntimeError, ValueError) as e:
             print(f"{source}: erro: {e}", file=sys.stderr)
             status = 1
+    store.publish_site_data()  # o que o site (PHP) precisa do filtro
     return status
 
 

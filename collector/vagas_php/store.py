@@ -1,10 +1,17 @@
 """MySQL 8 com as vagas coletadas (LinkedIn, Gupy, posts do LinkedIn, GitHub, Remotar,
 Programathor, Catho, Sólides, InHire e Coodesh) e o histórico
-de execuções de cada coletor. O site usa a mesma base, só para leitura.
+de execuções de cada coletor. O site (web/, em PHP) usa a mesma base: lê as vagas e grava
+só os cliques (tabela clicks).
+
+A base é o contrato entre os dois lados (ver docs/contrato-base.md). O site não roda o
+filtro (php.py): o que ele precisa do filtro o coletor grava pronto, em publish_site_data():
+as colunas jobs.company_key e jobs.author_recruiter e a tabela site_meta (taxonomia, regras,
+contagem por regra e agenda das coletas).
 
 Conexão: DATABASE_URL=mysql://usuario:senha@host:3306/base[?ssl-mode=REQUIRED] (senha
 com caracteres especiais vai codificada, ex.: @ -> %40)."""
 
+import json
 import logging
 import os
 import re
@@ -13,7 +20,7 @@ import threading
 import time
 from collections import Counter
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -41,11 +48,13 @@ SCHEMA = [
     seniority   VARCHAR(32),           -- Estágio | Júnior | Pleno | Sênior | Especialista
     contract    VARCHAR(32),           -- CLT | PJ | Freelance
     stack       VARCHAR(512),          -- "PHP,Laravel"
+    company_key VARCHAR(255),          -- php.company_key(company): agrupa a empresa; NULL = não diz quem contrata
     salary      VARCHAR(255),
     url         TEXT,
     author      VARCHAR(512),
     author_url  TEXT,
     author_headline VARCHAR(512),      -- texto abaixo do nome do autor do post (cargo)
+    author_recruiter TINYINT,          -- php.is_recruiter(author_headline)
     description MEDIUMTEXT,
     posted_at   VARCHAR(40),           -- quando foi publicada (ISO; aproximada para posts)
     first_seen  VARCHAR(40) NOT NULL,
@@ -87,6 +96,13 @@ SCHEMA = [
     status      VARCHAR(32) NOT NULL,  -- ok | erro | sem_permissao | quota
     detail      TEXT,                  -- mensagem do Google na falha
     INDEX indexing_log_status (status, pushed_at)
+)""",
+    # Dados para o site que só o coletor sabe calcular (JSON): taxonomy, rules, rule_counts,
+    # schedule. Ver publish_site_data() e docs/contrato-base.md.
+    """CREATE TABLE IF NOT EXISTS site_meta (
+    name        VARCHAR(64) PRIMARY KEY,
+    value       MEDIUMTEXT NOT NULL,   -- JSON
+    updated_at  VARCHAR(40) NOT NULL   -- ISO UTC
 )""",
 ]
 
@@ -204,7 +220,9 @@ class Store:
             "WHERE table_schema = DATABASE()")}
         for table, column, ddl in (("runs", "listed", "INT AFTER found"),
                                    ("runs", "failed", "INT AFTER listed"),
-                                   ("jobs", "author_headline", "VARCHAR(512) AFTER author_url")):
+                                   ("jobs", "author_headline", "VARCHAR(512) AFTER author_url"),
+                                   ("jobs", "company_key", "VARCHAR(255) AFTER stack"),
+                                   ("jobs", "author_recruiter", "TINYINT AFTER author_headline")):
             if (table, column) not in have:
                 self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
@@ -421,77 +439,9 @@ class Store:
                   AND closed_at IS NULL AND COALESCE(posted_at, first_seen) >= ? AND {DEDUP}""",
             (dates.cutoff(),)).fetchone()[0]
 
-    def job_facets(self, days: int = 90) -> list[dict]:
-        """Fonte, empresa, modalidade, senioridade, contratação e stack das vagas aceitas
-        dos últimos `days` dias, sem as repetidas e incluindo as já encerradas: números
-        das páginas por tema (/vagas/laravel...)."""
-        since = dates.utc_iso(dates.now_utc() - timedelta(days=days))
-        return [dict(r) for r in self.execute(
-            f"""SELECT source, company, workplace, seniority, contract, stack,
-                       COALESCE(posted_at, first_seen) AS posted
-                FROM jobs WHERE relevant = 1 AND dismissed IS NULL AND {DEDUP}
-                  AND COALESCE(posted_at, first_seen) >= ?""", (since,))]
-
-    def dashboard(self, days: int = 14) -> dict:
-        """Números do dashboard. Distribuições: vagas abertas das últimas 72 h (as que o
-        site mostra). Série diária: vagas novas por dia de publicação (dia de Brasília)
-        nos últimos `days` dias, incluindo as já encerradas."""
-        today = datetime.now(dates.BRASILIA).date()
-        first_day = today - timedelta(days=days - 1)
-        start = datetime.combine(first_day, datetime.min.time(), dates.BRASILIA)
-        rows = [dict(r) for r in self.execute(
-            f"""SELECT source, company, workplace, seniority, contract, stack, closed_at,
-                       COALESCE(posted_at, first_seen) AS posted
-                FROM jobs WHERE relevant = 1 AND dismissed IS NULL AND {DEDUP}
-                  AND COALESCE(posted_at, first_seen) >= ?""", (dates.utc_iso(start),))]
-        cut72, cut24, cut48 = dates.cutoff(), dates.cutoff(24), dates.cutoff(48)
-        live = [r for r in rows if r["posted"] >= cut72 and not r["closed_at"]]
-
-        def count(key, items=live, missing="Não informado"):
-            return Counter((r[key] or missing) for r in items).most_common()
-
-        daily = {(first_day + timedelta(days=i)).isoformat(): Counter() for i in range(days)}
-        for r in rows:
-            day = datetime.fromisoformat(r["posted"]).astimezone(dates.BRASILIA).date().isoformat()
-            if day in daily:
-                daily[day][r["source"]] += 1
-        stacks = Counter(s for r in live for s in (r["stack"] or "").split(",")
-                         if s and s != "PHP")
-        runs = {}
-        for source in SOURCES:
-            last = self.execute("SELECT * FROM runs WHERE source = ? ORDER BY id DESC LIMIT 1",
-                                   (source,)).fetchone()
-            day = self.execute(
-                "SELECT count(*) total, sum(ok = 1) ok, sum(ok = 0) failed, sum(new_jobs) new "
-                "FROM runs WHERE source = ? AND started_at >= ?", (source, cut24)).fetchone()
-            last_ok = self.execute("SELECT finished_at FROM runs WHERE source = ? AND ok = 1 "
-                                      "ORDER BY id DESC LIMIT 1", (source,)).fetchone()
-            runs[source] = {"last": dict(last) if last else None, "last_24h": dict(day),
-                            "last_ok_at": last_ok[0] if last_ok else None}
-        since = self.execute("SELECT min(first_seen) FROM jobs").fetchone()[0]
-        return {
-            "max_age_hours": dates.MAX_AGE_HOURS,
-            "kpis": {
-                "open": len(live),
-                "new_24h": sum(r["posted"] >= cut24 for r in rows),
-                "prev_24h": sum(cut48 <= r["posted"] < cut24 for r in rows),
-                "remote": sum(r["workplace"] == "Remoto" for r in live),
-                "companies": len({r["company"] for r in live if r["company"]}),
-            },
-            "by_source": [[s, sum(r["source"] == s for r in live)] for s in SOURCES],
-            "daily": [{"day": d, **{s: c[s] for s in SOURCES}} for d, c in daily.items()],
-            "workplace": count("workplace"),
-            "seniority": count("seniority"),
-            "contract": count("contract"),
-            "stack": stacks.most_common(8),
-            "companies": Counter(r["company"] for r in live if r["company"]).most_common(8),
-            "runs": runs,
-            "collecting_since": since,
-        }
-
-    def rule_stats(self) -> dict:
-        """Quantas vagas/posts da base cada regra de filtro decidiu (página /regras) e as
-        descartadas à mão. Posts recusados na busca nem chegam à base: não entram aqui."""
+    def rule_counts(self) -> dict:
+        """Quantas vagas/posts da base cada regra de filtro decidiu (página /regras). Posts
+        recusados na busca nem chegam à base: não entram aqui."""
         counts = Counter()
         for source, title, description, author, relevant in self.execute(
                 "SELECT source, title, description, author, relevant FROM jobs "
@@ -501,67 +451,42 @@ class Store:
             else:  # etiquetas do GitHub não ficam na base: aceitas por elas = php_title
                 verdict = php.job_verdict(title, description)
                 counts["php_title" if relevant and verdict not in php.JOB_OK else verdict] += 1
-        dismissed = [dict(r) for r in self.execute(
-            "SELECT source, title, url, dismissed FROM jobs WHERE dismissed IS NOT NULL "
-            "ORDER BY dismissed DESC")]
-        return {"counts": dict(counts), "dismissed": dismissed}
+        return dict(counts)
 
-    def recruiters(self, days: int = 90, min_jobs: int = 2, hidden=()) -> list[dict]:
-        """Tech recruiters (php.is_recruiter no headline) que publicaram vagas PHP aceitas
-        nos últimos `days` dias (página /recrutadores), com `min_jobs` ou mais vagas. Os
-        perfis de `hidden` (pediram para sair) ficam de fora."""
-        profile = lambda url: url.split("?")[0].rstrip("/").lower()  # noqa: E731
-        hidden = {profile(u) for u in hidden if u}
-        since = dates.utc_iso(dates.now_utc() - timedelta(days=days))
-        people: dict[str, dict] = {}
-        for r in self.execute(
-                f"""SELECT author, author_url, author_headline, stack,
-                           COALESCE(posted_at, first_seen) AS posted
-                    FROM jobs WHERE source = 'post' AND relevant = 1 AND dismissed IS NULL
-                      AND author_url IS NOT NULL AND {DEDUP}
-                      AND COALESCE(posted_at, first_seen) >= ?
-                    ORDER BY posted DESC""", (since,)):
-            key = profile(r["author_url"])
-            if key in hidden:
-                continue
-            p = people.setdefault(key, {"name": r["author"], "url": r["author_url"].split("?")[0],
-                                        "headline": r["author_headline"], "jobs": 0,
-                                        "last_posted": r["posted"], "stack": Counter()})
-            p["headline"] = p["headline"] or r["author_headline"]  # o mais recente que houver
-            p["jobs"] += 1
-            p["stack"].update(s for s in (r["stack"] or "").split(",") if s and s != "PHP")
-        out = [{**p, "stack": [s for s, _ in p["stack"].most_common(4)]} for p in people.values()
-               if p["jobs"] >= min_jobs and php.is_recruiter(p["headline"])]
-        return sorted(out, key=lambda p: (p["jobs"], p["last_posted"]), reverse=True)
+    def refresh_derived(self) -> int:
+        """Recalcula jobs.company_key e jobs.author_recruiter (php.company_key e
+        php.is_recruiter) onde mudaram: vagas novas e mudanças no filtro. Retorna quantas
+        linhas mudaram."""
+        changed = []
+        for r in self.execute("SELECT id, company, company_key, author_headline, "
+                              "author_recruiter FROM jobs"):
+            key = php.company_key(r["company"])
+            recruiter = int(php.is_recruiter(r["author_headline"]))
+            if key != r["company_key"] or recruiter != r["author_recruiter"]:
+                changed.append((key, recruiter, r["id"]))
+        with self.tx():
+            self.executemany("UPDATE jobs SET company_key = ?, author_recruiter = ? WHERE id = ?",
+                             changed)
+        return len(changed)
 
-    def companies(self, days: int = 90, min_jobs: int = 2) -> list[dict]:
-        """Empresas que mais anunciaram vagas PHP aceitas nos últimos `days` dias (página
-        /empresas), com `min_jobs` ou mais vagas. Agrupa por php.company_key, que também
-        tira as que não dizem quem contrata."""
-        since = dates.utc_iso(dates.now_utc() - timedelta(days=days))
-        companies: dict[str, dict] = {}
-        for r in self.execute(
-                f"""SELECT source, company, workplace, stack,
-                           COALESCE(posted_at, first_seen) AS posted
-                    FROM jobs WHERE relevant = 1 AND dismissed IS NULL AND company IS NOT NULL
-                      AND {DEDUP} AND COALESCE(posted_at, first_seen) >= ?
-                    ORDER BY posted DESC""", (since,)):
-            if not (key := php.company_key(r["company"])):
-                continue
-            c = companies.setdefault(key, {"names": Counter(), "jobs": 0, "last_posted": r["posted"],
-                                           "sources": Counter(), "workplace": Counter(),
-                                           "stack": Counter()})
-            c["names"][r["company"].strip()] += 1
-            c["jobs"] += 1
-            c["sources"][r["source"]] += 1
-            c["workplace"][r["workplace"] or "Não informado"] += 1
-            c["stack"].update(s for s in (r["stack"] or "").split(",") if s and s != "PHP")
-        out = [{"name": c["names"].most_common(1)[0][0], "jobs": c["jobs"],
-                "last_posted": c["last_posted"], "sources": [s for s, _ in c["sources"].most_common()],
-                "workplace": c["workplace"].most_common(),
-                "stack": [s for s, _ in c["stack"].most_common(4)]}
-               for c in companies.values() if c["jobs"] >= min_jobs]
-        return sorted(out, key=lambda c: (c["jobs"], c["last_posted"]), reverse=True)
+    def set_meta(self, name: str, value) -> None:
+        """Grava um item de site_meta (JSON)."""
+        self.execute("REPLACE INTO site_meta (name, value, updated_at) VALUES (?, ?, ?)",
+                     (name, json.dumps(value, ensure_ascii=False), now_iso()))
+
+    def publish_site_data(self) -> None:
+        """Tudo o que o site precisa do filtro: colunas derivadas, taxonomia (stacks,
+        modalidades, senioridades e fontes, na ordem do filtro), regras e contagem por regra."""
+        self.refresh_derived()
+        self.set_meta("taxonomy", {
+            "stacks": list(php.PHP_STACK),
+            "workplaces": [label for label, _ in php.WORKPLACE],
+            "seniorities": [label for label, _ in php.SENIORITY],
+            "contracts": [label for label, _ in php.CONTRACT],
+            "sources": list(SOURCES),
+        })
+        self.set_meta("rules", php.RULES)
+        self.set_meta("rule_counts", self.rule_counts())
 
     def start_run(self, source: str) -> int:
         with self.tx():
@@ -584,33 +509,6 @@ class Store:
         else:
             rows = self.execute("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (n,))
         return [dict(r) for r in rows]
-
-    def log_click(self, job_id: str | None, url: str, page: str | None,
-                  source: str | None) -> None:
-        """Grava um clique para o anúncio original. Falha na base (tabela ainda não
-        criada pelo coletor, MySQL fora) só vira aviso: o redirecionamento continua."""
-        try:
-            self.execute("INSERT INTO clicks (at, job_id, url, page, source) VALUES (?, ?, ?, ?, ?)",
-                         (now_iso(), (job_id or None) and job_id[:255], url,
-                          (page or None) and page[:255], (source or None) and source[:32]))
-        except pymysql.MySQLError as e:
-            log.warning("clique não gravado (%s): %s", e, url)
-
-    def click_stats(self, days: int = 7) -> dict:
-        """Cliques dos últimos `days` dias: total, por vaga, por fonte e por dia (UTC)."""
-        since = dates.utc_iso(dates.now_utc() - timedelta(days=days))
-        total = self.execute("SELECT count(*) FROM clicks WHERE at >= ?", (since,)).fetchone()[0]
-        by_job = self.execute(
-            "SELECT job_id, url, count(*) n FROM clicks WHERE at >= ? "
-            "GROUP BY job_id, url ORDER BY n DESC", (since,))
-        by_source = self.execute(
-            "SELECT source, count(*) n FROM clicks WHERE at >= ? GROUP BY source ORDER BY n DESC",
-            (since,))
-        by_day = self.execute(
-            "SELECT left(at, 10) day, count(*) FROM clicks WHERE at >= ? GROUP BY day ORDER BY day",
-            (since,))
-        return {"total": total, "by_job": [list(r) for r in by_job],
-                "by_source": [list(r) for r in by_source], "by_day": [list(r) for r in by_day]}
 
     def last_ok_start(self, source: str) -> str | None:
         row = self.execute("SELECT started_at FROM runs WHERE source = ? AND ok = 1 "

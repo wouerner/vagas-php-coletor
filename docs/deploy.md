@@ -47,19 +47,21 @@ Zona `wouerner.dev`, com os nameservers da Cloudflare.
 
 - Recurso: repositório deste projeto, branch `main`, build pack **Docker Compose**,
   *Docker Compose Location* `/docker-compose.coolify.yml`.
-- Domínio do serviço `web`: `https://vagasphp.wouerner.dev`. A porta interna (8000) vem de
+- Domínio do serviço `web` (o site, em PHP, build de `web/`): `https://vagasphp.wouerner.dev`. A porta interna (8000) vem de
   `SERVICE_URL_WEB_8000` no compose, então não precisa ir no domínio. Com `http://` no
   lugar de `https://`, o Traefik não pede certificado e o site responde com o
   "TRAEFIK DEFAULT CERT".
-- O serviço `vagas-php` (coletor e MCP) não tem domínio. MCP e noVNC ficam só no
+- O serviço `vagas-php` (coletor e MCP, em Python, build de `collector/`) não tem domínio. MCP e noVNC ficam só no
   `127.0.0.1` do servidor (veja o README).
 - Variáveis em *Environment Variables*, com os nomes do `.env.example`. A
   `VAGAS_DASHBOARD_URL` (usada pelo post diário do LinkedIn) aponta para
-  `https://vagasphp.wouerner.dev/dashboard`.
+  `https://vagasphp.wouerner.dev/dashboard`. O token do origin trial do WebMCP (expira em
+  30/03/2027; renove em https://developer.chrome.com/origintrials) vai em
+  `VAGAS_ORIGIN_TRIAL`, no serviço `web`.
 - **O deploy não é automático:** um push na `main` não publica nada. Faça o deploy pelo
   painel do Coolify (ou pela API). Quando o serviço sobe, ele reaplica os filtros às vagas
-  e aos posts já salvos, então uma mudança de regra em `vagas_php/php.py` vale para a base
-  inteira.
+  e aos posts já salvos e regrava o que o site precisa do filtro (`site_meta`), então uma
+  mudança de regra em `collector/vagas_php/php.py` vale para a base inteira e para o site.
 
 ## Buscadores
 
