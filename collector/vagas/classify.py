@@ -112,6 +112,34 @@ SHOWCASE_RE = re.compile("|".join(f"({rx})" for rx in SHOWCASE), re.I)
 
 def is_showcase(text: str) -> bool:
     return bool(SHOWCASE_RE.search(text))
+
+
+# Debate ou opinião sobre vagas e o mercado ("Hoje me deparei com uma vaga que me fez
+# refletir... Estamos contratando profissionais de TI ou departamentos inteiros? Quero ouvir
+# a opinião de vocês!"): cita a linguagem numa lista e frases de contratação, muitas vezes em
+# pergunta, sem anunciar vaga. Barra até sinal forte, a menos que o texto traga como se
+# candidatar (APPLY). Acrescente padrões aqui.
+OPINION = [
+    r"\b(quero|gostaria de|adoraria) (ouvir|saber|ler|conhecer) (a )?(sua |tua )?opini[aã]o",
+    # "O que você acha de trabalhar em uma empresa inovadora?" abre anúncio: só no plural.
+    r"\bqual (é )?(a )?(sua|tua) opini[aã]o\b", r"\bo que voc[eê]s (acham|pensam)\b",
+    r"\bdeix[ea] (a |aqui )?(sua |tua )?opini[aã]o\b", r"\bme fez (refletir|pensar)\b",
+    r"\b(me deparei|deparei-me|esbarrei|topei) com (uma|um|essa|esse|esta|este) (vaga|an[uú]ncio)\b",
+    r"\bminha pergunta (para|pra|aos?|[aà]s?)\b", r"\b(o que|n[aã]o) questiono\b",
+    r"\b(vamos|bora) (debater|discutir|refletir)\b",
+    r"\bwhat do you think\b", r"\b(love|like) to hear your (thoughts|opinions?)\b",
+]
+OPINION_RE = re.compile("|".join(f"({rx})" for rx in OPINION), re.I)
+# Como se candidatar: com isso, o texto anuncia vaga mesmo pedindo opinião ("Me deparei com
+# essa vaga de PHP e lembrei de vocês: https://...").
+APPLY = re.compile(
+    r"(candidate-se|candidatar-se|candidatura|inscreva-se|inscri[cç][aãoõ]|envie (seu )?curr[ií]culo|"
+    r"chama(r)? no (privado|direct|inbox|dm)|link (da vaga|para (se )?candidat|nos coment[aá]rios)|"
+    r"\bapply\b|https?://|[\w.+-]+@[\w-]+\.[a-z]{2,})", re.I)
+
+
+def is_opinion(text: str) -> bool:
+    return bool(OPINION_RE.search(text) and not APPLY.search(text))
 # Divulgação de grupos/canais/comunidades de vagas, sem curadoria ("Vagas T.I. - Remotas",
 # "nosso Discord"...): barrada mesmo com sinal forte de contratação. Uma menção só é comum
 # no rodapé de anúncios de verdade ("entre no grupo do Telegram"), então precisa de
@@ -362,6 +390,10 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
     # Quem mostra o próprio projeto pode citar "divulgação de vagas" sem contratar ninguém.
     if is_showcase(text) and not RECRUITING.search(text):
         return "showcase"
+    # Debate sobre vagas usa "estamos contratando" em pergunta: sem como se candidatar, não
+    # é anúncio.
+    if is_opinion(text):
+        return "opinion"
     if HIRING.search(text):
         return "hiring_strong"
     if not HIRING_WEAK.search(text):
@@ -377,7 +409,7 @@ def is_hiring_post(text: str | None, author: str | None = None) -> bool:
     posts genéricos enchem de #php #java...); não é divulgação de grupos (AGGREGATOR) nem lista de vagas
     de terceiros (JOB_LIST_*), nem de agregador
     de vagas (AGGREGATOR_AUTHOR) ou do próprio site (SELF_AUTHOR), nem de alguém
-    procurando emprego; e tem sinal claro de contratação."""
+    procurando emprego, nem debate sobre vagas (OPINION); e tem sinal claro de contratação."""
     return post_verdict(text, author) in POST_OK
 
 
@@ -565,6 +597,16 @@ def _rules() -> list[dict]:
                  "também recruta (\"candidate-se\", \"envie seu currículo\", \"contratamos\"...), "
                  "vale como anúncio.",
          "patterns": _patterns(SHOWCASE)},
+        {"group": "posts", "id": "opinion", "effect": "recusa",
+         "title": "Debate ou opinião sobre vagas",
+         "text": "Posts que comentam vagas ou o mercado e pedem a opinião de quem lê (\"me "
+                 "deparei com uma vaga que me fez refletir\", \"quero ouvir a opinião de "
+                 "vocês\", \"o que vocês acham?\"...) não são anúncios, mesmo com frases de "
+                 "contratação, que nesses posts costumam vir em pergunta (\"Estamos contratando "
+                 "profissionais de TI ou departamentos inteiros?\"). Se o texto traz como se "
+                 "candidatar (link, e-mail, \"candidate-se\", \"envie seu currículo\", \"me chama "
+                 "no privado\"...), vale como anúncio.",
+         "patterns": _patterns(OPINION)},
         {"group": "posts", "id": "hiring_strong", "effect": "aceita",
          "title": "Sinal forte de contratação",
          "text": "\"Vaga para\", \"contratando\", \"estamos buscando\", \"candidate-se\", "

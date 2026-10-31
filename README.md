@@ -63,9 +63,12 @@ Tudo vai para o MySQL (`DATABASE_URL`), mas só aparece no site o que passa no f
   post curto com `#vagas`, e nunca com contexto de outro assunto (`NOT_HIRING`: projeto
   pessoal, "encerro minha jornada", certificados). Divulgação de grupos e canais de vagas
   sem curadoria (`AGGREGATOR`: Discord, Telegram, "nossos grupos", "Vagas T.I. -"...; 3 ou
-  mais padrões diferentes) é barrada mesmo com sinal forte. Para barrar um novo tipo de
-  post, acrescente um padrão em `NOT_HIRING` ou `AGGREGATOR`; ao reiniciar, o serviço
-  reaplica o filtro às publicações já salvas.
+  mais padrões diferentes) é barrada mesmo com sinal forte, e debate sobre vagas
+  (`OPINION`: "me deparei com uma vaga que me fez refletir", "quero ouvir a opinião de
+  vocês"...) também, a menos que o texto diga como se candidatar (link, e-mail,
+  "candidate-se"...). Para barrar um novo tipo de post, acrescente um padrão em
+  `NOT_HIRING`, `AGGREGATOR` ou `OPINION`; ao reiniciar, o serviço reaplica o filtro às
+  publicações já salvas.
 
 O que ainda escapar pode ser descartado à mão com a ferramenta MCP `dismiss_job` (id, URL
 ou número do post): a vaga sai do site, da API e do MCP e não volta em novas coletas.
