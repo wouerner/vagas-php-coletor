@@ -49,8 +49,8 @@ horário de Brasília no site. Precisão de cada fonte:
   hipótese mais antiga, para nada com mais de 72 h aparecer como recente;
 - **publicações**: o LinkedIn mostra "18 h", "2 d"...; "3 d" já fica de fora.
 
-Tudo vai para o MySQL (`DATABASE_URL`), mas só aparece no site o que passa no filtro de PHP
-(`collector/vagas_php/php.py`):
+Tudo vai para o MySQL (`DATABASE_URL`), mas só aparece no site o que passa no filtro
+(`collector/vagas/classify.py`, com os termos de PHP da configuração):
 
 - **vagas de portais e issues**: PHP/framework no título ou nas etiquetas; ou título de
   desenvolvimento com PHP citado 2+ vezes na descrição (uma menção só costuma ser
@@ -84,6 +84,21 @@ Issues fechadas no GitHub ficam marcadas como encerradas e saem do site.
 Copie `.env.example` para `.env` e ajuste: credenciais do LinkedIn (só para a fonte
 `post` e o post diário) e as configurações das fontes. Ajustes feitos pela ferramenta MCP
 `configure_scheduler` ficam em `data/config.json` e têm precedência sobre o `.env`.
+
+O coletor não tem linguagem no código: o nome da linguagem, os termos que a identificam,
+a stack, o que buscar em cada fonte e o dono do site ficam na base (tabela
+`collector_config`). Na primeira subida ela recebe os valores de PHP de
+`collector/vagas/config_defaults.json`; depois vale o que está na base:
+
+```bash
+docker compose run --rm vagas-php config                 # tudo
+docker compose run --rm vagas-php config search          # um item
+docker compose run --rm vagas-php config set core '"\\b(php|laravel)\\b"'   # valida, grava e reaplica o filtro
+```
+
+Os itens estão em [docs/contrato-base.md](docs/contrato-base.md#configuração-dos-coletores).
+As variáveis de termos de busca do `.env` (`VAGAS_GUPY_TERMS`...), se definidas, têm
+prioridade sobre a base.
 
 ## Serviço (Docker)
 
@@ -129,7 +144,7 @@ claude mcp add --transport http vagas-php http://localhost:8766/mcp   # ou use o
 
 Com `VAGAS_LINKEDIN_DAILY_POST=true`, o serviço publica todo dia às `VAGAS_LINKEDIN_POST_TIME`
 (horário de Brasília, padrão 09:00), nos dias de `VAGAS_LINKEDIN_POST_DAYS` (0 = segunda ...
-6 = domingo), um post na conta da sessão do bot (`collector/vagas_php/linkedin_post.py`):
+6 = domingo), um post na conta da sessão do bot (`collector/vagas/linkedin_post.py`):
 
 - imagem: print do topo do dashboard (números, vagas por site e vagas novas por dia);
 - texto: resumo do dia (vagas abertas, novas em 24 h, remotas, empresas), fontes, filtro,
@@ -140,7 +155,7 @@ Com `VAGAS_LINKEDIN_DAILY_POST=true`, o serviço publica todo dia às `VAGAS_LIN
 O resumo semanal do [canal do Telegram](https://t.me/vagas_php) (`telegram-digest`) é este
 mesmo post: o mesmo print do dashboard e o mesmo texto.
 
-Os alertas de vagas novas do canal saem de `python -m vagas_php telegram-alert`, que lê a
+Os alertas de vagas novas do canal saem de `python -m vagas telegram-alert`, que lê a
 API pública do site e envia, por padrão, uma mensagem por vaga (no máximo `--limit`, 5).
 Com `--batch`, todas as vagas pendentes vão numa mensagem só (título em negrito e, abaixo,
 empresa · local · modalidade · senioridade · stack e o link); se a mensagem passar do limite
@@ -212,7 +227,7 @@ JSON-LD (`web/src/Seo.php`). Páginas para buscadores:
 
 - `/vagas` e `/vagas/<tema>`: vagas abertas por stack, modalidade, senioridade e algumas
   combinações (`/vagas/laravel-remoto`, `/vagas/php-junior`...), com um resumo em números;
-  os temas saem da taxonomia do filtro (`php.py`), que o coletor grava em `site_meta`
+  os temas saem da taxonomia do filtro (`classify.py`), que o coletor grava em `site_meta`
   (`web/src/Themes.php`).
 - `/vaga/<número>-<título>`: uma página por vaga de portal, com JSON-LD `JobPosting` (Google
   for Jobs) enquanto está aberta; depois de 72 h ela fica com `noindex` e sugere vagas
@@ -295,7 +310,7 @@ Use `docker-compose.coolify.yml`:
 
 Migrando uma instalação que já usava SQLite (a base antiga continua no volume
 `vagas-data`): logo depois do deploy, no terminal do serviço `vagas-php` no Coolify, rode
-`python -m vagas_php migrate-sqlite /app/data/vagas.db --force`. A cópia é uma transação
+`python -m vagas migrate-sqlite /app/data/vagas.db --force`. A cópia é uma transação
 só: se falhar (por exemplo, uma coleta gravando ao mesmo tempo), nada muda e basta repetir.
 O `--force` descarta só o que o serviço novo gravou desde a subida.
 
@@ -312,6 +327,7 @@ http://localhost:6081/vnc.html e conclua o login. Depois ligue `VAGAS_POSTS_ENAB
 docker compose run --rm vagas-php collect all          # ou uma fonte: linkedin | gupy | remotar | ... | post
 docker compose run --rm vagas-php list --q laravel --hours 24
 docker compose run --rm vagas-php site-data            # regrava o que o site precisa do filtro
+docker compose run --rm vagas-php config               # configuração dos coletores (config set NOME JSON)
 ```
 
 ## Testes
@@ -337,7 +353,7 @@ O CI (`.github/workflows/ci.yml`) roda os dois a cada push e pull request.
   automático com checagem anti-robô), **InfoJobs** e **GeekHunter** (o robots.txt proíbe
   a coleta das vagas).
 - O LinkedIn muda o HTML com frequência; se a fonte `post` parar de trazer resultados,
-  os seletores ficam em `collector/vagas_php/bot.py`.
+  os seletores ficam em `collector/vagas/bot.py`.
 
 ## Licença
 

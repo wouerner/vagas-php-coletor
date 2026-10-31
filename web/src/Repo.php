@@ -6,7 +6,7 @@ namespace VagasPhp;
 
 /**
  * Consultas do site na base do coletor. O site só lê, menos os cliques (tabela clicks).
- * O que depende do filtro (php.py do coletor) já vem pronto: jobs.company_key,
+ * O que depende do filtro (classify.py do coletor) já vem pronto: jobs.company_key,
  * jobs.author_recruiter e a tabela site_meta (ver docs/contrato-base.md).
  */
 final class Repo

@@ -10,13 +10,13 @@ import re
 import time
 from datetime import datetime, timedelta
 
-from . import (catho_jobs, coodesh_jobs, dates, github_jobs, gupy_jobs, inhire_jobs, jobposting,
-               nerdin_jobs, php, programathor_jobs, public_jobs, recrutei_jobs, remotar_jobs,
+from . import (catho_jobs, classify, config, coodesh_jobs, dates, github_jobs, gupy_jobs, inhire_jobs, jobposting,
+               nerdin_jobs, programathor_jobs, public_jobs, recrutei_jobs, remotar_jobs,
                solides_jobs, upvagas_jobs)
 from .bot import LinkedInBot, Post
 from .store import Store
 
-log = logging.getLogger("vagas_php.collect")
+log = logging.getLogger(__name__)
 
 
 def _env_list(name: str, default: str) -> list[str]:
@@ -27,8 +27,8 @@ def _env_list(name: str, default: str) -> list[str]:
 
 def collect_linkedin(store: Store, hours: float) -> dict:
     """Busca as palavras-chave nas últimas `hours` horas e baixa a descrição das vagas
-    novas, que decide se a vaga é mesmo de PHP (a busca do LinkedIn é ampla)."""
-    keywords = _env_list("VAGAS_LINKEDIN_KEYWORDS", "php,laravel,symfony,wordpress,magento,drupal")
+    novas, que decide se a vaga é mesmo da linguagem (a busca do LinkedIn é ampla)."""
+    keywords = config.search("linkedin", "VAGAS_LINKEDIN_KEYWORDS")
     locations = _env_list("VAGAS_LINKEDIN_LOCATIONS", "Brasil")
     limit = int(os.getenv("VAGAS_LINKEDIN_LIMIT", 100))
     found: dict[str, public_jobs.PublicJob] = {}
@@ -51,10 +51,10 @@ def collect_linkedin(store: Store, hours: float) -> dict:
                 details_failed += 1  # tenta de novo na próxima coleta
                 log.warning("Detalhes da vaga %s: %s", job.id, e)
             time.sleep(1.5)
-        info = php.details(job.title, job.location, description)
+        info = classify.details(job.title, job.location, description)
         jobs.append({
             "id": jid, "source": "linkedin",
-            "relevant": php.is_php_job(job.title, description),
+            "relevant": classify.is_relevant_job(job.title, description),
             "title": job.title, "company": job.company, "location": job.location,
             "url": job.url, "description": description,
             "posted_at": dates.from_date(job.posted_date, job.posted),
@@ -76,12 +76,12 @@ def collect_gupy(store: Store, since: datetime) -> dict:
         time.sleep(1)
     jobs = []
     for job in found.values():
-        info = php.details(job.title, job.description)
+        info = classify.details(job.title, job.description)
         if job.internship and not info["seniority"]:
             info["seniority"] = "Estágio"
         jobs.append({
             "id": f"gupy:{job.id}", "source": "gupy",
-            "relevant": php.is_php_job(job.title, job.description),
+            "relevant": classify.is_relevant_job(job.title, job.description),
             "title": job.title, "company": job.company, "location": job.location,
             "url": job.url, "description": job.description, "posted_at": job.published,
             # Modalidade e contratação vêm da própria Gupy (mais confiável que o texto).
@@ -103,17 +103,17 @@ def collect_solides(store: Store, since: datetime) -> dict:
         time.sleep(1)
     jobs = []
     for job in found.values():
-        info = php.details(job.title, job.description)
+        info = classify.details(job.title, job.description)
         jobs.append({
             "id": f"solides:{job.id}", "source": "solides",
-            "relevant": php.is_php_job(job.title, job.description),
+            "relevant": classify.is_relevant_job(job.title, job.description),
             "title": job.title, "company": job.company, "location": job.location,
             "url": job.url, "description": job.description,
             "posted_at": dates.from_date(job.published),
             # Modalidade, contratação, senioridade e salário vêm da própria Sólides.
             **info, **{k: v for k, v in (
                 ("workplace", job.workplace), ("contract", job.contract),
-                ("seniority", php._first(php.SENIORITY, job.seniority))) if v},
+                ("seniority", classify._first(classify.SENIORITY, job.seniority))) if v},
             "salary": job.salary or info["salary"],
         })
     new = store.save_jobs(jobs)
@@ -122,21 +122,21 @@ def collect_solides(store: Store, since: datetime) -> dict:
 
 # --- portais com JSON-LD JobPosting: Catho, Programathor, Coodesh (sem login) ------
 
-def _maybe_php_title(title: str) -> bool:
-    """Título que is_php_job pode aceitar (cargo de desenvolvimento ou PHP no título):
+def _maybe_relevant_title(title: str) -> bool:
+    """Título que is_relevant_job pode aceitar (cargo de desenvolvimento ou a linguagem no título):
     só esses valem baixar a página da vaga."""
-    return php.job_verdict(title) != "not_dev" and bool(
-        php.DEV_ROLE.search(title) or php.PHP_CORE.search(title))
+    return classify.job_verdict(title) != "not_dev" and bool(
+        classify.DEV_ROLE.search(title) or classify.CORE.search(title))
 
 
 def _jobposting_jobs(store: Store, source: str, candidates, details, delay: float = 1.5) -> dict:
-    """Baixa a página das vagas novas com título que pode ser de PHP (`candidates`: (id,
+    """Baixa a página das vagas novas com título que pode ser da linguagem (`candidates`: (id,
     título ou endereço, URL)) e lê o JSON-LD JobPosting (`details(url)`). Vagas antigas
     também são guardadas, para não serem baixadas de novo: o site mostra só as das 72 h."""
     known = store.known(source)
     jobs, failed = [], 0
     for job_id, title, url in candidates:
-        if f"{source}:{job_id}" in known or not _maybe_php_title(title):
+        if f"{source}:{job_id}" in known or not _maybe_relevant_title(title):
             continue
         try:
             job = details(url)
@@ -144,12 +144,12 @@ def _jobposting_jobs(store: Store, source: str, candidates, details, delay: floa
             failed += 1  # tenta de novo na próxima coleta
             log.warning("%s %s: %s", source, job_id, e)
             continue
-        info = php.details(job["title"], job["description"])
+        info = classify.details(job["title"], job["description"])
         if job["internship"] and not info["seniority"]:
             info["seniority"] = "Estágio"
         jobs.append({
             "id": f"{source}:{job_id}", "source": source,
-            "relevant": php.is_php_job(job["title"], job["description"]),
+            "relevant": classify.is_relevant_job(job["title"], job["description"]),
             "title": job["title"] or title, "company": job["company"],
             "location": job["location"], "url": url,
             "description": job["description"], "posted_at": dates.from_date(job["published"]),
@@ -222,12 +222,12 @@ def collect_upvagas(store: Store, since: datetime) -> dict:
         time.sleep(1)
     jobs = []
     for j in found.values():
-        info = php.details(j.title, j.description)
+        info = classify.details(j.title, j.description)
         if j.internship and not info["seniority"]:
             info["seniority"] = "Estágio"
         jobs.append({
             "id": f"upvagas:{j.id}", "source": "upvagas",
-            "relevant": php.is_php_job(j.title, j.description),
+            "relevant": classify.is_relevant_job(j.title, j.description),
             "title": j.title, "company": j.company, "location": j.location,
             "url": j.url, "description": j.description, "posted_at": dates.normalize(j.published),
             **info, **{k: getattr(j, k) for k in ("workplace", "contract") if getattr(j, k)},
@@ -248,9 +248,9 @@ def collect_remotar(store: Store, since: datetime) -> dict:
     jobs = []
     for job in found.values():
         tags = job.pop("tags")
-        info = php.details(job["title"], tags, job["description"])
+        info = classify.details(job["title"], tags, job["description"])
         jobs.append({**job, "source": "remotar",
-                     "relevant": php.is_php_job(job["title"], job["description"]),
+                     "relevant": classify.is_relevant_job(job["title"], job["description"]),
                      "posted_at": dates.normalize(job["posted_at"]),
                      **info, **({"workplace": job["workplace"]} if job["workplace"] else {}),
                      "salary": job["salary"] or info["salary"]})
@@ -262,7 +262,7 @@ def collect_remotar(store: Store, since: datetime) -> dict:
 
 def collect_inhire(store: Store) -> dict:
     """Lista as vagas de cada empresa e baixa o detalhe só das novas com título que pode
-    ser de vaga PHP (cargo de desenvolvimento ou PHP no título: is_php_job não aceita
+    ser de vaga da linguagem (cargo de desenvolvimento ou a linguagem no título: is_relevant_job não aceita
     outras). Não há data na lista: as antigas são guardadas e o site mostra só as das
     últimas 72 h."""
     known = store.known("inhire")
@@ -281,7 +281,7 @@ def collect_inhire(store: Store) -> dict:
         listed += len(items)
         for item in items:
             title = item.get("displayName") or ""
-            if f"inhire:{item['jobId']}" in known or not _maybe_php_title(title):
+            if f"inhire:{item['jobId']}" in known or not _maybe_relevant_title(title):
                 continue
             try:
                 job = inhire_jobs.job_details(tenant, item, company)
@@ -291,11 +291,11 @@ def collect_inhire(store: Store) -> dict:
                 continue
             jobs.append({
                 "id": f"inhire:{job.id}", "source": "inhire",
-                "relevant": php.is_php_job(job.title, job.description),
+                "relevant": classify.is_relevant_job(job.title, job.description),
                 "title": job.title, "company": job.company, "location": job.location,
                 "url": job.url, "description": job.description,
                 "posted_at": dates.normalize(job.published),
-                **php.details(job.title, job.description),
+                **classify.details(job.title, job.description),
                 # Modalidade e contratação vêm da própria InHire.
                 **{k: v for k, v in (("workplace", job.workplace), ("contract", job.contract)) if v},
             })
@@ -317,33 +317,33 @@ def collect_github(store: Store, since: str | None) -> dict:
             labels = ",".join(it.labels)
             jobs.append({
                 "id": f"github:{it.id}", "source": "github",
-                "relevant": php.is_php_job(it.title, it.body, labels),
+                "relevant": classify.is_relevant_job(it.title, it.body, labels),
                 "title": it.title, "company": it.company, "location": repo,
                 "url": it.url, "author": it.author, "author_url": it.author_url,
                 "description": it.body, "posted_at": dates.normalize(it.created_at), "closed_at": it.closed_at,
-                **php.details(it.title, labels, it.body),
+                **classify.details(it.title, labels, it.body),
             })
     new = store.save_jobs(jobs)
     return {"found": len(jobs), "relevant": sum(j["relevant"] for j in jobs), "new": new}
 
 
-# --- LinkedIn: publicações anunciando vagas PHP (logado) ----------------------------
+# --- LinkedIn: publicações anunciando vagas (logado) --------------------------------
 
 def _post_title(text: str) -> str:
     """A primeira linha com texto. Se ela for só um chamado curto, sem vaga nem cargo
     ("Alô Devs!!!", ou "Meu Perfil" em posts que copiam a página da vaga), usa a primeira
-    linha seguinte com cargo de desenvolvimento ou PHP."""
+    linha seguinte com cargo de desenvolvimento ou a linguagem."""
     lines = [line.strip(" #*•-–—🚀📢💼🔥✨👉➡️") for line in text.splitlines()]
     lines = [line for line in lines if len(line) >= 8]
     if not lines:
         return text.strip()[:140]
     first = lines[0]
     if len(first.split()) <= 3 and not re.search(r"vaga|oportunidade|contrat", first, re.I) \
-            and not (php.DEV_ROLE.search(first) or php.PHP_CORE.search(first)):
+            and not (classify.DEV_ROLE.search(first) or classify.CORE.search(first)):
         for line in lines[1:12]:
             if line.count("#") >= 2:  # linha de hashtags
                 continue
-            if php.DEV_ROLE.search(line) or php.PHP_CORE.search(line):
+            if classify.DEV_ROLE.search(line) or classify.CORE.search(line):
                 return line.lstrip("#0123456789 -")[:140]
     return first[:140]
 
@@ -355,19 +355,19 @@ def post_to_job(post: Post) -> dict:
     else:
         jid = "post:h:" + hashlib.sha1(f"{post.author}|{text[:300]}".encode()).hexdigest()[:20]
     return {
-        "id": jid, "source": "post", "relevant": php.is_php_hiring_post(text, post.author),
+        "id": jid, "source": "post", "relevant": classify.is_hiring_post(text, post.author),
         "title": _post_title(text), "company": None, "url": post.url,
         "author": post.author, "author_url": post.author_url,
         "author_headline": post.headline, "description": text,
         "posted_at": dates.from_relative(post.time),
-        **php.details(None, text),
+        **classify.details(None, text),
     }
 
 
 def search_hiring_posts(bot: LinkedInBot, date_posted: str) -> list[Post]:
     """Roda as buscas de publicações (no navegador já logado) e junta os resultados: os
-    que anunciam vaga PHP e os recusados pelo filtro que falam de PHP."""
-    keywords = _env_list("VAGAS_POSTS_KEYWORDS", "vaga php,vaga laravel,desenvolvedor php,pessoa desenvolvedora php,oportunidade php,vaga wordpress")
+    que anunciam vaga e os recusados pelo filtro que falam da linguagem."""
+    keywords = config.search("posts", "VAGAS_POSTS_KEYWORDS")
     limit = int(os.getenv("VAGAS_POSTS_PER_QUERY", 15))
     oldest = dates.cutoff()
 
@@ -379,14 +379,14 @@ def search_hiring_posts(bot: LinkedInBot, date_posted: str) -> list[Post]:
         posted = dates.from_relative(p.time)
         if not (posted and posted > oldest):
             return False
-        verdict = php.post_verdict(p.text or p.raw_text, p.author)
-        # Recusados que falam de PHP também são guardados (fora do site): a página
+        verdict = classify.post_verdict(p.text or p.raw_text, p.author)
+        # Recusados que falam da linguagem também são guardados (fora do site): a página
         # /regras conta quantos cada regra barrou, e mudanças no filtro valem para eles
         # (reclassify). Posts de quem procura emprego e do próprio site não.
-        if verdict not in php.POST_OK and verdict not in ("post_no_php", "job_seeker",
+        if verdict not in classify.POST_OK and verdict not in ("post_no_lang", "job_seeker",
                                                           "self_author"):
             rejected.setdefault(key(p), p)
-        return verdict in php.POST_OK
+        return verdict in classify.POST_OK
 
     posts: dict[str, Post] = {}
     for kw in keywords:
@@ -401,7 +401,7 @@ POST_ID = re.compile(r"[-:](share|activity|ugcPost)[-:](\d{10,})")
 
 def import_post(store: Store, url: str) -> dict:
     """Lê um post público do LinkedIn pelo link (inclusive lnkd.in), sem login, aplica o
-    filtro e guarda na base se falar de PHP (como a busca faz). Diz qual regra decidiu."""
+    filtro e guarda na base se falar da linguagem (como a busca faz). Diz qual regra decidiu."""
     page = jobposting.fetch(url, "LinkedIn")  # segue o redirecionamento do lnkd.in
     m = re.search(r'https://www\.linkedin\.com/(?:posts|feed/update)/[^"\'<>\s?]+', page) \
         if "lnkd.in" in url else None
@@ -419,18 +419,18 @@ def import_post(store: Store, url: str) -> dict:
                   if m.group(1) == "share"), None) \
         or POST_ID.search(canonical) or POST_ID.search(url) or POST_ID.search(page)
     author = post.get("author") or {}
-    verdict = php.post_verdict(text, author.get("name"))
+    verdict = classify.post_verdict(text, author.get("name"))
     job = {"id": f"post:urn:li:{ident.group(1)}:{ident.group(2)}" if ident else
            "post:h:" + hashlib.sha1(f"{author.get('name')}|{text[:300]}".encode()).hexdigest()[:20],
-           "source": "post", "relevant": verdict in php.POST_OK, "title": _post_title(text),
+           "source": "post", "relevant": verdict in classify.POST_OK, "title": _post_title(text),
            "company": None, "url": canonical.split("?")[0], "author": author.get("name"),
            "author_url": author.get("url"), "author_headline": author.get("jobTitle"),
            "description": text,
-           "posted_at": dates.normalize(post.get("datePublished")), **php.details(None, text)}
-    saved = verdict not in ("post_no_php", "job_seeker", "self_author")
+           "posted_at": dates.normalize(post.get("datePublished")), **classify.details(None, text)}
+    saved = verdict not in ("post_no_lang", "job_seeker", "self_author")
     if saved:
         store.save_jobs([job])
-    rule = next((r for r in php.RULES if r["id"] == verdict), {})
+    rule = next((r for r in classify.RULES if r["id"] == verdict), {})
     return {"id": job["id"], "title": job["title"], "author": job["author"],
             "posted_at": job["posted_at"], "relevant": job["relevant"],
             "in_window": bool(job["posted_at"] and job["posted_at"] > dates.cutoff()),

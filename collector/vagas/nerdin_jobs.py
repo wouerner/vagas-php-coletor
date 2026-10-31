@@ -2,21 +2,19 @@
 (vagas.php?busca=<termo>, permitida no robots.txt) lista as vagas abertas da mais nova para
 a mais antiga; a página de cada vaga traz um JSON-LD JobPosting com a data de publicação."""
 
-import os
 import re
 import time
 import urllib.parse
 
-from . import jobposting
+from . import config, jobposting
 
 BASE = "https://www.nerdin.com.br"
-DEFAULT_TERMS = "php,laravel,symfony,codeigniter,wordpress,magento,drupal"
 JOB_LINK = re.compile(r'href="(?:/|https://www\.nerdin\.com\.br/)?vaga_emprego/vaga-([a-z0-9-]+)-(\d+)\.php"')
 
 
 def terms() -> list[str]:
-    return [t.strip() for t in (os.getenv("VAGAS_NERDIN_TERMS") or DEFAULT_TERMS).split(",")
-            if t.strip()]
+    """Termos buscados: VAGAS_NERDIN_TERMS, senão a configuração (config.py)."""
+    return config.search("nerdin", "VAGAS_NERDIN_TERMS")
 
 
 def search(term: str) -> list[tuple[int, str, str]]:

@@ -19,7 +19,7 @@ from playwright.sync_api import Error as PlaywrightError, sync_playwright
 from . import dates
 from .bot import BASE_URL, LinkedInBot
 
-log = logging.getLogger("vagas_php.linkedin_post")
+log = logging.getLogger(__name__)
 
 DASHBOARD_URL = os.getenv("VAGAS_DASHBOARD_URL", "http://web:8000/dashboard")
 SOURCES_TEXT = ("LinkedIn (vagas e publicações), Gupy, Catho, Sólides, Remotar, Programathor, "
@@ -107,7 +107,7 @@ def find_composer(page, timeout: int = 20000):
             raise RuntimeError(
                 f"Editor da caixa de publicação não encontrado em {timeout // 1000}s "
                 f"(caixas {', '.join(COMPOSER_BOXES)}; editor {COMPOSER_EDITOR}). O LinkedIn "
-                "pode ter mudado a caixa: rode python -m vagas_php post --probe.")
+                "pode ter mudado a caixa: rode python -m vagas post --probe.")
         page.wait_for_timeout(500)
 
 

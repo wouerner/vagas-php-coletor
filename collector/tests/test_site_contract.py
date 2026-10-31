@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from vagas_php import indexing, php
-from vagas_php.store import SOURCES, Store
+from vagas import classify, indexing
+from vagas.store import SOURCES, Store
 
 CASES = json.loads((Path(__file__).resolve().parents[2] / "contracts" / "job_paths.json").read_text())
 
@@ -51,12 +51,12 @@ def test_refresh_derived_only_updates_what_changed():
 
 def test_site_meta_is_json_with_taxonomy_in_filter_order(monkeypatch):
     store = FakeStore([])
-    monkeypatch.setattr(store, "rule_counts", lambda: {"php_title": 3})
+    monkeypatch.setattr(store, "rule_counts", lambda: {"lang_title": 3})
     store.publish_site_data()
     tax = store.meta["taxonomy"]
     assert tax["stacks"][0] == "PHP" and "Laravel" in tax["stacks"]
-    assert tax["workplaces"] == [label for label, _ in php.WORKPLACE]
-    assert tax["seniorities"] == [label for label, _ in php.SENIORITY]
+    assert tax["workplaces"] == [label for label, _ in classify.WORKPLACE]
+    assert tax["seniorities"] == [label for label, _ in classify.SENIORITY]
     assert tax["sources"] == list(SOURCES)
-    assert {r["id"] for r in store.meta["rules"]} == {r["id"] for r in php.RULES}
-    assert store.meta["rule_counts"] == {"php_title": 3}
+    assert {r["id"] for r in store.meta["rules"]} == {r["id"] for r in classify.RULES}
+    assert store.meta["rule_counts"] == {"lang_title": 3}

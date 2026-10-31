@@ -3,7 +3,6 @@ sem login. A busca por termo olha título e descrição, e os resultados vêm do
 para o mais antigo (só a data, sem hora): a paginação para ao passar do início da janela."""
 
 import json
-import os
 import time
 import urllib.error
 import urllib.parse
@@ -11,11 +10,11 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import date
 
+from . import config
 from .public_jobs import USER_AGENT, html_to_text
 
 API = "https://vagas.solides.com.br/api/vacancies"
 PAGE_SIZE = 20  # a API recusa páginas maiores
-DEFAULT_TERMS = "php,laravel,symfony,codeigniter,wordpress,magento,drupal"
 
 WORKPLACE = {"remoto": "Remoto", "hibrido": "Híbrido", "presencial": "Presencial"}
 
@@ -55,8 +54,8 @@ def _get(params: dict) -> dict:
 
 
 def terms() -> list[str]:
-    return [t.strip() for t in (os.getenv("VAGAS_SOLIDES_TERMS") or DEFAULT_TERMS).split(",")
-            if t.strip()]
+    """Termos buscados: VAGAS_SOLIDES_TERMS, senão a configuração (config.py)."""
+    return config.search("solides", "VAGAS_SOLIDES_TERMS")
 
 
 def _contract(types: list[dict]) -> str | None:

@@ -1,12 +1,14 @@
 """Uso:
-  python -m vagas_php collect <fonte>|all [--show]   # coleta agora e grava em data/ (fontes: store.SOURCES)
-  python -m vagas_php list [--q laravel] [--source github] [--hours 24] [--limit 20]
-  python -m vagas_php migrate-sqlite data/vagas.db       # copia a base SQLite antiga para o MySQL
-  python -m vagas_php post [--dry-run] [--show]           # post diário no LinkedIn (print de VAGAS_DASHBOARD_URL)
-  python -m vagas_php post --probe [--show]               # diagnóstico da caixa de publicação (não publica)
-  python -m vagas_php telegram-alert [--dry-run] [--limit 5] [--force] [--batch]  # vagas novas da API pública no Telegram
-  python -m vagas_php telegram-digest [--dry-run]         # resumo semanal no Telegram (mesmo post do LinkedIn)
-  python -m vagas_php indexing-push [--limit 50] [--dry-run] [--force]  # vagas abertas na Google Indexing API
+  python -m vagas collect <fonte>|all [--show]   # coleta agora e grava em data/ (fontes: store.SOURCES)
+  python -m vagas list [--q laravel] [--source github] [--hours 24] [--limit 20]
+  python -m vagas migrate-sqlite data/vagas.db       # copia a base SQLite antiga para o MySQL
+  python -m vagas post [--dry-run] [--show]           # post diário no LinkedIn (print de VAGAS_DASHBOARD_URL)
+  python -m vagas post --probe [--show]               # diagnóstico da caixa de publicação (não publica)
+  python -m vagas telegram-alert [--dry-run] [--limit 5] [--force] [--batch]  # vagas novas da API pública no Telegram
+  python -m vagas telegram-digest [--dry-run]         # resumo semanal no Telegram (mesmo post do LinkedIn)
+  python -m vagas indexing-push [--limit 50] [--dry-run] [--force]  # vagas abertas na Google Indexing API
+  python -m vagas config [NOME]                       # configuração dos coletores (linguagem, buscas...)
+  python -m vagas config set NOME '<json>'            # grava um item e reaplica o filtro à base
 """
 
 import argparse
@@ -17,7 +19,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from . import collect, migrate_sqlite
+from . import classify, collect, migrate_sqlite
 from .bot import LoginError
 from .store import SOURCES, Store
 
@@ -87,6 +89,11 @@ def main() -> int:
                     help="publica de novo as já enviadas com sucesso nas últimas 24 h")
     sub.add_parser("site-data", help="grava na base o que o site precisa do filtro (regras, "
                                      "taxonomia, empresa e recrutador de cada vaga)")
+    cf = sub.add_parser("config", help="mostra ou grava a configuração dos coletores (tabela "
+                                       "collector_config)")
+    cf.add_argument("words", nargs="*", metavar="[set] NOME [JSON]",
+                    help="sem argumentos: tudo; NOME: um item (language, core, stack, search, "
+                         "self_author); set NOME JSON: grava o item")
     args = parser.parse_args()
 
     if args.cmd == "telegram-digest":
@@ -137,6 +144,8 @@ def main() -> int:
         store.publish_site_data()
         print("site_meta e colunas derivadas atualizados")
         return 0
+    if args.cmd == "config":
+        return config_cmd(store, args)
     if args.cmd == "indexing-push":
         from . import indexing
         result = indexing.publish(indexing.open_urls(store), limit=args.limit,
@@ -152,8 +161,31 @@ def main() -> int:
         except (LoginError, RuntimeError, ValueError) as e:
             print(f"{source}: erro: {e}", file=sys.stderr)
             status = 1
-    store.publish_site_data()  # o que o site (PHP) precisa do filtro
+    store.publish_site_data()  # o que o site precisa do filtro
     return status
+
+
+def config_cmd(store: Store, args) -> int:
+    """Mostra a configuração (ou um item), ou grava um item e reaplica o filtro às vagas
+    já salvas: trocar a linguagem ou os termos muda o que é relevante."""
+    words = args.words
+    if words[:1] != ["set"]:
+        cfg = store.get_config()
+        print(json.dumps(cfg.get(words[0]) if words else cfg, ensure_ascii=False, indent=2))
+        return 0
+    if len(words) != 3:
+        print("config set: informe NOME e o JSON", file=sys.stderr)
+        return 1
+    _, name, value = words
+    try:
+        store.set_config(name, json.loads(value))
+    except ValueError as e:  # inclui JSON inválido
+        print(f"config set: erro: {e}", file=sys.stderr)
+        return 1
+    changed = store.reclassify_jobs() + store.reclassify("post", classify.is_hiring_post)
+    store.publish_site_data()
+    print(f"{name} gravado; {len(changed)} vagas mudaram de relevância")
+    return 0
 
 
 # Percorre o documento e todos os shadow roots abertos (recursivamente) e descreve os

@@ -5,7 +5,7 @@ from datetime import timedelta
 
 import pytest
 
-from vagas_php import indexing
+from vagas import indexing
 
 BASE = "https://vagasphp.wouerner.dev/vaga/"
 

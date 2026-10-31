@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Comandos (o site fica em web/, em PHP, com imagem própria):
 #   serve        -> serviço contínuo (coleta agendada + MCP, se VAGAS_MCP_ENABLED)
-#   outros args  -> CLI (python -m vagas_php ...), ex.: collect all
+#   outros args  -> CLI (python -m vagas ...), ex.: collect all
 # Para serve/CLI sobe display virtual + VNC + noVNC, para acompanhar o navegador e
 # concluir verificações do LinkedIn (2FA/captcha).
 set -euo pipefail
@@ -19,6 +19,6 @@ sleep 1
 echo "Navegador visível no noVNC (porta NOVNC_PUBLISH_PORT do host, padrão 6081)."
 
 if [ "${1:-}" = "serve" ]; then
-  exec python -m vagas_php.service
+  exec python -m vagas.service
 fi
-exec python -m vagas_php "$@"
+exec python -m vagas "$@"

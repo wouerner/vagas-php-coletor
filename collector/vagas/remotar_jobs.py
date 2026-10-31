@@ -3,22 +3,20 @@ site usa, sem login. A busca olha título e descrição; os resultados vêm do m
 para o mais antigo: a paginação para ao passar do início da janela."""
 
 import json
-import os
 import time
 import urllib.parse
 from datetime import datetime
 
-from . import jobposting
+from . import config, jobposting
 from .public_jobs import html_to_text
 
 API = "https://api.remotar.com.br/jobs"
-DEFAULT_TERMS = "php,laravel,symfony,wordpress,magento,drupal"
 WORKPLACE = {"remote": "Remoto", "hybrid": "Híbrido", "onsite": "Presencial", "on-site": "Presencial"}
 
 
 def terms() -> list[str]:
-    return [t.strip() for t in (os.getenv("VAGAS_REMOTAR_TERMS") or DEFAULT_TERMS).split(",")
-            if t.strip()]
+    """Termos buscados: VAGAS_REMOTAR_TERMS, senão a configuração (config.py)."""
+    return config.search("remotar", "VAGAS_REMOTAR_TERMS")
 
 
 PERIOD = {"monthly": " por mês", "yearly": " por ano", "hourly": " por hora"}

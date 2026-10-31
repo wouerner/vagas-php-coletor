@@ -10,7 +10,7 @@ do relatório diário do canal.
 
 Além do id, há dedupe por conteúdo: a mesma vaga às vezes volta com outro id (ex.: a
 UpVagas republica uma cópia por cidade da mesma vaga do Lever). A chave (content_key) é a
-empresa normalizada (php.company_key; sem empresa, o autor) + o título normalizado (sem
+empresa normalizada (classify.company_key; sem empresa, o autor) + o título normalizado (sem
 acento, minúsculo, sem pontuação e sem refs tipo "REF#123"). Vaga cuja chave já foi
 enviada nos últimos DEDUPE_DAYS dias (pelo `at`/`key` do log) não sai, mas o id entra no
 estado para não ser reavaliada; no mesmo lote, só a mais recente de cada chave sai. Sem
@@ -35,9 +35,9 @@ from datetime import datetime, timedelta
 from html import escape
 from pathlib import Path
 
-from . import dates, php
+from . import classify, dates
 
-log = logging.getLogger("vagas_php.telegram_alert")
+log = logging.getLogger(__name__)
 
 VAGAS_API_URL = (os.getenv("VAGAS_API_URL") or "https://vagasphp.wouerner.dev").rstrip("/")
 VAGAS_TELEGRAM_TOKEN = os.getenv("VAGAS_TELEGRAM_TOKEN", "")
@@ -345,9 +345,9 @@ def title_key(title: str | None) -> str:
 
 
 def content_key(job: dict) -> str | None:
-    """"empresa|título" normalizados (empresa por php.company_key; sem ela, o autor).
+    """"empresa|título" normalizados (empresa por classify.company_key; sem ela, o autor).
     None sem empresa nem autor, ou sem título: aí vale só o id."""
-    who = php.company_key(job.get("company")) or _plain(job.get("author")).replace(" ", "")
+    who = classify.company_key(job.get("company")) or _plain(job.get("author")).replace(" ", "")
     title = title_key(job.get("title"))
     return f"{who}|{title}" if who and title else None
 

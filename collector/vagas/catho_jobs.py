@@ -4,22 +4,20 @@ pelos últimos N dias; a página de cada vaga traz um JSON-LD JobPosting com dat
 contratação, empresa, local, salário e descrição."""
 
 import html
-import os
 import re
 import time
 import urllib.parse
 
-from . import jobposting
+from . import config, jobposting
 
 BASE = "https://www.catho.com.br"
-DEFAULT_TERMS = "php,laravel,symfony,codeigniter,wordpress,magento,drupal"
 OFFER = re.compile(r'<li data-offer-item="(\d+)"(.*?)</li>', re.S)
 OFFER_LINK = re.compile(r'<a href="(/vagas/[^"]+/\d+/?)" title="([^"]*)"')
 
 
 def terms() -> list[str]:
-    return [t.strip() for t in (os.getenv("VAGAS_CATHO_TERMS") or DEFAULT_TERMS).split(",")
-            if t.strip()]
+    """Termos buscados: VAGAS_CATHO_TERMS, senão a configuração (config.py)."""
+    return config.search("catho", "VAGAS_CATHO_TERMS")
 
 
 def search(term: str, days: int, max_pages: int = 5) -> list[tuple[int, str, str]]:

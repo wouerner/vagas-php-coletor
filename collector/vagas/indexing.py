@@ -16,7 +16,7 @@ como "Completo" (Full) a API responde 403 "Failed to verify the URL ownership".
 Quota do Google: 200 publicações por dia por projeto. Aqui o teto é DAILY_CAP, contado
 pelas publicações bem-sucedidas das últimas 24 h em indexing_log.
 
-Uso: python -m vagas_php indexing-push [--limit N] [--dry-run] [--force]
+Uso: python -m vagas indexing-push [--limit N] [--dry-run] [--force]
 """
 
 import base64

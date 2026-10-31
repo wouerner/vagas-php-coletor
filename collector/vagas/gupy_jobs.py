@@ -4,7 +4,6 @@ login. A busca é só no título, então buscamos também termos amplos ("desenv
 recente para o mais antigo: a paginação para ao passar do início da janela."""
 
 import json
-import os
 import time
 import urllib.error
 import urllib.parse
@@ -12,11 +11,11 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime
 
+from . import config
 from .public_jobs import USER_AGENT, html_to_text
 
 API = "https://portal.gupy.io/api/job-search/jobs"
 PAGE_SIZE = 100
-DEFAULT_TERMS = "php,laravel,symfony,wordpress,magento,drupal,desenvolvedor,desenvolvedora,backend,full stack"
 
 WORKPLACE = {"remote": "Remoto", "hybrid": "Híbrido", "on-site": "Presencial"}
 # Tipo da vaga na Gupy -> contratação / senioridade.
@@ -55,8 +54,8 @@ def _get(params: dict) -> dict:
 
 
 def terms() -> list[str]:
-    return [t.strip() for t in (os.getenv("VAGAS_GUPY_TERMS") or DEFAULT_TERMS).split(",")
-            if t.strip()]
+    """Termos buscados: VAGAS_GUPY_TERMS, senão a configuração (config.py)."""
+    return config.search("gupy", "VAGAS_GUPY_TERMS")
 
 
 def search(term: str, since: datetime, max_pages: int = 5) -> list[GupyJob]:

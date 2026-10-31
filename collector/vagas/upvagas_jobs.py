@@ -5,17 +5,15 @@ mais nova para a mais antiga, com data e hora."""
 
 import html
 import json
-import os
 import time
 import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime
 
-from . import jobposting
+from . import config, jobposting
 from .public_jobs import html_to_text
 
 API = "https://upvagas.com.br/wp-json/wp/v2/job-listings"
-DEFAULT_TERMS = "php,laravel,symfony,codeigniter,wordpress,magento,drupal"
 PAGE_SIZE = 50
 CONTRACT = {5: "Freelance"}  # job-types: 5 = Freelancer (os outros são jornada, não contrato)
 INTERNSHIP = 6               # job-types: 6 = Estágio
@@ -38,8 +36,8 @@ class UpvagasJob:
 
 
 def terms() -> list[str]:
-    return [t.strip() for t in (os.getenv("VAGAS_UPVAGAS_TERMS") or DEFAULT_TERMS).split(",")
-            if t.strip()]
+    """Termos buscados: VAGAS_UPVAGAS_TERMS, senão a configuração (config.py)."""
+    return config.search("upvagas", "VAGAS_UPVAGAS_TERMS")
 
 
 def search(term: str, since: datetime, max_pages: int = 4) -> list[UpvagasJob]:

@@ -11,8 +11,9 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
+from . import config
+
 API = "https://api.github.com"
-DEFAULT_REPOS = "phpdevbr/vagas,backend-br/vagas"
 MAX_PAGES = 10  # 100 issues por página
 
 # Empresa no título: "... na Empresa", "... - Empresa", "... (Empresa)" ou "@ Empresa".
@@ -71,8 +72,8 @@ def company_from_title(title: str) -> str | None:
 
 
 def repos() -> list[str]:
-    return [r.strip() for r in (os.getenv("VAGAS_GITHUB_REPOS") or DEFAULT_REPOS).split(",")
-            if r.strip()]
+    """Repositórios lidos: VAGAS_GITHUB_REPOS, senão a configuração (config.py)."""
+    return config.search("github", "VAGAS_GITHUB_REPOS")
 
 
 def fetch_issues(repo: str, since: str | None) -> list[GitHubJob]:

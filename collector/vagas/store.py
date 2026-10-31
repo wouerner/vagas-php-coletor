@@ -4,9 +4,12 @@ de execuções de cada coletor. O site (web/, em PHP) usa a mesma base: lê as v
 só os cliques (tabela clicks).
 
 A base é o contrato entre os dois lados (ver docs/contrato-base.md). O site não roda o
-filtro (php.py): o que ele precisa do filtro o coletor grava pronto, em publish_site_data():
-as colunas jobs.company_key e jobs.author_recruiter e a tabela site_meta (taxonomia, regras,
-contagem por regra e agenda das coletas).
+filtro (classify.py): o que ele precisa do filtro o coletor grava pronto, em
+publish_site_data(): as colunas jobs.company_key e jobs.author_recruiter e a tabela
+site_meta (taxonomia, regras, contagem por regra e agenda das coletas).
+
+A configuração dos coletores (linguagem, termos de busca, dono do site) fica na tabela
+collector_config (ver config.py): quem abre a base passa a usá-la.
 
 Conexão: DATABASE_URL=mysql://usuario:senha@host:3306/base[?ssl-mode=REQUIRED] (senha
 com caracteres especiais vai codificada, ex.: @ -> %40)."""
@@ -26,7 +29,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 import pymysql
 
-from . import dates, php
+from . import classify, config, dates
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +43,7 @@ SCHEMA = [
     id          VARCHAR(255) COLLATE utf8mb4_bin PRIMARY KEY, -- "linkedin:<id>", "gupy:<id>", "post:<urn ou hash>", "github:<repo>#<n>", "inhire:<uuid>", "<fonte>:<id>" nas demais
     seq         BIGINT NOT NULL AUTO_INCREMENT UNIQUE,         -- ordem de inserção (DEDUP)
     source      VARCHAR(32) NOT NULL,  -- ver SOURCES
-    relevant    TINYINT NOT NULL,      -- 1 = vaga de engenharia de software com PHP
+    relevant    TINYINT NOT NULL,      -- 1 = vaga de engenharia de software da linguagem configurada
     title       TEXT,
     company     VARCHAR(512),
     location    VARCHAR(512),
@@ -48,13 +51,13 @@ SCHEMA = [
     seniority   VARCHAR(32),           -- Estágio | Júnior | Pleno | Sênior | Especialista
     contract    VARCHAR(32),           -- CLT | PJ | Freelance
     stack       VARCHAR(512),          -- "PHP,Laravel"
-    company_key VARCHAR(255),          -- php.company_key(company): agrupa a empresa; NULL = não diz quem contrata
+    company_key VARCHAR(255),          -- classify.company_key(company): agrupa a empresa; NULL = não diz quem contrata
     salary      VARCHAR(255),
     url         TEXT,
     author      VARCHAR(512),
     author_url  TEXT,
     author_headline VARCHAR(512),      -- texto abaixo do nome do autor do post (cargo)
-    author_recruiter TINYINT,          -- php.is_recruiter(author_headline)
+    author_recruiter TINYINT,          -- classify.is_recruiter(author_headline)
     description MEDIUMTEXT,
     posted_at   VARCHAR(40),           -- quando foi publicada (ISO; aproximada para posts)
     first_seen  VARCHAR(40) NOT NULL,
@@ -100,6 +103,13 @@ SCHEMA = [
     # Dados para o site que só o coletor sabe calcular (JSON): taxonomy, rules, rule_counts,
     # schedule. Ver publish_site_data() e docs/contrato-base.md.
     """CREATE TABLE IF NOT EXISTS site_meta (
+    name        VARCHAR(64) PRIMARY KEY,
+    value       MEDIUMTEXT NOT NULL,   -- JSON
+    updated_at  VARCHAR(40) NOT NULL   -- ISO UTC
+)""",
+    # Configuração dos coletores (JSON): language, core, stack, search, self_author. Ver
+    # config.py; os valores iniciais vêm de config_defaults.json.
+    """CREATE TABLE IF NOT EXISTS collector_config (
     name        VARCHAR(64) PRIMARY KEY,
     value       MEDIUMTEXT NOT NULL,   -- JSON
     updated_at  VARCHAR(40) NOT NULL   -- ISO UTC
@@ -212,6 +222,8 @@ class Store:
                 self.execute(statement)
             self._add_columns()
             self._normalize_dates()
+            self._seed_config()
+        self.load_config()
 
     def _add_columns(self) -> None:
         """Colunas criadas depois da tabela: o CREATE TABLE IF NOT EXISTS não as acrescenta."""
@@ -225,6 +237,43 @@ class Store:
                                    ("jobs", "author_recruiter", "TINYINT AFTER author_headline")):
             if (table, column) not in have:
                 self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+    def _seed_config(self) -> None:
+        """Grava os valores iniciais da configuração (config_defaults.json) que ainda não
+        estão na base; o que já está nela (inclusive editado à mão) fica."""
+        now = now_iso()
+        self.executemany("INSERT IGNORE INTO collector_config (name, value, updated_at) "
+                         "VALUES (?, ?, ?)",
+                         [(name, json.dumps(value, ensure_ascii=False), now)
+                          for name, value in config.DEFAULTS.items()])
+
+    def get_config(self) -> dict:
+        """A configuração gravada na base ({} se a tabela ainda não existe)."""
+        try:
+            rows = self.execute("SELECT name, value FROM collector_config").fetchall()
+        except pymysql.err.ProgrammingError as e:
+            if e.args[0] == 1146:  # tabela não existe (base aberta só para leitura)
+                return {}
+            raise
+        return {r["name"]: json.loads(r["value"]) for r in rows}
+
+    def load_config(self) -> None:
+        """Passa a usar a configuração da base (filtro, termos de busca...)."""
+        config.load(self.get_config())
+
+    def set_config(self, name: str, value) -> None:
+        """Grava um item da configuração (JSON) e passa a usá-lo."""
+        if name not in config.DEFAULTS:
+            raise ValueError(f"configuração desconhecida: {name} (opções: "
+                             f"{', '.join(config.DEFAULTS)})")
+        current = self.get_config()
+        try:  # valida antes de gravar (ex.: regex inválida): a base nunca fica quebrada
+            config.load({**current, name: value})
+        except Exception as e:
+            config.load(current)
+            raise ValueError(f"{name} inválido: {e}") from e
+        self.execute("REPLACE INTO collector_config (name, value, updated_at) VALUES (?, ?, ?)",
+                     (name, json.dumps(value, ensure_ascii=False), now_iso()))
 
     def _wait_for_db(self, wait: float) -> None:
         """Na subida o MySQL pode ainda não aceitar conexões: tenta por `wait` s."""
@@ -353,7 +402,7 @@ class Store:
         return [job_id for _, job_id in changed]
 
     def reclassify_jobs(self) -> list[str]:
-        """Reaplica php.is_php_job às vagas de portais já salvas (todas as fontes menos
+        """Reaplica classify.is_relevant_job às vagas de portais já salvas (todas as fontes menos
         "post"), para mudanças na regra valerem também para o que já foi coletado. As
         etiquetas das issues do GitHub não ficam na base: issue aceita por etiqueta
         continua aceita. Retorna os ids que mudaram."""
@@ -361,8 +410,8 @@ class Store:
                                "WHERE source != 'post'").fetchall()
         changed = []
         for r in rows:
-            ok = php.is_php_job(r["title"], r["description"]) or (r["source"] == "github"
-                                                                   and r["relevant"])
+            ok = classify.is_relevant_job(r["title"], r["description"]) or (
+                r["source"] == "github" and r["relevant"])
             if ok != bool(r["relevant"]):
                 changed.append((int(ok), r["id"]))
         with self.tx():
@@ -447,21 +496,22 @@ class Store:
                 "SELECT source, title, description, author, relevant FROM jobs "
                 "WHERE dismissed IS NULL"):
             if source == "post":
-                counts[php.post_verdict(description, author)] += 1
-            else:  # etiquetas do GitHub não ficam na base: aceitas por elas = php_title
-                verdict = php.job_verdict(title, description)
-                counts["php_title" if relevant and verdict not in php.JOB_OK else verdict] += 1
+                counts[classify.post_verdict(description, author)] += 1
+            else:  # etiquetas do GitHub não ficam na base: aceitas por elas = lang_title
+                verdict = classify.job_verdict(title, description)
+                counts["lang_title" if relevant and verdict not in classify.JOB_OK
+                       else verdict] += 1
         return dict(counts)
 
     def refresh_derived(self) -> int:
-        """Recalcula jobs.company_key e jobs.author_recruiter (php.company_key e
-        php.is_recruiter) onde mudaram: vagas novas e mudanças no filtro. Retorna quantas
+        """Recalcula jobs.company_key e jobs.author_recruiter (classify.company_key
+        e classify.is_recruiter) onde mudaram: vagas novas e mudanças no filtro. Retorna quantas
         linhas mudaram."""
         changed = []
         for r in self.execute("SELECT id, company, company_key, author_headline, "
                               "author_recruiter FROM jobs"):
-            key = php.company_key(r["company"])
-            recruiter = int(php.is_recruiter(r["author_headline"]))
+            key = classify.company_key(r["company"])
+            recruiter = int(classify.is_recruiter(r["author_headline"]))
             if key != r["company_key"] or recruiter != r["author_recruiter"]:
                 changed.append((key, recruiter, r["id"]))
         with self.tx():
@@ -479,13 +529,13 @@ class Store:
         modalidades, senioridades e fontes, na ordem do filtro), regras e contagem por regra."""
         self.refresh_derived()
         self.set_meta("taxonomy", {
-            "stacks": list(php.PHP_STACK),
-            "workplaces": [label for label, _ in php.WORKPLACE],
-            "seniorities": [label for label, _ in php.SENIORITY],
-            "contracts": [label for label, _ in php.CONTRACT],
+            "stacks": list(classify.STACK),
+            "workplaces": [label for label, _ in classify.WORKPLACE],
+            "seniorities": [label for label, _ in classify.SENIORITY],
+            "contracts": [label for label, _ in classify.CONTRACT],
             "sources": list(SOURCES),
         })
-        self.set_meta("rules", php.RULES)
+        self.set_meta("rules", classify.RULES)
         self.set_meta("rule_counts", self.rule_counts())
 
     def start_run(self, source: str) -> int:

@@ -1,17 +1,14 @@
 """Vagas da Programathor (programathor.com.br), portal só de vagas de programação, sem
-login. As listas por tecnologia (/jobs-php, /jobs-laravel...) não seguem a ordem de
+login. As listas por tecnologia (/jobs-php, /jobs-laravel..., na configuração) não seguem a ordem de
 publicação (vagas antigas ainda abertas aparecem no meio): a data vem do JSON-LD
 JobPosting da página de cada vaga, baixada só para as vagas novas."""
 
-import os
 import re
 import time
 
-from . import jobposting
+from . import config, jobposting
 
 BASE = "https://programathor.com.br"
-DEFAULT_PAGES = ("jobs-php,jobs-laravel,jobs-symfony,jobs-codeigniter,jobs-wordpress,jobs-magento,"
-                 "jobs-drupal")
 JOB_LINK = re.compile(r'href="/jobs/(\d+)-([a-z0-9-]*)"')
 # O título do JobPosting termina com a categoria da vaga ("... - Full Stack").
 CATEGORY = re.compile(r"\s+-\s+(Full Stack|Back-End|Front-End|Mobile|DevOps|Dados|Data|QA|"
@@ -19,8 +16,8 @@ CATEGORY = re.compile(r"\s+-\s+(Full Stack|Back-End|Front-End|Mobile|DevOps|Dado
 
 
 def pages() -> list[str]:
-    return [t.strip() for t in (os.getenv("VAGAS_PROGRAMATHOR_PAGES") or DEFAULT_PAGES)
-            .split(",") if t.strip()]
+    """Listas lidas: VAGAS_PROGRAMATHOR_PAGES, senão a configuração (config.py)."""
+    return config.search("programathor", "VAGAS_PROGRAMATHOR_PAGES")
 
 
 def list_jobs(page: str, max_pages: int = 3) -> list[tuple[int, str, str]]:

@@ -1,30 +1,19 @@
-"""Classifica textos de vagas: é vaga de engenharia de software com PHP? Extrai
-modalidade, senioridade, contratação e stack PHP para os filtros do site."""
+"""Classifica textos de vagas: é vaga de engenharia de software da linguagem configurada
+(config.py: termos e stack ficam na base)? Extrai modalidade, senioridade, contratação e
+stack para os filtros do site."""
 
 import re
 import unicodedata
 
-# Termos que indicam PHP (a linguagem ou o ecossistema).
-PHP_STACK = {
-    "PHP": r"\bphp\s?\d?(\.\d)?\b",
-    "Laravel": r"\blaravel\b",
-    "Symfony": r"\bsymfony\b",
-    "CodeIgniter": r"\bcode\s?igniter\b",
-    "CakePHP": r"\bcake\s?php\b",
-    "Yii": r"\byii2?\b",
-    "Laminas/Zend": r"\b(laminas|zend)\b",
-    "Hyperf/Swoole": r"\b(hyperf|swoole|openswoole)\b",
-    "Livewire": r"\blivewire\b",
-    "Filament": r"\bfilament(php)?\b",
-    "Magento": r"\bmagento\b",
-    "WordPress": r"\bwordpress\b",
-    "Drupal": r"\bdrupal\b",
-}
-PHP_STACK_RE = {name: re.compile(rx, re.I) for name, rx in PHP_STACK.items()}
-# Frameworks e plataformas fortes o bastante para, sozinhos no título, indicar vaga PHP
-# (WordPress, Magento e Drupal são PHP: temas, plugins e lojas contam).
-PHP_CORE = re.compile(r"\b(php|laravel|symfony|code\s?igniter|cake\s?php|yii2?|laminas|"
-                      r"hyperf|swoole|livewire|wordpress|magento|drupal)\b", re.I)
+from . import config
+
+# A linguagem vem da configuração (config.py), recalculada em _configure() quando ela é
+# carregada da base: CORE são os termos fortes o bastante para, sozinhos no título, indicar
+# vaga da linguagem (no PHP, WordPress, Magento e Drupal também contam); STACK, as
+# tecnologias mostradas nos filtros do site, na ordem da configuração.
+CORE: re.Pattern
+STACK: dict[str, str] = {}
+STACK_RE: dict[str, re.Pattern] = {}
 
 # Título de vaga de engenharia/desenvolvimento de software.
 DEV_ROLE = re.compile(
@@ -80,7 +69,7 @@ JOB_MARKERS = re.compile(
     r"\b(requisitos|benef[ií]cios|remunera[cç][aã]o|sal[aá]rio|contrata[cç][aã]o|clt|pj|"
     r"modelo de trabalho|regime|atribui[cç][oõ]es|responsabilidades|diferenciais|local:)",
     re.I)
-# Contextos de posts que citam PHP mas não anunciam vaga: projeto pessoal, mudança de
+# Contextos de posts que citam a linguagem mas não anunciam vaga: projeto pessoal, mudança de
 # emprego, certificados. Só barram sinais fracos de contratação. Acrescente padrões aqui.
 NOT_HIRING = [
     r"estou trabalhando (na|no|em)", r"\b(utilizei|desenvolvi|implementei|constru[ií])\b",
@@ -166,14 +155,12 @@ AGGREGATOR_AUTHOR = [
     r"^home office$",
 ]
 AGGREGATOR_AUTHOR_RE = re.compile("|".join(f"({rx})" for rx in AGGREGATOR_AUTHOR), re.I)
-# O dono do site: o post diário no LinkedIn (linkedin_post.py) cita vagas PHP e voltaria
-# na busca de publicações. O site não se auto-coleta.
-SELF_AUTHOR = {
-    "names": [r"^wouerner\b"],
-    "urls": [r"linkedin\.com/in/wouerner/?$"],
-}
-SELF_AUTHOR_RE = re.compile("|".join(f"({rx})" for rx in SELF_AUTHOR["names"]), re.I)
-SELF_AUTHOR_URL_RE = re.compile("|".join(f"({rx})" for rx in SELF_AUTHOR["urls"]), re.I)
+# O dono do site (configuração "self_author": nomes e perfis): o post diário no LinkedIn
+# (linkedin_post.py) cita as vagas e voltaria na busca de publicações. O site não se
+# auto-coleta. Recalculados em _configure().
+SELF_AUTHOR: dict
+SELF_AUTHOR_RE: re.Pattern
+SELF_AUTHOR_URL_RE: re.Pattern
 HASHTAG_OR_URL = re.compile(r"(#\w+|hashtag\s*#?\w+|https?://\S+)", re.I)
 JOB_SEEKER = re.compile(
     r"(#opentowork|open to work|estou (em busca|buscando|procurando|dispon[ií]vel)|"
@@ -256,11 +243,11 @@ def _first(rules, *texts) -> str | None:
 
 def stack(*texts: str | None) -> list[str]:
     blob = " ".join(t for t in texts if t)
-    return [name for name, rx in PHP_STACK_RE.items() if rx.search(blob)]
+    return [name for name, rx in STACK_RE.items() if rx.search(blob)]
 
 
 # Motivos de cada decisão (ids das regras em RULES).
-JOB_OK = ("php_title", "php_description")
+JOB_OK = ("lang_title", "lang_description")
 POST_OK = ("hiring_strong", "hiring_weak")
 
 
@@ -271,31 +258,31 @@ def job_verdict(title: str | None, description: str | None = None,
     title = title or ""
     if NOT_DEV.search(title) and not DEV_ROLE.search(title):
         return "not_dev"
-    if PHP_CORE.search(title) or (labels and PHP_CORE.search(labels)):
-        return "php_title"
-    if DEV_ROLE.search(title) and description and len(PHP_CORE.findall(description)) >= 2:
-        return "php_description"
-    return "no_php"
+    if CORE.search(title) or (labels and CORE.search(labels)):
+        return "lang_title"
+    if DEV_ROLE.search(title) and description and len(CORE.findall(description)) >= 2:
+        return "lang_description"
+    return "no_lang"
 
 
-def is_php_job(title: str | None, description: str | None = None,
-               labels: str | None = None) -> bool:
-    """Vaga de engenharia de software com PHP: PHP/framework no título ou nas etiquetas,
-    ou título de desenvolvimento com PHP em destaque na descrição (2+ menções: uma só
-    costuma ser PHP numa lista de linguagens aceitas)."""
+def is_relevant_job(title: str | None, description: str | None = None,
+                    labels: str | None = None) -> bool:
+    """Vaga de engenharia de software da linguagem: termo de CORE no título ou nas
+    etiquetas, ou título de desenvolvimento com a linguagem em destaque na descrição (2+
+    menções: uma só costuma ser a linguagem numa lista de linguagens aceitas)."""
     return job_verdict(title, description, labels) in JOB_OK
 
 
 def _job_title_line(text: str) -> bool:
-    """Alguma linha com cara de título de vaga: cargo de desenvolvimento + PHP +
-    senioridade ou modalidade ("• Pessoa Desenvolvedora PHP Sênior | 100% remoto"). Num
-    post curto, senioridade, modalidade ou contratação podem vir em outra linha
-    ("Desenvolvedor WordPress Full Stack" / "Modelo PJ/ Hibrido")."""
+    """Alguma linha com cara de título de vaga: cargo de desenvolvimento + linguagem
+    (CORE) + senioridade ou modalidade ("• Pessoa Desenvolvedora PHP Sênior | 100%
+    remoto"). Num post curto, senioridade, modalidade ou contratação podem vir em outra
+    linha ("Desenvolvedor WordPress Full Stack" / "Modelo PJ/ Hibrido")."""
     short = len(text) < 400
     terms = lambda t: _first(SENIORITY, t) or _first(WORKPLACE, t) or _first(CONTRACT, t)  # noqa: E731
     for line in text.splitlines():
         line = HASHTAG_OR_URL.sub(" ", line)
-        if (len(line) <= 160 and DEV_ROLE.search(line) and PHP_CORE.search(line)
+        if (len(line) <= 160 and DEV_ROLE.search(line) and CORE.search(line)
                 and (_first(SENIORITY, line) or _first(WORKPLACE, line) or (short and terms(text)))):
             return True
     return False
@@ -356,11 +343,11 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
     if is_self_author(author):
         return "self_author"
     if not text:
-        return "post_no_php"
+        return "post_no_lang"
     body = HASHTAG_OR_URL.sub(" ", text)
-    php_mentions = len(PHP_CORE.findall(body))
-    if not (php_mentions and (DEV_ROLE.search(body) or php_mentions >= 2)):
-        return "post_no_php"
+    mentions = len(CORE.findall(body))
+    if not (mentions and (DEV_ROLE.search(body) or mentions >= 2)):
+        return "post_no_lang"
     if is_aggregator(text):
         return "aggregator"
     if is_job_list(text):
@@ -384,10 +371,10 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
     return "hiring_weak" if _job_ad_shape(text) else "no_hiring"
 
 
-def is_php_hiring_post(text: str | None, author: str | None = None) -> bool:
-    """Post do LinkedIn que anuncia vaga PHP: cita PHP no texto junto de um cargo de
-    desenvolvimento, ou mais de uma vez (hashtags e links não contam: posts genéricos
-    enchem de #php #java...); não é divulgação de grupos (AGGREGATOR) nem lista de vagas
+def is_hiring_post(text: str | None, author: str | None = None) -> bool:
+    """Post do LinkedIn que anuncia vaga da linguagem: cita a linguagem (CORE) no texto
+    junto de um cargo de desenvolvimento, ou mais de uma vez (hashtags e links não contam:
+    posts genéricos enchem de #php #java...); não é divulgação de grupos (AGGREGATOR) nem lista de vagas
     de terceiros (JOB_LIST_*), nem de agregador
     de vagas (AGGREGATOR_AUTHOR) ou do próprio site (SELF_AUTHOR), nem de alguém
     procurando emprego; e tem sinal claro de contratação."""
@@ -500,124 +487,144 @@ def _patterns(*rxs) -> list[str]:
     return out
 
 
-RULES = [
-    {"group": "vagas", "id": "not_dev", "effect": "recusa",
-     "title": "Cargo que não é de engenharia",
-     "text": "Título de vendas, suporte, design, ensino, recrutamento etc., sem cargo de "
-             "desenvolvimento junto, fica de fora mesmo citando PHP.",
-     "patterns": _patterns(NOT_DEV)},
-    {"group": "vagas", "id": "php_title", "effect": "aceita",
-     "title": "PHP ou framework PHP no título",
-     "text": "PHP, Laravel, Symfony, CodeIgniter, CakePHP, Yii, Laminas, Hyperf/Swoole, "
-             "Livewire, WordPress, Magento ou Drupal no título da vaga (ou nas etiquetas da "
-             "issue, no GitHub).",
-     "patterns": _patterns(PHP_CORE)},
-    {"group": "vagas", "id": "php_description", "effect": "aceita",
-     "title": "Cargo de desenvolvimento com PHP em destaque na descrição",
-     "text": "Título de desenvolvimento (desenvolvedor, back-end, full stack...) e PHP citado "
-             "2 ou mais vezes na descrição. Uma menção só costuma ser PHP numa lista de "
-             "linguagens aceitas, e não conta.",
-     "patterns": _patterns(DEV_ROLE)},
-    {"group": "vagas", "id": "no_php", "effect": "recusa",
-     "title": "Sem PHP em destaque",
-     "text": "O que não se encaixa nas regras acima: a busca dos sites é ampla e traz vagas "
-             "de outras linguagens.", "patterns": []},
+def _rules() -> list[dict]:
+    """Regras com o nome e os termos da linguagem configurada."""
+    lang = config.get("language")
+    name, slug, examples = lang["name"], lang["slug"], lang["examples"]
+    return [
+        {"group": "vagas", "id": "not_dev", "effect": "recusa",
+         "title": "Cargo que não é de engenharia",
+         "text": "Título de vendas, suporte, design, ensino, recrutamento etc., sem cargo de "
+                 f"desenvolvimento junto, fica de fora mesmo citando {name}.",
+         "patterns": _patterns(NOT_DEV)},
+        {"group": "vagas", "id": "lang_title", "effect": "aceita",
+         "title": f"{name} ou tecnologia do ecossistema no título",
+         "text": f"{examples} no título da vaga (ou nas etiquetas da issue, no GitHub).",
+         "patterns": _patterns(CORE)},
+        {"group": "vagas", "id": "lang_description", "effect": "aceita",
+         "title": f"Cargo de desenvolvimento com {name} em destaque na descrição",
+         "text": f"Título de desenvolvimento (desenvolvedor, back-end, full stack...) e {name} "
+                 f"citado 2 ou mais vezes na descrição. Uma menção só costuma ser {name} numa "
+                 f"lista de linguagens aceitas, e não conta.",
+         "patterns": _patterns(DEV_ROLE)},
+        {"group": "vagas", "id": "no_lang", "effect": "recusa",
+         "title": f"Sem {name} em destaque",
+         "text": "O que não se encaixa nas regras acima: a busca dos sites é ampla e traz vagas "
+                 "de outras linguagens.", "patterns": []},
 
-    {"group": "posts", "id": "self_author", "effect": "recusa",
-     "title": "Post do próprio site",
-     "text": "Os posts do dono do site no LinkedIn (o post diário com as vagas) citam vagas "
-             "PHP e voltariam na busca: o site não coleta a si mesmo. Vale pelo nome ou pelo "
-             "perfil de quem publicou.",
-     "patterns": _patterns(SELF_AUTHOR["names"], SELF_AUTHOR["urls"])},
-    {"group": "posts", "id": "post_no_php", "effect": "recusa",
-     "title": "Não fala de PHP",
-     "text": "O texto precisa citar PHP (ou framework/plataforma PHP, inclusive WordPress, "
-             "Magento e Drupal) junto de um cargo de "
-             "desenvolvimento, ou mais de uma vez. Hashtags e links não contam: muitos "
-             "posts enchem de #php #java #python.", "patterns": _patterns(PHP_CORE)},
-    {"group": "posts", "id": "aggregator", "effect": "recusa",
-     "title": "Divulgação de grupos e canais de vagas, sem curadoria",
-     "text": f"Posts que divulgam grupos, canais e comunidades de vagas (Discord, Telegram, "
-             f"WhatsApp, \"Vagas T.I. - Remotas\"...): {AGGREGATOR_MIN} ou mais das expressões "
-             f"abaixo, diferentes entre si. Vale mesmo quando o texto tem sinal de "
-             f"contratação: queremos o anúncio da vaga, não a propaganda do grupo. Uma menção "
-             f"só (\"entre no nosso grupo do Telegram\" no fim de um anúncio) não barra.",
-     "patterns": _patterns(AGGREGATOR)},
-    {"group": "posts", "id": "job_list", "effect": "recusa",
-     "title": "Lista de vagas montada por terceiros",
-     "text": f"Posts que listam várias vagas, cada uma com o próprio link de candidatura "
-             f"(\"🚨 5 VAGAS HOME OFFICE\", \"Confira essas 7 vagas...\"): {JOB_LIST_MIN} ou "
-             f"mais chamadas de candidatura (\"Candidate-se:\", \"Inscrição:\", \"Apply:\"...) "
-             f"seguidas de link, ou um cabeçalho \"N vagas\" ({JOB_LIST_MIN} ou mais) com "
-             f"{JOB_LIST_MIN} ou mais links. Vale mesmo quando o texto tem sinal de "
-             f"contratação: queremos o anúncio de quem contrata, não listas montadas por "
-             f"terceiros, sem curadoria. Um anúncio com um link só não barra.",
-     "patterns": _patterns([JOB_LIST_APPLY_RE.pattern], JOB_LIST_HEADER)},
-    {"group": "posts", "id": "aggregator_author", "effect": "recusa",
-     "title": "Publicado por agregador de vagas",
-     "text": "Páginas, comunidades e consultorias que republicam anúncios genéricos de outras "
-             "empresas, sem curadoria (\"Vagas Remotas\", \"DEVagas\", \"Jobs Brasil\", "
-             "\"Recrutei Empregos\", \"Comunidade ...\", \"Home Office\"...): não são quem contrata, e as vagas costumam chegar velhas. O "
-             "bloqueio é pelo nome de quem publicou (sem acentos), não pelo texto, e vale "
-             "antes de julgar o anúncio. Nomes de pessoas não são bloqueados.",
-     "patterns": _patterns(AGGREGATOR_AUTHOR)},
-    {"group": "posts", "id": "job_seeker", "effect": "recusa",
-     "title": "Pessoa procurando emprego",
-     "text": "Posts de quem procura vaga (#opentowork, \"estou em busca de oportunidade\"...) "
-             "não são anúncios. Texto de "
-             "recrutador (\"estou em busca de pessoas\", \"candidate-se\"...) não conta como "
-             "procura de emprego.",
-     "patterns": _patterns(JOB_SEEKER)},
-    {"group": "posts", "id": "showcase", "effect": "recusa",
-     "title": "Vitrine de projeto pessoal",
-     "text": "Posts de quem mostra o próprio projeto, sistema, app ou portfólio (\"estou "
-             "desenvolvendo\", \"meu projeto\", \"TCC\"...) não são anúncios, mesmo que o "
-             "projeto fale de vagas (\"plataforma para divulgação de vagas\"). Se o texto "
-             "também recruta (\"candidate-se\", \"envie seu currículo\", \"contratamos\"...), "
-             "vale como anúncio.",
-     "patterns": _patterns(SHOWCASE)},
-    {"group": "posts", "id": "hiring_strong", "effect": "aceita",
-     "title": "Sinal forte de contratação",
-     "text": "\"Vaga para\", \"contratando\", \"estamos buscando\", \"candidate-se\", "
-             "\"envie seu currículo\", \"we're hiring\"... \"Está procurando\" não vale quando "
-             "vem seguido de emprego, trabalho, vaga ou oportunidade, mesmo com até 2 palavras "
-             "no meio (\"uma nova oportunidade\", \"um novo emprego\"): aí o post fala com quem "
-             "procura emprego (\"quem está procurando emprego sabe...\"), não anuncia vaga. "
-             "\"Hiring\" sozinho também não vale (aparece em posts sobre contratação), só em "
-             "forma de anúncio: \"we're hiring\", \"now hiring\", \"hiring a/for\"...",
-     "patterns": _patterns(HIRING)},
-    {"group": "posts", "id": "other_subject", "effect": "recusa",
-     "title": "Outro assunto",
-     "text": "Com sinal fraco de contratação (abaixo), posts sobre projeto pessoal, troca de "
-             "emprego, certificados etc. ficam de fora.", "patterns": _patterns(NOT_HIRING)},
-    {"group": "posts", "id": "hiring_weak", "effect": "aceita",
-     "title": "Sinal fraco de contratação com cara de anúncio",
-     "text": "\"Oportunidade para\", \"oportunidades abertas\", \"processo seletivo\", "
-             "#vagas, #VagasTech, uma linha começando com \"Oportunidade\" ou \"Vaga\"... só "
-             "valem com cara de anúncio: 2 ou mais itens de anúncio (requisitos, benefícios, "
-             "salário, CLT/PJ...), uma linha com cara de título de vaga (cargo de "
-             "desenvolvimento + PHP + senioridade ou modalidade, ex.: \"Pessoa Desenvolvedora "
-             "PHP Sênior | 100% remoto\"; num post curto, de até 400 caracteres, senioridade, "
-             "modalidade ou contratação podem vir em outra linha) ou um post curto (menos de "
-             "300 caracteres) com hashtag de vaga.",
-     "patterns": _patterns(HIRING_WEAK, JOB_MARKERS)},
-    {"group": "posts", "id": "no_hiring", "effect": "recusa",
-     "title": "Sem sinal de contratação",
-     "text": "Fala de PHP, mas não anuncia vaga.", "patterns": []},
+        {"group": "posts", "id": "self_author", "effect": "recusa",
+         "title": "Post do próprio site",
+         "text": "Os posts do dono do site no LinkedIn (o post diário com as vagas) citam vagas "
+                 f"{name} e voltariam na busca: o site não coleta a si mesmo. Vale pelo nome ou pelo "
+                 "perfil de quem publicou.",
+         "patterns": _patterns(SELF_AUTHOR["names"], SELF_AUTHOR["urls"])},
+        {"group": "posts", "id": "post_no_lang", "effect": "recusa",
+         "title": f"Não fala de {name}",
+         "text": f"O texto precisa citar {name} (ou tecnologia do ecossistema: {examples}) junto "
+                 f"de um cargo de desenvolvimento, ou mais de uma vez. Hashtags e links não "
+                 f"contam: muitos posts enchem de #{slug} #java #python.",
+         "patterns": _patterns(CORE)},
+        {"group": "posts", "id": "aggregator", "effect": "recusa",
+         "title": "Divulgação de grupos e canais de vagas, sem curadoria",
+         "text": f"Posts que divulgam grupos, canais e comunidades de vagas (Discord, Telegram, "
+                 f"WhatsApp, \"Vagas T.I. - Remotas\"...): {AGGREGATOR_MIN} ou mais das expressões "
+                 f"abaixo, diferentes entre si. Vale mesmo quando o texto tem sinal de "
+                 f"contratação: queremos o anúncio da vaga, não a propaganda do grupo. Uma menção "
+                 f"só (\"entre no nosso grupo do Telegram\" no fim de um anúncio) não barra.",
+         "patterns": _patterns(AGGREGATOR)},
+        {"group": "posts", "id": "job_list", "effect": "recusa",
+         "title": "Lista de vagas montada por terceiros",
+         "text": f"Posts que listam várias vagas, cada uma com o próprio link de candidatura "
+                 f"(\"🚨 5 VAGAS HOME OFFICE\", \"Confira essas 7 vagas...\"): {JOB_LIST_MIN} ou "
+                 f"mais chamadas de candidatura (\"Candidate-se:\", \"Inscrição:\", \"Apply:\"...) "
+                 f"seguidas de link, ou um cabeçalho \"N vagas\" ({JOB_LIST_MIN} ou mais) com "
+                 f"{JOB_LIST_MIN} ou mais links. Vale mesmo quando o texto tem sinal de "
+                 f"contratação: queremos o anúncio de quem contrata, não listas montadas por "
+                 f"terceiros, sem curadoria. Um anúncio com um link só não barra.",
+         "patterns": _patterns([JOB_LIST_APPLY_RE.pattern], JOB_LIST_HEADER)},
+        {"group": "posts", "id": "aggregator_author", "effect": "recusa",
+         "title": "Publicado por agregador de vagas",
+         "text": "Páginas, comunidades e consultorias que republicam anúncios genéricos de outras "
+                 "empresas, sem curadoria (\"Vagas Remotas\", \"DEVagas\", \"Jobs Brasil\", "
+                 "\"Recrutei Empregos\", \"Comunidade ...\", \"Home Office\"...): não são quem contrata, e as vagas costumam chegar velhas. O "
+                 "bloqueio é pelo nome de quem publicou (sem acentos), não pelo texto, e vale "
+                 "antes de julgar o anúncio. Nomes de pessoas não são bloqueados.",
+         "patterns": _patterns(AGGREGATOR_AUTHOR)},
+        {"group": "posts", "id": "job_seeker", "effect": "recusa",
+         "title": "Pessoa procurando emprego",
+         "text": "Posts de quem procura vaga (#opentowork, \"estou em busca de oportunidade\"...) "
+                 "não são anúncios. Texto de "
+                 "recrutador (\"estou em busca de pessoas\", \"candidate-se\"...) não conta como "
+                 "procura de emprego.",
+         "patterns": _patterns(JOB_SEEKER)},
+        {"group": "posts", "id": "showcase", "effect": "recusa",
+         "title": "Vitrine de projeto pessoal",
+         "text": "Posts de quem mostra o próprio projeto, sistema, app ou portfólio (\"estou "
+                 "desenvolvendo\", \"meu projeto\", \"TCC\"...) não são anúncios, mesmo que o "
+                 "projeto fale de vagas (\"plataforma para divulgação de vagas\"). Se o texto "
+                 "também recruta (\"candidate-se\", \"envie seu currículo\", \"contratamos\"...), "
+                 "vale como anúncio.",
+         "patterns": _patterns(SHOWCASE)},
+        {"group": "posts", "id": "hiring_strong", "effect": "aceita",
+         "title": "Sinal forte de contratação",
+         "text": "\"Vaga para\", \"contratando\", \"estamos buscando\", \"candidate-se\", "
+                 "\"envie seu currículo\", \"we're hiring\"... \"Está procurando\" não vale quando "
+                 "vem seguido de emprego, trabalho, vaga ou oportunidade, mesmo com até 2 palavras "
+                 "no meio (\"uma nova oportunidade\", \"um novo emprego\"): aí o post fala com quem "
+                 "procura emprego (\"quem está procurando emprego sabe...\"), não anuncia vaga. "
+                 "\"Hiring\" sozinho também não vale (aparece em posts sobre contratação), só em "
+                 "forma de anúncio: \"we're hiring\", \"now hiring\", \"hiring a/for\"...",
+         "patterns": _patterns(HIRING)},
+        {"group": "posts", "id": "other_subject", "effect": "recusa",
+         "title": "Outro assunto",
+         "text": "Com sinal fraco de contratação (abaixo), posts sobre projeto pessoal, troca de "
+                 "emprego, certificados etc. ficam de fora.", "patterns": _patterns(NOT_HIRING)},
+        {"group": "posts", "id": "hiring_weak", "effect": "aceita",
+         "title": "Sinal fraco de contratação com cara de anúncio",
+         "text": "\"Oportunidade para\", \"oportunidades abertas\", \"processo seletivo\", "
+                 "#vagas, #VagasTech, uma linha começando com \"Oportunidade\" ou \"Vaga\"... só "
+                 "valem com cara de anúncio: 2 ou mais itens de anúncio (requisitos, benefícios, "
+                 "salário, CLT/PJ...), uma linha com cara de título de vaga (cargo de "
+                 f"desenvolvimento + {name} + senioridade ou modalidade, ex.: \"Pessoa "
+                 f"Desenvolvedora {name} Sênior | 100% remoto\"; num post curto, de até 400 caracteres, senioridade, "
+                 "modalidade ou contratação podem vir em outra linha) ou um post curto (menos de "
+                 "300 caracteres) com hashtag de vaga.",
+         "patterns": _patterns(HIRING_WEAK, JOB_MARKERS)},
+        {"group": "posts", "id": "no_hiring", "effect": "recusa",
+         "title": "Sem sinal de contratação",
+         "text": f"Fala de {name}, mas não anuncia vaga.", "patterns": []},
 
-    {"group": "recrutadores", "id": "recruiter", "effect": "aceita",
-     "title": "Headline de recrutamento",
-     "text": "Entra na página de recrutadores quem publicou vagas PHP aceitas nos últimos "
-             "90 dias (o mínimo de vagas aparece na página) e tem no headline do LinkedIn (o texto abaixo do nome) Tech "
-             "Recruiter, recrutamento, Talent Acquisition, headhunter... Páginas de vagas e "
-             "devs que divulgam vagas não entram.",
-     "patterns": _patterns(RECRUITER)},
+        {"group": "recrutadores", "id": "recruiter", "effect": "aceita",
+         "title": "Headline de recrutamento",
+         "text": f"Entra na página de recrutadores quem publicou vagas {name} aceitas nos últimos "
+                 "90 dias (o mínimo de vagas aparece na página) e tem no headline do LinkedIn (o texto abaixo do nome) Tech "
+                 "Recruiter, recrutamento, Talent Acquisition, headhunter... Páginas de vagas e "
+                 "devs que divulgam vagas não entram.",
+         "patterns": _patterns(RECRUITER)},
 
-    {"group": "empresas", "id": "not_employer", "effect": "recusa",
-     "title": "Nome que não diz quem contrata",
-     "text": "A página de empresas soma as vagas de portais dos últimos 90 dias por empresa. "
-             "Vaga confidencial e sites de vagas que repostam anúncios de outras empresas "
-             "ficam de fora dela (as vagas continuam no site). Nomes escritos de jeitos "
-             "diferentes (maiúsculas, acentos, LTDA, ME, S.A.) contam como a mesma empresa.",
-     "patterns": _patterns(NOT_EMPLOYER)},
-]
+        {"group": "empresas", "id": "not_employer", "effect": "recusa",
+         "title": "Nome que não diz quem contrata",
+         "text": "A página de empresas soma as vagas de portais dos últimos 90 dias por empresa. "
+                 "Vaga confidencial e sites de vagas que repostam anúncios de outras empresas "
+                 "ficam de fora dela (as vagas continuam no site). Nomes escritos de jeitos "
+                 "diferentes (maiúsculas, acentos, LTDA, ME, S.A.) contam como a mesma empresa.",
+         "patterns": _patterns(NOT_EMPLOYER)},
+    ]
+
+
+def _configure() -> None:
+    """Recalcula o que vem da configuração: termos da linguagem, stack, dono do site e as
+    regras publicadas (que citam a linguagem e trazem as expressões)."""
+    global CORE, STACK, STACK_RE, SELF_AUTHOR, SELF_AUTHOR_RE, SELF_AUTHOR_URL_RE, RULES
+    CORE = re.compile(config.get("core"), re.I)
+    STACK = {name: rx for name, rx in config.get("stack")}
+    STACK_RE = {name: re.compile(rx, re.I) for name, rx in STACK.items()}
+    SELF_AUTHOR = config.get("self_author")
+    SELF_AUTHOR_RE = re.compile("|".join(f"({rx})" for rx in SELF_AUTHOR["names"]), re.I)
+    SELF_AUTHOR_URL_RE = re.compile("|".join(f"({rx})" for rx in SELF_AUTHOR["urls"]), re.I)
+    RULES = _rules()
+
+
+RULES: list[dict] = []
+config.on_load(_configure)
+_configure()

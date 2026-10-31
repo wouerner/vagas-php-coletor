@@ -8,7 +8,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --break-system-packages --ignore-installed -r requirements.txt
 
-COPY vagas_php/ vagas_php/
+COPY vagas/ vagas/
 COPY docker/entrypoint.sh /entrypoint.sh
 
 # Volumes nomeados (Coolify) herdam o dono destas pastas: o usuário pwuser grava nelas.

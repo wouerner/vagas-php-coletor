@@ -5,7 +5,7 @@ declare(strict_types=1);
 use VagasPhp\Seo;
 
 // Endereço da página de vaga: contrato com o coletor, que anuncia essas URLs ao Google
-// (collector/vagas_php/indexing.py). Os dois lados testam contra contracts/job_paths.json.
+// (collector/vagas/indexing.py). Os dois lados testam contra contracts/job_paths.json.
 
 $cases = json_decode((string) file_get_contents(dirname(__DIR__, 2) . '/contracts/job_paths.json'), true);
 

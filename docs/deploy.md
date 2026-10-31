@@ -61,7 +61,7 @@ Zona `wouerner.dev`, com os nameservers da Cloudflare.
 - **O deploy não é automático:** um push na `main` não publica nada. Faça o deploy pelo
   painel do Coolify (ou pela API). Quando o serviço sobe, ele reaplica os filtros às vagas
   e aos posts já salvos e regrava o que o site precisa do filtro (`site_meta`), então uma
-  mudança de regra em `collector/vagas_php/php.py` vale para a base inteira e para o site.
+  mudança de regra em `collector/vagas/classify.py` vale para a base inteira e para o site.
 
 ## Buscadores
 

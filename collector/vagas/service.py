@@ -6,7 +6,7 @@ rodam numa thread comum; a busca de publicações usa o navegador logado, numa t
 única (o Playwright síncrono não é thread-safe e o perfil do Chromium só aceita um
 navegador por vez; a trava em .session/ garante isso).
 
-Uso: python -m vagas_php.service   (MCP em http://HOST:PORT/mcp)
+Uso: python -m vagas.service   (MCP em http://HOST:PORT/mcp)
 """
 
 import asyncio
@@ -25,7 +25,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
-from . import collect, dates, indexing, linkedin_post, php
+from . import classify, collect, dates, indexing, linkedin_post
 from .store import SOURCES, Store
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -44,7 +44,7 @@ MIN_INTERVAL = {"linkedin": 0.5, "gupy": 0.5, "github": 0.25, "post": 2,
                 "inhire": 1, "solides": 0.5, "catho": 1, "remotar": 0.5, "programathor": 1,
                 "coodesh": 1, "nerdin": 1, "recrutei": 1, "upvagas": 0.5}
 
-log = logging.getLogger("vagas_php.service")
+log = logging.getLogger(__name__)
 
 
 def _days(spec: str) -> set[int]:
@@ -171,7 +171,7 @@ class Service:
     def __init__(self):
         self.store = Store()
         # O filtro de publicações pode ter mudado desde a coleta: reaplica ao que já está salvo.
-        if changed := self.store.reclassify("post", php.is_php_hiring_post):
+        if changed := self.store.reclassify("post", classify.is_hiring_post):
             log.info("Filtro de publicações reaplicado: %d mudaram (%s)", len(changed),
                      ", ".join(changed))
         if changed := self.store.reclassify_jobs():

@@ -12,9 +12,10 @@ MySQL. Este é o contrato. Mudou algo aqui, mude os dois lados no mesmo pull req
 | `clicks` | cria | insere (`/out`) e lê (`/api/clicks`) |
 | `site_meta` | cria e grava | lê |
 | `indexing_log` | cria e grava (Indexing API) | não usa |
+| `collector_config` | cria, grava os valores iniciais e lê | não usa |
 
 O coletor cria e migra as tabelas na subida (`Store.__init__`, `SCHEMA` e `_add_columns`
-em `collector/vagas_php/store.py`). O site nunca cria tabela: se ela ainda não existe,
+em `collector/vagas/store.py`). O site nunca cria tabela: se ela ainda não existe,
 responde vazio (`Site::safe()` trata os erros `42S02` e `42S22`).
 
 ## Datas
@@ -24,21 +25,42 @@ O site converte para o horário de Brasília só na hora de mostrar.
 
 ## O que o site não calcula
 
-O filtro de PHP (`collector/vagas_php/php.py`) é feito de expressões regulares em Python. O
+O filtro (`collector/vagas/classify.py`) é feito de expressões regulares em Python. O
 site não roda o filtro. O coletor grava pronto o que o site precisa dele, em
 `Store.publish_site_data()`, na subida do serviço, depois de cada coleta, depois de
-`dismiss_job` e com `python -m vagas_php site-data`:
+`dismiss_job` e com `python -m vagas site-data`:
 
 | Onde | Conteúdo | Usado em |
 |---|---|---|
-| `jobs.company_key` | `php.company_key(company)`: chave para agrupar a mesma empresa; `NULL` = o nome não diz quem contrata | `/empresas`, empresas nas páginas de tema, `hiringOrganization` do JobPosting |
-| `jobs.author_recruiter` | `php.is_recruiter(author_headline)`: 1 se o headline do autor do post é de recrutamento | `/recrutadores` |
+| `jobs.company_key` | `classify.company_key(company)`: chave para agrupar a mesma empresa; `NULL` = o nome não diz quem contrata | `/empresas`, empresas nas páginas de tema, `hiringOrganization` do JobPosting |
+| `jobs.author_recruiter` | `classify.is_recruiter(author_headline)`: 1 se o headline do autor do post é de recrutamento | `/recrutadores` |
 | `site_meta` `taxonomy` | `{"stacks": [...], "workplaces": [...], "seniorities": [...], "contracts": [...], "sources": [...]}`, na ordem do filtro | temas (`/vagas/<tema>`), validação de `source` |
-| `site_meta` `rules` | `php.RULES`: grupo, id, efeito, título, texto e expressões de cada regra | `/regras`, `/api/rules` |
+| `site_meta` `rules` | `classify.RULES`: grupo, id, efeito, título, texto e expressões de cada regra | `/regras`, `/api/rules` |
 | `site_meta` `rule_counts` | `{"<id da regra>": n}`: quantos itens da base cada regra decidiu | `/regras`, `/api/rules` |
 | `site_meta` `schedule` | próximas coletas por fonte (`enabled`, `running`, `interval_hours`, `active_hours`, `next_run`) e `updated_at`; regravado a cada minuto | `/api/dashboard` (`schedule`) |
 
 `site_meta` tem `name` (chave), `value` (JSON) e `updated_at` (ISO UTC).
+
+## Configuração dos coletores
+
+A linguagem das vagas e o que buscar ficam em `collector_config` (`name`, `value` JSON,
+`updated_at`), não no código: o mesmo coletor serve para qualquer linguagem. Na subida, o
+coletor grava os itens que faltam a partir de `collector/vagas/config_defaults.json` (o
+que já está na base não é sobrescrito). Veja e edite com `python -m vagas config` e
+`python -m vagas config set NOME '<json>'`, que valida o item, reaplica o filtro às vagas
+salvas e regrava `site_meta`.
+
+| Item | Conteúdo |
+|---|---|
+| `language` | `{"name": "PHP", "slug": "php", "examples": "PHP, Laravel..."}`: nome nos textos das regras |
+| `core` | regex dos termos que, no título, bastam para a vaga ser da linguagem |
+| `stack` | `[["PHP", "<regex>"], ...]`: tecnologias, na ordem dos filtros e temas do site |
+| `search` | termos de busca por fonte (`linkedin`, `posts`, `gupy`...; `programathor`: listas; `github`: repositórios) |
+| `self_author` | `{"names": [...], "urls": [...]}`: o dono do site, cujos posts não são coletados |
+
+As variáveis `VAGAS_*_TERMS`, `VAGAS_LINKEDIN_KEYWORDS`, `VAGAS_POSTS_KEYWORDS`,
+`VAGAS_PROGRAMATHOR_PAGES` e `VAGAS_GITHUB_REPOS`, se definidas, têm prioridade sobre
+`search`.
 
 ## Vagas que o site mostra
 
