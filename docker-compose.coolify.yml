@@ -85,6 +85,28 @@ services:
       - vagas-data:/app/data
       - linkedin-session:/app/.session
 
+  # Coletor do tenant ruby (multi-tenant: mesma base, VAGAS_TENANT=ruby). Só coleta: sem
+  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+  # variáveis listadas aqui: os termos de busca do Ruby vêm da base (collector_config),
+  # nunca dos VAGAS_*_TERMS do PHP.
+  collector-ruby:
+    build: ./collector
+    command: ["serve"]
+    restart: unless-stopped
+    user: pwuser
+    environment:
+      TZ: America/Sao_Paulo
+      VAGAS_TENANT: ruby
+      VAGAS_MCP_ENABLED: "false"
+      VAGAS_POSTS_ENABLED: "false"
+      VAGAS_LINKEDIN_DAILY_POST: "false"
+      VAGAS_INDEXING_ENABLED: "false"
+      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+      DATABASE_URL: ${DATABASE_URL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+    volumes:
+      - ruby-data:/app/data
+
   web:
     build: ./web
     restart: unless-stopped
@@ -105,5 +127,6 @@ services:
       retries: 3
 
 volumes:
+  ruby-data:
   vagas-data:
   linkedin-session:

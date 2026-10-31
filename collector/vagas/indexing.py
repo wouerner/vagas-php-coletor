@@ -142,14 +142,15 @@ def job_path(job: dict) -> str | None:
 
 
 def open_urls(store) -> list[str]:
-    """URLs absolutas das vagas abertas: as mesmas páginas de vaga do sitemap."""
+    """URLs absolutas das vagas abertas do tenant da Store: as mesmas páginas de vaga do
+    sitemap."""
     from .store import DEDUP
     base = (os.getenv("VAGAS_SITE_URL") or SITE_URL).strip().rstrip("/")
     rows = store.execute(
         f"""SELECT seq, source, title, COALESCE(posted_at, first_seen) AS posted FROM jobs
-            WHERE source != 'post' AND relevant = 1 AND dismissed IS NULL
+            WHERE tenant = ? AND source != 'post' AND relevant = 1 AND dismissed IS NULL
               AND closed_at IS NULL AND COALESCE(posted_at, first_seen) >= ? AND {DEDUP}
-            ORDER BY posted DESC""", (dates.cutoff(),))
+            ORDER BY posted DESC""", (store.tenant, dates.cutoff()))
     return [base + job_path(dict(r)) for r in rows]
 
 

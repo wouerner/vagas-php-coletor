@@ -14,9 +14,30 @@ MySQL. Este é o contrato. Mudou algo aqui, mude os dois lados no mesmo pull req
 | `indexing_log` | cria e grava (Indexing API) | não usa |
 | `collector_config` | cria, grava os valores iniciais e lê | não usa |
 
-O coletor cria e migra as tabelas na subida (`Store.__init__`, `SCHEMA` e `_add_columns`
-em `collector/vagas/store.py`). O site nunca cria tabela: se ela ainda não existe,
-responde vazio (`Site::safe()` trata os erros `42S02` e `42S22`).
+Todas por tenant, menos `clicks` e `indexing_log` (veja abaixo).
+
+O coletor cria e migra as tabelas na subida (`Store.__init__`, `SCHEMA`, `_add_columns` e
+`_add_tenant` em `collector/vagas/store.py`). O site nunca cria tabela: se ela ainda não
+existe, responde vazio (`Site::safe()` trata os erros `42S02` e `42S22`).
+
+## Multi-tenant: uma base, uma linguagem por tenant
+
+`jobs`, `runs`, `site_meta` e `collector_config` têm a coluna `tenant` (`php`, `ruby`...).
+Cada processo coletor grava um tenant só (`VAGAS_TENANT`, padrão `php`; na linha de
+comando, `python -m vagas --tenant ruby ...`), e o site lê só o dele (`VAGAS_TENANT` do
+site, padrão `php`). Regras:
+
+- **Toda consulta a essas tabelas filtra o tenant**, dos dois lados. Sem o filtro, as
+  vagas de outra linguagem aparecem no site.
+- `jobs` tem a chave `(tenant, id)`: a mesma vaga pode estar em dois tenants (uma vaga
+  full stack pode ser PHP e Ruby), cada uma com a sua relevância. `seq` continua único
+  entre os tenants (o endereço `/vaga/<seq>-<slug>` não colide).
+- `DEDUP` agrupa também por `tenant`, para a linha de um tenant não esconder a de outro.
+- `site_meta` e `collector_config` têm a chave `(tenant, name)`.
+- Linhas de antes do multi-tenant ficaram no tenant `php` (a coluna nasce com o padrão
+  `'php'`).
+- `clicks` e `indexing_log` não têm tenant: são do site, e só o tenant `php` tem site
+  (a Indexing API fica desligada nos outros).
 
 ## Datas
 
@@ -43,10 +64,12 @@ site não roda o filtro. O coletor grava pronto o que o site precisa dele, em
 
 ## Configuração dos coletores
 
-A linguagem das vagas e o que buscar ficam em `collector_config` (`name`, `value` JSON,
-`updated_at`), não no código: o mesmo coletor serve para qualquer linguagem. Na subida, o
-coletor grava os itens que faltam a partir de `collector/vagas/config_defaults.json` (o
-que já está na base não é sobrescrito). Veja e edite com `python -m vagas config` e
+A linguagem das vagas e o que buscar ficam em `collector_config` (`tenant`, `name`,
+`value` JSON, `updated_at`), não no código: o mesmo coletor serve para qualquer
+linguagem. Na subida, o coletor grava os itens do seu tenant que faltam a partir de
+`collector/vagas/config_defaults.json` (um bloco por tenant; o que já está na base não é
+sobrescrito). Um tenant sem valores iniciais nem configuração na base não sobe: nunca
+herda os termos de outro. Veja e edite com `python -m vagas config` e
 `python -m vagas config set NOME '<json>'`, que valida o item, reaplica o filtro às vagas
 salvas e regrava `site_meta`.
 
@@ -60,7 +83,8 @@ salvas e regrava `site_meta`.
 
 As variáveis `VAGAS_*_TERMS`, `VAGAS_LINKEDIN_KEYWORDS`, `VAGAS_POSTS_KEYWORDS`,
 `VAGAS_PROGRAMATHOR_PAGES` e `VAGAS_GITHUB_REPOS`, se definidas, têm prioridade sobre
-`search`.
+`search` só no tenant `php` (são de antes do multi-tenant); os outros tenants usam só a
+base.
 
 ## Vagas que o site mostra
 

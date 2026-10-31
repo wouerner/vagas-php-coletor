@@ -25,7 +25,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
-from . import classify, collect, dates, indexing, linkedin_post
+from . import classify, collect, config, dates, indexing, linkedin_post
 from .store import SOURCES, Store
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -194,8 +194,10 @@ class Service:
         self.daily_post_days = _days(os.getenv("VAGAS_LINKEDIN_POST_DAYS", "0-6"))
         self.daily_post_tries: dict[str, list[datetime]] = {}
         self.daily_post_running = False
-        # Google Indexing API depois de cada coleta OK (indexing.py).
-        self.indexing = _env_bool("VAGAS_INDEXING_ENABLED", True)
+        # Google Indexing API depois de cada coleta OK (indexing.py). Só o tenant que tem
+        # site (as URLs são as páginas de vaga dele) publica por padrão.
+        self.indexing = _env_bool("VAGAS_INDEXING_ENABLED",
+                                  self.store.tenant == config.DEFAULT_TENANT)
         self.indexing_running = False
 
     async def collect(self, source: str, origin: str) -> dict:
@@ -391,9 +393,9 @@ class Service:
 
 def build_server(service: Service) -> MCPServer:
     mcp = MCPServer(
-        name="vagas-php",
+        name=f"vagas-{service.store.tenant}",
         instructions=(
-            "Vagas de engenharia de software com PHP (Laravel, Symfony...) coletadas do "
+            f"Vagas de engenharia de software com {config.language()} coletadas do "
             "LinkedIn (busca pública de vagas e publicações anunciando vagas), da Gupy, da "
             "Sólides, da Catho, da Remotar, da Programathor, da Coodesh, da Nerdin, da Recrutei, da UpVagas, de empresas que usam a InHire e de issues de repositórios de vagas no GitHub. Use list_jobs para consultar a base local."
         ),
@@ -406,7 +408,7 @@ def build_server(service: Service) -> MCPServer:
                         stack: str | None = None, hours: float = 72,
                         include_closed: bool = False, limit: int = 30,
                         offset: int = 0) -> dict:
-        """Consulta as vagas PHP já coletadas, publicadas há no máximo 72 h (mais recentes
+        """Consulta as vagas já coletadas (da linguagem deste coletor), publicadas há no máximo 72 h (mais recentes
         primeiro). q: palavras no título/empresa/descrição; source: "linkedin", "gupy",
         "remotar", "programathor", "catho", "solides", "inhire", "coodesh", "nerdin", "recrutei", "upvagas", "post" ou "github"; workplace: "Remoto", "Híbrido" ou "Presencial"; seniority: "Estágio", "Júnior", "Pleno",
         "Sênior" ou "Especialista"; stack: ex. "Laravel"; hours: publicadas nas últimas N
@@ -432,7 +434,7 @@ def build_server(service: Service) -> MCPServer:
         """Confere um post do LinkedIn pelo link (linkedin.com/posts/... ou lnkd.in/...):
         lê o post público (sem login), aplica o filtro e diz qual regra decidiu (rule,
         rule_title, rule_effect) e se aparece no site (relevant e in_window: publicado
-        nas últimas 72 h). Guarda o post na base se falar de PHP, como a busca faria."""
+        nas últimas 72 h). Guarda o post na base se falar da linguagem, como a busca faria."""
         try:
             return await asyncio.get_running_loop().run_in_executor(
                 None, collect.import_post, service.store, url)

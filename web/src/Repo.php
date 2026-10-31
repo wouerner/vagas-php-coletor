@@ -8,6 +8,9 @@ namespace VagasPhp;
  * Consultas do site na base do coletor. O site só lê, menos os cliques (tabela clicks).
  * O que depende do filtro (classify.py do coletor) já vem pronto: jobs.company_key,
  * jobs.author_recruiter e a tabela site_meta (ver docs/contrato-base.md).
+ *
+ * A base é multi-tenant (uma linguagem por tenant): o site lê só o seu (VAGAS_TENANT,
+ * padrão "php") em jobs, runs e site_meta. Toda consulta nessas tabelas filtra o tenant.
  */
 final class Repo
 {
@@ -16,20 +19,25 @@ final class Repo
         'solides', 'inhire', 'coodesh', 'nerdin', 'recrutei', 'upvagas'];
 
     /** Colunas internas do contrato que a API não expõe. */
-    private const HIDDEN = ['company_key', 'author_recruiter'];
+    private const HIDDEN = ['company_key', 'author_recruiter', 'tenant'];
 
     /**
      * A mesma vaga é anunciada várias vezes (ex.: um ID do LinkedIn por cidade): vale só a
-     * mais recente de cada título + empresa da mesma fonte. Igual ao DEDUP do coletor.
+     * mais recente de cada título + empresa da mesma fonte, dentro do tenant (a consulta
+     * filtra o tenant; agrupar por ele impede que outro tenant esconda a vaga). Igual ao
+     * DEDUP do coletor.
      */
-    public const DEDUP = "seq IN (SELECT max(seq) FROM jobs GROUP BY source,
+    public const DEDUP = "seq IN (SELECT max(seq) FROM jobs GROUP BY tenant, source,
              lower(COALESCE(title, '')), lower(COALESCE(company, author, '')))";
 
     /** @var array<string, mixed> */
     private array $meta = [];
 
-    public function __construct(public readonly Db $db)
+    public readonly string $tenant;
+
+    public function __construct(public readonly Db $db, ?string $tenant = null)
     {
+        $this->tenant = strtolower(trim($tenant ?? ((string) getenv('VAGAS_TENANT') ?: 'php')));
     }
 
     /** Item de site_meta (JSON gravado pelo coletor), ou null. */
@@ -37,7 +45,8 @@ final class Repo
     {
         if (!array_key_exists($name, $this->meta)) {
             try {
-                $v = $this->db->scalar('SELECT value FROM site_meta WHERE name = ?', [$name]);
+                $v = $this->db->scalar('SELECT value FROM site_meta WHERE tenant = ? AND name = ?',
+                    [$this->tenant, $name]);
             } catch (\PDOException $e) {
                 if (!Db::isMissingTable($e)) {
                     throw $e;
@@ -78,8 +87,8 @@ final class Repo
                               ?string $seniority = null, ?string $stack = null, ?float $hours = null,
                               bool $includeClosed = false, int $limit = 50, int $offset = 0): array
     {
-        $sql = 'SELECT * FROM jobs WHERE 1=1 AND relevant = 1 AND dismissed IS NULL';
-        $args = [];
+        $sql = 'SELECT * FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL';
+        $args = [$this->tenant];
         if (!$includeClosed) {
             $sql .= ' AND closed_at IS NULL';
         }
@@ -114,16 +123,17 @@ final class Repo
     public function openCount(): int
     {
         return (int) $this->db->scalar(
-            'SELECT count(*) FROM jobs WHERE relevant = 1 AND dismissed IS NULL
+            'SELECT count(*) FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL
                AND closed_at IS NULL AND COALESCE(posted_at, first_seen) >= ? AND ' . self::DEDUP,
-            [Dates::cutoff()],
+            [$this->tenant, Dates::cutoff()],
         );
     }
 
     /** @return array<string, mixed>|null */
     private function lastRun(string $source): ?array
     {
-        return $this->db->one('SELECT * FROM runs WHERE source = ? ORDER BY id DESC LIMIT 1', [$source]);
+        return $this->db->one('SELECT * FROM runs WHERE tenant = ? AND source = ? ORDER BY id DESC LIMIT 1',
+            [$this->tenant, $source]);
     }
 
     public function stats(): array
@@ -133,8 +143,8 @@ final class Repo
             'SELECT source, count(*) total, sum(relevant AND dismissed IS NULL) relevant,
                     sum(relevant AND dismissed IS NULL AND closed_at IS NULL
                         AND COALESCE(posted_at, first_seen) >= ?) open
-             FROM jobs GROUP BY source',
-            [Dates::cutoff()],
+             FROM jobs WHERE tenant = ? GROUP BY source',
+            [Dates::cutoff(), $this->tenant],
         ) as $r) {
             $bySource[$r['source']] = ['source' => $r['source'], 'total' => (int) $r['total'],
                 'relevant' => self::num($r['relevant']), 'open' => self::num($r['open'])];
@@ -155,9 +165,10 @@ final class Repo
         return $this->db->all(
             'SELECT source, company, workplace, seniority, contract, stack,
                     COALESCE(posted_at, first_seen) AS posted
-             FROM jobs WHERE relevant = 1 AND dismissed IS NULL AND ' . self::DEDUP . '
-               AND COALESCE(posted_at, first_seen) >= ?',
-            [Dates::daysAgo($days)],
+             FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL AND ' . self::DEDUP . '
+               AND COALESCE(posted_at, first_seen) >= ?
+             ORDER BY seq',
+            [$this->tenant, Dates::daysAgo($days)],
         );
     }
 
@@ -173,9 +184,10 @@ final class Repo
         $rows = $this->db->all(
             'SELECT source, company, workplace, seniority, contract, stack, closed_at,
                     COALESCE(posted_at, first_seen) AS posted
-             FROM jobs WHERE relevant = 1 AND dismissed IS NULL AND ' . self::DEDUP . '
-               AND COALESCE(posted_at, first_seen) >= ?',
-            [Dates::utcIso($firstDay)],
+             FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL AND ' . self::DEDUP . '
+               AND COALESCE(posted_at, first_seen) >= ?
+             ORDER BY seq',
+            [$this->tenant, Dates::utcIso($firstDay)],
         );
         [$cut72, $cut24, $cut48] = [Dates::cutoff(), Dates::cutoff(24), Dates::cutoff(48)];
         $live = array_values(array_filter($rows, fn ($r) => strcmp($r['posted'], $cut72) >= 0 && !$r['closed_at']));
@@ -204,12 +216,12 @@ final class Repo
         foreach ($sources as $source) {
             $day = $this->db->one(
                 'SELECT count(*) total, sum(ok = 1) ok, sum(ok = 0) failed, sum(new_jobs) new
-                 FROM runs WHERE source = ? AND started_at >= ?',
-                [$source, $cut24],
+                 FROM runs WHERE tenant = ? AND source = ? AND started_at >= ?',
+                [$this->tenant, $source, $cut24],
             );
             $lastOk = $this->db->scalar(
-                'SELECT finished_at FROM runs WHERE source = ? AND ok = 1 ORDER BY id DESC LIMIT 1',
-                [$source],
+                'SELECT finished_at FROM runs WHERE tenant = ? AND source = ? AND ok = 1 ORDER BY id DESC LIMIT 1',
+                [$this->tenant, $source],
             );
             $runs[$source] = [
                 'last' => $this->lastRun($source),
@@ -238,7 +250,8 @@ final class Repo
             'stack' => Text::mostCommon($stacks, 8),
             'companies' => Text::mostCommon($companies, 8),
             'runs' => $runs,
-            'collecting_since' => $this->db->scalar('SELECT min(first_seen) FROM jobs'),
+            'collecting_since' => $this->db->scalar('SELECT min(first_seen) FROM jobs WHERE tenant = ?',
+                [$this->tenant]),
         ];
     }
 
@@ -246,7 +259,9 @@ final class Repo
     public function ruleStats(): array
     {
         $dismissed = $this->db->all(
-            'SELECT source, title, url, dismissed FROM jobs WHERE dismissed IS NOT NULL ORDER BY dismissed DESC',
+            'SELECT source, title, url, dismissed FROM jobs WHERE tenant = ? AND dismissed IS NOT NULL
+             ORDER BY dismissed DESC',
+            [$this->tenant],
         );
         return ['counts' => (object) ($this->meta('rule_counts') ?? []), 'dismissed' => $dismissed];
     }
@@ -267,11 +282,11 @@ final class Repo
         foreach ($this->db->all(
             'SELECT author, author_url, author_headline, author_recruiter, stack,
                     COALESCE(posted_at, first_seen) AS posted
-             FROM jobs WHERE source = \'post\' AND relevant = 1 AND dismissed IS NULL
+             FROM jobs WHERE tenant = ? AND source = \'post\' AND relevant = 1 AND dismissed IS NULL
                AND author_url IS NOT NULL AND ' . self::DEDUP . '
                AND COALESCE(posted_at, first_seen) >= ?
-             ORDER BY posted DESC',
-            [Dates::daysAgo($days)],
+             ORDER BY posted DESC, seq DESC',
+            [$this->tenant, Dates::daysAgo($days)],
         ) as $r) {
             $key = $profile($r['author_url']);
             if (isset($hidden[$key])) {
@@ -315,10 +330,10 @@ final class Repo
         foreach ($this->db->all(
             'SELECT source, company, company_key, workplace, stack,
                     COALESCE(posted_at, first_seen) AS posted
-             FROM jobs WHERE relevant = 1 AND dismissed IS NULL AND company IS NOT NULL
+             FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL AND company IS NOT NULL
                AND ' . self::DEDUP . ' AND COALESCE(posted_at, first_seen) >= ?
-             ORDER BY posted DESC',
-            [Dates::daysAgo($days)],
+             ORDER BY posted DESC, seq DESC',
+            [$this->tenant, Dates::daysAgo($days)],
         ) as $r) {
             if (!($key = $r['company_key'])) {
                 continue;
@@ -384,16 +399,16 @@ final class Repo
     /** @return array<string, mixed>|null */
     public function jobBySeq(int $seq): ?array
     {
-        return $this->db->one('SELECT * FROM jobs WHERE seq = ?', [$seq]);
+        return $this->db->one('SELECT * FROM jobs WHERE tenant = ? AND seq = ?', [$this->tenant, $seq]);
     }
 
     /** seq mais recente da mesma vaga (fonte + título + empresa), como no DEDUP. */
     public function newestSeq(array $job): ?int
     {
         $v = $this->db->scalar(
-            "SELECT max(seq) FROM jobs WHERE source = ? AND lower(COALESCE(title, '')) = lower(?)
+            "SELECT max(seq) FROM jobs WHERE tenant = ? AND source = ? AND lower(COALESCE(title, '')) = lower(?)
                AND lower(COALESCE(company, author, '')) = lower(?)",
-            [$job['source'], $job['title'] ?? '', $job['company'] ?: ($job['author'] ?: '')],
+            [$this->tenant, $job['source'], $job['title'] ?? '', $job['company'] ?: ($job['author'] ?: '')],
         );
         return $v === null ? null : (int) $v;
     }
@@ -403,10 +418,10 @@ final class Repo
     {
         return $this->db->all(
             "SELECT seq, source, title, COALESCE(posted_at, first_seen) AS posted FROM jobs
-             WHERE source != 'post' AND relevant = 1 AND dismissed IS NULL
+             WHERE tenant = ? AND source != 'post' AND relevant = 1 AND dismissed IS NULL
                AND closed_at IS NULL AND COALESCE(posted_at, first_seen) >= ? AND " . self::DEDUP . '
-             ORDER BY posted DESC',
-            [Dates::cutoff()],
+             ORDER BY posted DESC, seq DESC',
+            [$this->tenant, Dates::cutoff()],
         );
     }
 }

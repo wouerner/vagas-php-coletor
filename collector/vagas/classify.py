@@ -627,4 +627,5 @@ def _configure() -> None:
 
 RULES: list[dict] = []
 config.on_load(_configure)
-_configure()
+if config.current:  # tenant sem valores iniciais: espera a configuração da base
+    _configure()
