@@ -1,5 +1,6 @@
-# Monorepo: coletor em Python (collector/, serviço vagas-php) e site em PHP (web/, serviço
-# web). Os dois conversam só pelo MySQL (docs/contrato-base.md).
+# Monorepo: coletor em Python (collector/, serviço vagas-php; collector-ruby para o tenant
+# ruby) e site em PHP (web/, serviço web). Conversam só pelo MySQL, uma base multi-tenant
+# (docs/contrato-base.md).
 # Portas publicadas (todas mudam por variável; veja o README):
 #   site 8780, MCP 8766, noVNC 6081, VNC 5901, MySQL 3307
 services:
@@ -52,7 +53,32 @@ services:
       - ${LINKEDIN_SESSION_PATH:-./.session}:/app/.session
       - ./data:/app/data           # config do coletor e posts diários (vagas no MySQL)
 
-  # Site (PHP 8.5 + Apache): lê o MySQL do coletor; só grava os cliques.
+  # Coletor do tenant ruby: mesma imagem e mesma base (multi-tenant, VAGAS_TENANT=ruby;
+  # docs/contrato-base.md). Só coleta: sem site, sem MCP, sem publicações do LinkedIn
+  # (precisam da sessão logada), sem post diário e sem Indexing API (as páginas de vaga
+  # são do site PHP). Não monta o .env: os termos de busca de PHP de lá valeriam aqui; os
+  # do Ruby vêm da base (collector_config).
+  collector-ruby:
+    build: ./collector
+    image: vagas-php-collector
+    command: ["serve"]
+    restart: unless-stopped
+    depends_on:
+      mysql: {condition: service_healthy}
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      TZ: America/Sao_Paulo
+      VAGAS_TENANT: ruby
+      VAGAS_MCP_ENABLED: "false"
+      VAGAS_POSTS_ENABLED: "false"
+      VAGAS_LINKEDIN_DAILY_POST: "false"
+      VAGAS_INDEXING_ENABLED: "false"
+      VAGAS_MAX_AGE_HOURS: "${VAGAS_MAX_AGE_HOURS:-72}"
+      DATABASE_URL: "mysql://vagas:${MYSQL_PASSWORD:-vagas}@mysql:3306/vagas"
+    volumes:
+      - ./data/ruby:/app/data      # config do agendador deste tenant
+
+  # Site (PHP 8.5 + Apache): lê o MySQL do coletor (só o tenant php); só grava os cliques.
   web:
     build: ./web
     image: vagas-php-web

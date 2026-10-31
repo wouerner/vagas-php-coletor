@@ -11,6 +11,12 @@ site_meta (taxonomia, regras, contagem por regra e agenda das coletas).
 A configuração dos coletores (linguagem, termos de busca, dono do site) fica na tabela
 collector_config (ver config.py): quem abre a base passa a usá-la.
 
+Multi-tenant: uma base para todas as linguagens. jobs, runs, site_meta e collector_config
+têm a coluna tenant ("php", "ruby"...), e cada Store lê e grava só o seu tenant
+(VAGAS_TENANT, padrão "php"). A mesma vaga pode estar em dois tenants (chave
+(tenant, id)): uma vaga full stack pode ser PHP e Ruby. Linhas de antes do multi-tenant
+são do tenant "php".
+
 Conexão: DATABASE_URL=mysql://usuario:senha@host:3306/base[?ssl-mode=REQUIRED] (senha
 com caracteres especiais vai codificada, ex.: @ -> %40)."""
 
@@ -40,8 +46,9 @@ SOURCES = ("linkedin", "gupy", "post", "github", "remotar", "programathor", "cat
 # padrão (sem diferenciar maiúsculas nem acentos nas buscas com LIKE).
 SCHEMA = [
     """CREATE TABLE IF NOT EXISTS jobs (
-    id          VARCHAR(255) COLLATE utf8mb4_bin PRIMARY KEY, -- "linkedin:<id>", "gupy:<id>", "post:<urn ou hash>", "github:<repo>#<n>", "inhire:<uuid>", "<fonte>:<id>" nas demais
-    seq         BIGINT NOT NULL AUTO_INCREMENT UNIQUE,         -- ordem de inserção (DEDUP)
+    tenant      VARCHAR(32) NOT NULL DEFAULT 'php',            -- linguagem: "php", "ruby"...
+    id          VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,     -- "linkedin:<id>", "gupy:<id>", "post:<urn ou hash>", "github:<repo>#<n>", "inhire:<uuid>", "<fonte>:<id>" nas demais
+    seq         BIGINT NOT NULL AUTO_INCREMENT UNIQUE,         -- ordem de inserção (DEDUP); única entre os tenants
     source      VARCHAR(32) NOT NULL,  -- ver SOURCES
     relevant    TINYINT NOT NULL,      -- 1 = vaga de engenharia de software da linguagem configurada
     title       TEXT,
@@ -64,10 +71,12 @@ SCHEMA = [
     last_seen   VARCHAR(40) NOT NULL,
     closed_at   VARCHAR(40),           -- issue fechada no GitHub
     dismissed   TEXT,                  -- descartada à mão ("não é vaga"): data e motivo
+    PRIMARY KEY (tenant, id),
     INDEX jobs_list (relevant, posted_at),
     INDEX jobs_source (source)
 )""",
     """CREATE TABLE IF NOT EXISTS runs (
+    tenant      VARCHAR(32) NOT NULL DEFAULT 'php',
     id          BIGINT PRIMARY KEY AUTO_INCREMENT,
     source      VARCHAR(32) NOT NULL,
     started_at  VARCHAR(40) NOT NULL,
@@ -103,22 +112,32 @@ SCHEMA = [
     # Dados para o site que só o coletor sabe calcular (JSON): taxonomy, rules, rule_counts,
     # schedule. Ver publish_site_data() e docs/contrato-base.md.
     """CREATE TABLE IF NOT EXISTS site_meta (
-    name        VARCHAR(64) PRIMARY KEY,
+    tenant      VARCHAR(32) NOT NULL DEFAULT 'php',
+    name        VARCHAR(64) NOT NULL,
     value       MEDIUMTEXT NOT NULL,   -- JSON
-    updated_at  VARCHAR(40) NOT NULL   -- ISO UTC
+    updated_at  VARCHAR(40) NOT NULL,  -- ISO UTC
+    PRIMARY KEY (tenant, name)
 )""",
     # Configuração dos coletores (JSON): language, core, stack, search, self_author. Ver
     # config.py; os valores iniciais vêm de config_defaults.json.
     """CREATE TABLE IF NOT EXISTS collector_config (
-    name        VARCHAR(64) PRIMARY KEY,
+    tenant      VARCHAR(32) NOT NULL DEFAULT 'php',
+    name        VARCHAR(64) NOT NULL,
     value       MEDIUMTEXT NOT NULL,   -- JSON
-    updated_at  VARCHAR(40) NOT NULL   -- ISO UTC
+    updated_at  VARCHAR(40) NOT NULL,  -- ISO UTC
+    PRIMARY KEY (tenant, name)
 )""",
 ]
+# Tabelas por tenant e a chave primária de cada uma (bases de antes do multi-tenant são
+# migradas em _add_tenant).
+TENANT_TABLES = {"jobs": "(tenant, id)", "runs": None, "site_meta": "(tenant, name)",
+                 "collector_config": "(tenant, name)"}
 
 # A mesma vaga é anunciada várias vezes (ex.: um ID do LinkedIn por cidade): vale só a
-# mais recente de cada título + empresa da mesma fonte.
-DEDUP = """seq IN (SELECT max(seq) FROM jobs GROUP BY source,
+# mais recente de cada título + empresa da mesma fonte, dentro do tenant (a consulta que
+# usa DEDUP filtra o tenant; agrupar por ele impede que a linha de outro tenant esconda
+# a deste).
+DEDUP = """seq IN (SELECT max(seq) FROM jobs GROUP BY tenant, source,
              lower(COALESCE(title, '')), lower(COALESCE(company, author, '')))"""
 
 FIELDS = ("source", "relevant", "title", "company", "location", "workplace", "seniority",
@@ -210,8 +229,10 @@ class Store:
     # conexões paradas (wait_timeout) e a base pode estar em outro servidor.
     IDLE_CHECK = 60
 
-    def __init__(self, url: str | None = None, readonly: bool = False, wait: float = 120):
+    def __init__(self, url: str | None = None, readonly: bool = False, wait: float = 120,
+                 tenant: str | None = None):
         self.args = connect_args(url)
+        self.tenant = (tenant or config.default_tenant()).strip().lower()
         # Coletores rodam em threads diferentes: uma conexão por thread; a trava
         # serializa as escritas.
         self.local = threading.local()
@@ -221,6 +242,7 @@ class Store:
             for statement in SCHEMA:
                 self.execute(statement)
             self._add_columns()
+            self._add_tenant()
             self._normalize_dates()
             self._seed_config()
         self.load_config()
@@ -238,19 +260,39 @@ class Store:
             if (table, column) not in have:
                 self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
+    def _add_tenant(self) -> None:
+        """Bases de antes do multi-tenant: acrescenta a coluna tenant (o que já existe fica
+        no tenant "php") e põe o tenant na chave primária."""
+        have = {(r[0], r[1]) for r in self.execute(
+            "SELECT table_name, column_name FROM information_schema.columns "
+            "WHERE table_schema = DATABASE()")}
+        for table, key in TENANT_TABLES.items():
+            if (table, "tenant") not in have:
+                self.execute(f"ALTER TABLE {table} ADD COLUMN tenant VARCHAR(32) NOT NULL "
+                             "DEFAULT 'php' FIRST")
+            if key and self._primary_key(table)[:1] != ["tenant"]:
+                self.execute(f"ALTER TABLE {table} DROP PRIMARY KEY, ADD PRIMARY KEY {key}")
+
+    def _primary_key(self, table: str) -> list[str]:
+        return [r[0] for r in self.execute(
+            "SELECT column_name FROM information_schema.key_column_usage WHERE table_schema = "
+            "DATABASE() AND table_name = ? AND constraint_name = 'PRIMARY' "
+            "ORDER BY ordinal_position", (table,))]
+
     def _seed_config(self) -> None:
-        """Grava os valores iniciais da configuração (config_defaults.json) que ainda não
-        estão na base; o que já está nela (inclusive editado à mão) fica."""
+        """Grava os valores iniciais da configuração do tenant (config_defaults.json) que
+        ainda não estão na base; o que já está nela (inclusive editado à mão) fica."""
         now = now_iso()
-        self.executemany("INSERT IGNORE INTO collector_config (name, value, updated_at) "
-                         "VALUES (?, ?, ?)",
-                         [(name, json.dumps(value, ensure_ascii=False), now)
-                          for name, value in config.DEFAULTS.items()])
+        self.executemany("INSERT IGNORE INTO collector_config (tenant, name, value, updated_at) "
+                         "VALUES (?, ?, ?, ?)",
+                         [(self.tenant, name, json.dumps(value, ensure_ascii=False), now)
+                          for name, value in config.defaults(self.tenant).items()])
 
     def get_config(self) -> dict:
-        """A configuração gravada na base ({} se a tabela ainda não existe)."""
+        """A configuração do tenant gravada na base ({} se a tabela ainda não existe)."""
         try:
-            rows = self.execute("SELECT name, value FROM collector_config").fetchall()
+            rows = self.execute("SELECT name, value FROM collector_config WHERE tenant = ?",
+                                (self.tenant,)).fetchall()
         except pymysql.err.ProgrammingError as e:
             if e.args[0] == 1146:  # tabela não existe (base aberta só para leitura)
                 return {}
@@ -259,21 +301,25 @@ class Store:
 
     def load_config(self) -> None:
         """Passa a usar a configuração da base (filtro, termos de busca...)."""
-        config.load(self.get_config())
+        config.load(self.get_config(), self.tenant)
 
     def set_config(self, name: str, value) -> None:
         """Grava um item da configuração (JSON) e passa a usá-lo."""
-        if name not in config.DEFAULTS:
+        if name not in config.ITEMS:
             raise ValueError(f"configuração desconhecida: {name} (opções: "
-                             f"{', '.join(config.DEFAULTS)})")
+                             f"{', '.join(config.ITEMS)})")
         current = self.get_config()
         try:  # valida antes de gravar (ex.: regex inválida): a base nunca fica quebrada
-            config.load({**current, name: value})
+            config.load({**current, name: value}, self.tenant)
         except Exception as e:
-            config.load(current)
+            try:
+                config.load(current, self.tenant)
+            except ValueError:
+                pass  # tenant ainda incompleto: segue sem configuração carregada
             raise ValueError(f"{name} inválido: {e}") from e
-        self.execute("REPLACE INTO collector_config (name, value, updated_at) VALUES (?, ?, ?)",
-                     (name, json.dumps(value, ensure_ascii=False), now_iso()))
+        self.execute("REPLACE INTO collector_config (tenant, name, value, updated_at) "
+                     "VALUES (?, ?, ?, ?)",
+                     (self.tenant, name, json.dumps(value, ensure_ascii=False), now_iso()))
 
     def _wait_for_db(self, wait: float) -> None:
         """Na subida o MySQL pode ainda não aceitar conexões: tenta por `wait` s."""
@@ -334,21 +380,23 @@ class Store:
     def _normalize_dates(self) -> None:
         """Bases antigas guardavam posted_at como veio da fonte ("2026-10-09",
         "...Z"); converte tudo para ISO UTC, que é o que as consultas comparam."""
-        rows = self.execute("SELECT id, posted_at FROM jobs WHERE posted_at IS NOT NULL "
-                               "AND posted_at NOT LIKE ?", ("%+00:00",)).fetchall()
+        rows = self.execute("SELECT tenant, id, posted_at FROM jobs WHERE posted_at IS NOT NULL "
+                            "AND posted_at NOT LIKE ?", ("%+00:00",)).fetchall()
         with self.tx():
-            for job_id, posted in rows:
-                self.execute("UPDATE jobs SET posted_at = ? WHERE id = ?",
-                                (dates.normalize(posted), job_id))
+            for tenant, job_id, posted in rows:
+                self.execute("UPDATE jobs SET posted_at = ? WHERE tenant = ? AND id = ?",
+                             (dates.normalize(posted), tenant, job_id))
 
     def known(self, source: str) -> dict[str, dict]:
         """id -> {description, relevant} das vagas já vistas de uma fonte."""
         return {r["id"]: dict(r) for r in self.execute(
-            "SELECT id, description, relevant FROM jobs WHERE source = ?", (source,))}
+            "SELECT id, description, relevant FROM jobs WHERE tenant = ? AND source = ?",
+            (self.tenant, source))}
 
     def texts_mentioning(self, needle: str) -> list[str]:
         """Descrições e URLs de vagas que citam `needle` (ex.: "inhire.app", para
-        descobrir empresas)."""
+        descobrir empresas). Em todos os tenants: o que um coletor descobre vale para os
+        outros."""
         like = f"%{needle}%"
         return [r[0] for r in self.execute(
             "SELECT CONCAT(COALESCE(description, ''), ' ', COALESCE(url, '')) FROM jobs "
@@ -360,11 +408,12 @@ class Store:
         with self.tx():
             for job in jobs:
                 row = {f: job.get(f) for f in FIELDS}
-                exists = self.execute("SELECT 1 FROM jobs WHERE id = ?", (job["id"],)).fetchone()
+                exists = self.execute("SELECT 1 FROM jobs WHERE tenant = ? AND id = ?",
+                                      (self.tenant, job["id"])).fetchone()
                 new += bool(not exists and row["relevant"])
                 self.execute(
-                    f"""INSERT INTO jobs (id, {", ".join(FIELDS)}, first_seen, last_seen)
-                        VALUES (?, {", ".join("?" * len(FIELDS))}, ?, ?) AS new
+                    f"""INSERT INTO jobs (tenant, id, {", ".join(FIELDS)}, first_seen, last_seen)
+                        VALUES (?, ?, {", ".join("?" * len(FIELDS))}, ?, ?) AS new
                         ON DUPLICATE KEY UPDATE
                             relevant = new.relevant, title = new.title,
                             company = COALESCE(new.company, jobs.company),
@@ -382,7 +431,7 @@ class Store:
                             posted_at = COALESCE(jobs.posted_at, new.posted_at),
                             closed_at = new.closed_at,
                             last_seen = new.last_seen""",
-                    (job["id"], *row.values(), now, now))
+                    (self.tenant, job["id"], *row.values(), now, now))
         return new
 
     def reclassify(self, source: str, classify) -> list[str]:
@@ -391,14 +440,15 @@ class Store:
         (inclusive o bloqueio por autor: agregadores e o próprio site saem do site).
         Retorna os ids que mudaram."""
         rows = self.execute("SELECT id, description, author, relevant FROM jobs "
-                               "WHERE source = ?", (source,)).fetchall()
+                            "WHERE tenant = ? AND source = ?", (self.tenant, source)).fetchall()
         changed = []
         for r in rows:
             ok = bool(classify(r["description"], r["author"]))
             if ok != bool(r["relevant"]):
                 changed.append((int(ok), r["id"]))
         with self.tx():
-            self.executemany("UPDATE jobs SET relevant = ? WHERE id = ?", changed)
+            self.executemany("UPDATE jobs SET relevant = ? WHERE tenant = ? AND id = ?",
+                             [(ok, self.tenant, job_id) for ok, job_id in changed])
         return [job_id for _, job_id in changed]
 
     def reclassify_jobs(self) -> list[str]:
@@ -407,7 +457,7 @@ class Store:
         etiquetas das issues do GitHub não ficam na base: issue aceita por etiqueta
         continua aceita. Retorna os ids que mudaram."""
         rows = self.execute("SELECT id, source, title, description, relevant FROM jobs "
-                               "WHERE source != 'post'").fetchall()
+                            "WHERE tenant = ? AND source != 'post'", (self.tenant,)).fetchall()
         changed = []
         for r in rows:
             ok = classify.is_relevant_job(r["title"], r["description"]) or (
@@ -415,7 +465,8 @@ class Store:
             if ok != bool(r["relevant"]):
                 changed.append((int(ok), r["id"]))
         with self.tx():
-            self.executemany("UPDATE jobs SET relevant = ? WHERE id = ?", changed)
+            self.executemany("UPDATE jobs SET relevant = ? WHERE tenant = ? AND id = ?",
+                             [(ok, self.tenant, job_id) for ok, job_id in changed])
         return [job_id for _, job_id in changed]
 
     def dismiss(self, ref: str, reason: str | None = None, undo: bool = False) -> list[dict]:
@@ -423,16 +474,17 @@ class Store:
         post/vaga contido nela. Fica na base: novas coletas não trazem de volta."""
         ref = ref.strip()
         digits = re.findall(r"\d{12,}", ref)
-        sql = "SELECT id, title, url FROM jobs WHERE id = ? OR url = ?"
-        args = [ref, ref]
+        sql = "SELECT id, title, url FROM jobs WHERE tenant = ? AND (id = ? OR url = ?"
+        args = [self.tenant, ref, ref]
         if digits:
             sql += " OR id LIKE ?"
             args.append(f"%{digits[-1]}%")
+        sql += ")"
         rows = [dict(r) for r in self.execute(sql, args)]
         mark = None if undo else f"{now_iso()} {reason or ''}".strip()
         with self.tx():
-            self.executemany("UPDATE jobs SET dismissed = ? WHERE id = ?",
-                                [(mark, r["id"]) for r in rows])
+            self.executemany("UPDATE jobs SET dismissed = ? WHERE tenant = ? AND id = ?",
+                             [(mark, self.tenant, r["id"]) for r in rows])
         return rows
 
     def query_jobs(self, q: str | None = None, source: str | None = None,
@@ -440,7 +492,7 @@ class Store:
                    stack: str | None = None, hours: float | None = None,
                    include_closed: bool = False, include_irrelevant: bool = False,
                    limit: int = 50, offset: int = 0) -> list[dict]:
-        sql, args = "SELECT * FROM jobs WHERE 1=1", []
+        sql, args = "SELECT * FROM jobs WHERE tenant = ?", [self.tenant]
         if not include_irrelevant:
             sql += " AND relevant = 1 AND dismissed IS NULL"
         if not include_closed:
@@ -472,11 +524,11 @@ class Store:
             """SELECT source, count(*) total, sum(relevant AND dismissed IS NULL) relevant,
                       sum(relevant AND dismissed IS NULL AND closed_at IS NULL
                           AND COALESCE(posted_at, first_seen) >= ?) open
-               FROM jobs GROUP BY source""", (dates.cutoff(),))}
+               FROM jobs WHERE tenant = ? GROUP BY source""", (dates.cutoff(), self.tenant))}
         last = {}
         for source in SOURCES:
-            run = self.execute("SELECT * FROM runs WHERE source = ? ORDER BY id DESC LIMIT 1",
-                                  (source,)).fetchone()
+            run = self.execute("SELECT * FROM runs WHERE tenant = ? AND source = ? "
+                               "ORDER BY id DESC LIMIT 1", (self.tenant, source)).fetchone()
             last[source] = dict(run) if run else None
         return {"sources": by_source, "last_runs": last, "open_total": self.open_count()}
 
@@ -484,9 +536,9 @@ class Store:
         """Vagas abertas que o site mostra (últimas 72 h, sem as repetidas): o mesmo que
         query_jobs sem filtros e sem limite."""
         return self.execute(
-            f"""SELECT count(*) FROM jobs WHERE relevant = 1 AND dismissed IS NULL
+            f"""SELECT count(*) FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL
                   AND closed_at IS NULL AND COALESCE(posted_at, first_seen) >= ? AND {DEDUP}""",
-            (dates.cutoff(),)).fetchone()[0]
+            (self.tenant, dates.cutoff())).fetchone()[0]
 
     def rule_counts(self) -> dict:
         """Quantas vagas/posts da base cada regra de filtro decidiu (página /regras). Posts
@@ -494,7 +546,7 @@ class Store:
         counts = Counter()
         for source, title, description, author, relevant in self.execute(
                 "SELECT source, title, description, author, relevant FROM jobs "
-                "WHERE dismissed IS NULL"):
+                "WHERE tenant = ? AND dismissed IS NULL", (self.tenant,)):
             if source == "post":
                 counts[classify.post_verdict(description, author)] += 1
             else:  # etiquetas do GitHub não ficam na base: aceitas por elas = lang_title
@@ -509,20 +561,21 @@ class Store:
         linhas mudaram."""
         changed = []
         for r in self.execute("SELECT id, company, company_key, author_headline, "
-                              "author_recruiter FROM jobs"):
+                              "author_recruiter FROM jobs WHERE tenant = ?", (self.tenant,)):
             key = classify.company_key(r["company"])
             recruiter = int(classify.is_recruiter(r["author_headline"]))
             if key != r["company_key"] or recruiter != r["author_recruiter"]:
                 changed.append((key, recruiter, r["id"]))
         with self.tx():
-            self.executemany("UPDATE jobs SET company_key = ?, author_recruiter = ? WHERE id = ?",
-                             changed)
+            self.executemany("UPDATE jobs SET company_key = ?, author_recruiter = ? "
+                             "WHERE tenant = ? AND id = ?",
+                             [(key, rec, self.tenant, job_id) for key, rec, job_id in changed])
         return len(changed)
 
     def set_meta(self, name: str, value) -> None:
-        """Grava um item de site_meta (JSON)."""
-        self.execute("REPLACE INTO site_meta (name, value, updated_at) VALUES (?, ?, ?)",
-                     (name, json.dumps(value, ensure_ascii=False), now_iso()))
+        """Grava um item de site_meta (JSON) do tenant."""
+        self.execute("REPLACE INTO site_meta (tenant, name, value, updated_at) VALUES (?, ?, ?, ?)",
+                     (self.tenant, name, json.dumps(value, ensure_ascii=False), now_iso()))
 
     def publish_site_data(self) -> None:
         """Tudo o que o site precisa do filtro: colunas derivadas, taxonomia (stacks,
@@ -540,8 +593,8 @@ class Store:
 
     def start_run(self, source: str) -> int:
         with self.tx():
-            return self.execute("INSERT INTO runs (source, started_at) VALUES (?, ?)",
-                                   (source, now_iso())).lastrowid
+            return self.execute("INSERT INTO runs (tenant, source, started_at) VALUES (?, ?, ?)",
+                                (self.tenant, source, now_iso())).lastrowid
 
     def finish_run(self, run_id: int, found: int = 0, new_jobs: int = 0,
                    error: str | None = None, listed: int | None = None,
@@ -554,13 +607,14 @@ class Store:
 
     def last_runs(self, source: str | None = None, n: int = 5) -> list[dict]:
         if source:
-            rows = self.execute("SELECT * FROM runs WHERE source = ? ORDER BY id DESC LIMIT ?",
-                                   (source, n))
+            rows = self.execute("SELECT * FROM runs WHERE tenant = ? AND source = ? "
+                                "ORDER BY id DESC LIMIT ?", (self.tenant, source, n))
         else:
-            rows = self.execute("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (n,))
+            rows = self.execute("SELECT * FROM runs WHERE tenant = ? ORDER BY id DESC LIMIT ?",
+                                (self.tenant, n))
         return [dict(r) for r in rows]
 
     def last_ok_start(self, source: str) -> str | None:
-        row = self.execute("SELECT started_at FROM runs WHERE source = ? AND ok = 1 "
-                              "ORDER BY id DESC LIMIT 1", (source,)).fetchone()
+        row = self.execute("SELECT started_at FROM runs WHERE tenant = ? AND source = ? "
+                           "AND ok = 1 ORDER BY id DESC LIMIT 1", (self.tenant, source)).fetchone()
         return row[0] if row else None

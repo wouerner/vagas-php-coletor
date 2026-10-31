@@ -103,6 +103,41 @@ Os itens estão em [docs/contrato-base.md](docs/contrato-base.md#configuração-
 As variáveis de termos de busca do `.env` (`VAGAS_GUPY_TERMS`...), se definidas, têm
 prioridade sobre a base.
 
+### Várias linguagens (multi-tenant)
+
+A base é multi-tenant: cada linguagem é um tenant (`php`, `ruby`), com as próprias vagas,
+coletas e configuração na mesma base. Cada coletor grava um tenant só (`VAGAS_TENANT`,
+padrão `php`), e o site mostra só o `php`. O serviço `collector-ruby` do compose coleta
+vagas de Ruby (Ruby on Rails, Sinatra, Hanami) nas fontes públicas, sem site:
+
+```bash
+docker compose up -d collector-ruby                    # coleta agendada do Ruby
+docker compose run --rm collector-ruby collect gupy    # coleta agora uma fonte
+docker compose run --rm collector-ruby list --hours 72 # vagas Ruby já coletadas
+docker compose run --rm collector-ruby config search   # termos de busca do Ruby
+```
+
+As variáveis de termos de busca do `.env` (`VAGAS_GUPY_TERMS`...) valem só para o tenant
+`php`: os outros usam só a configuração da base.
+
+Para outra linguagem: um bloco novo em `collector/vagas/config_defaults.json` (ou
+`config set` com `--tenant`) e um serviço como o `collector-ruby`. Regras em
+[docs/contrato-base.md](docs/contrato-base.md#multi-tenant-uma-base-uma-linguagem-por-tenant).
+
+#### Próximas linguagens
+
+Na ordem prevista. Cada uma é um tenant novo, só de coleta, como o Ruby:
+
+| linguagem | tenant | termos e frameworks | atenção no filtro |
+|---|---|---|---|
+| Ruby | `ruby` | Ruby, Rails, Sinatra, Hanami | feito (só coleta) |
+| Java | `java` | Java, Spring, Spring Boot, Quarkus | buscas por "java" trazem vagas de JavaScript |
+| C# | `csharp` | C#, .NET, ASP.NET, Blazor | `\b` não casa em volta de `#` e `.`: `c#` e `.net` precisam de regex à parte |
+| Python | `python` | Python, Django, Flask, FastAPI | vagas de dados e ML citam Python sem ser de desenvolvimento |
+| Node.js | `node` | Node.js, NestJS, Express | "JavaScript" sozinho também é vaga de front-end |
+| Go | `go` | Go, Golang, Gin | "go" é palavra comum em inglês: buscar por "golang" |
+| Rust | `rust` | Rust, Tokio, Actix, Axum | poucas vagas no Brasil: conferir se as fontes rendem |
+
 ## Serviço (Docker)
 
 ```bash

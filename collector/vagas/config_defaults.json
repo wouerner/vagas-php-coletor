@@ -1,39 +1,74 @@
 {
-  "language": {
-    "name": "PHP",
-    "slug": "php",
-    "examples": "PHP, Laravel, Symfony, CodeIgniter, CakePHP, Yii, Laminas, Hyperf/Swoole, Livewire, WordPress, Magento ou Drupal"
+  "php": {
+    "language": {
+      "name": "PHP",
+      "slug": "php",
+      "examples": "PHP, Laravel, Symfony, CodeIgniter, CakePHP, Yii, Laminas, Hyperf/Swoole, Livewire, WordPress, Magento ou Drupal"
+    },
+    "core": "\\b(php|laravel|symfony|code\\s?igniter|cake\\s?php|yii2?|laminas|hyperf|swoole|livewire|wordpress|magento|drupal)\\b",
+    "stack": [
+      ["PHP", "\\bphp\\s?\\d?(\\.\\d)?\\b"],
+      ["Laravel", "\\blaravel\\b"],
+      ["Symfony", "\\bsymfony\\b"],
+      ["CodeIgniter", "\\bcode\\s?igniter\\b"],
+      ["CakePHP", "\\bcake\\s?php\\b"],
+      ["Yii", "\\byii2?\\b"],
+      ["Laminas/Zend", "\\b(laminas|zend)\\b"],
+      ["Hyperf/Swoole", "\\b(hyperf|swoole|openswoole)\\b"],
+      ["Livewire", "\\blivewire\\b"],
+      ["Filament", "\\bfilament(php)?\\b"],
+      ["Magento", "\\bmagento\\b"],
+      ["WordPress", "\\bwordpress\\b"],
+      ["Drupal", "\\bdrupal\\b"]
+    ],
+    "search": {
+      "linkedin": ["php", "laravel", "symfony", "wordpress", "magento", "drupal"],
+      "posts": ["vaga php", "vaga laravel", "desenvolvedor php", "pessoa desenvolvedora php", "oportunidade php", "vaga wordpress"],
+      "gupy": ["php", "laravel", "symfony", "wordpress", "magento", "drupal", "desenvolvedor", "desenvolvedora", "backend", "full stack"],
+      "solides": ["php", "laravel", "symfony", "codeigniter", "wordpress", "magento", "drupal"],
+      "catho": ["php", "laravel", "symfony", "codeigniter", "wordpress", "magento", "drupal"],
+      "remotar": ["php", "laravel", "symfony", "wordpress", "magento", "drupal"],
+      "programathor": ["jobs-php", "jobs-laravel", "jobs-symfony", "jobs-codeigniter", "jobs-wordpress", "jobs-magento", "jobs-drupal"],
+      "nerdin": ["php", "laravel", "symfony", "codeigniter", "wordpress", "magento", "drupal"],
+      "upvagas": ["php", "laravel", "symfony", "codeigniter", "wordpress", "magento", "drupal"],
+      "github": ["phpdevbr/vagas", "backend-br/vagas"]
+    },
+    "self_author": {
+      "names": ["^wouerner\\b"],
+      "urls": ["linkedin\\.com/in/wouerner/?$"]
+    }
   },
-  "core": "\\b(php|laravel|symfony|code\\s?igniter|cake\\s?php|yii2?|laminas|hyperf|swoole|livewire|wordpress|magento|drupal)\\b",
-  "stack": [
-    ["PHP", "\\bphp\\s?\\d?(\\.\\d)?\\b"],
-    ["Laravel", "\\blaravel\\b"],
-    ["Symfony", "\\bsymfony\\b"],
-    ["CodeIgniter", "\\bcode\\s?igniter\\b"],
-    ["CakePHP", "\\bcake\\s?php\\b"],
-    ["Yii", "\\byii2?\\b"],
-    ["Laminas/Zend", "\\b(laminas|zend)\\b"],
-    ["Hyperf/Swoole", "\\b(hyperf|swoole|openswoole)\\b"],
-    ["Livewire", "\\blivewire\\b"],
-    ["Filament", "\\bfilament(php)?\\b"],
-    ["Magento", "\\bmagento\\b"],
-    ["WordPress", "\\bwordpress\\b"],
-    ["Drupal", "\\bdrupal\\b"]
-  ],
-  "search": {
-    "linkedin": ["php", "laravel", "symfony", "wordpress", "magento", "drupal"],
-    "posts": ["vaga php", "vaga laravel", "desenvolvedor php", "pessoa desenvolvedora php", "oportunidade php", "vaga wordpress"],
-    "gupy": ["php", "laravel", "symfony", "wordpress", "magento", "drupal", "desenvolvedor", "desenvolvedora", "backend", "full stack"],
-    "solides": ["php", "laravel", "symfony", "codeigniter", "wordpress", "magento", "drupal"],
-    "catho": ["php", "laravel", "symfony", "codeigniter", "wordpress", "magento", "drupal"],
-    "remotar": ["php", "laravel", "symfony", "wordpress", "magento", "drupal"],
-    "programathor": ["jobs-php", "jobs-laravel", "jobs-symfony", "jobs-codeigniter", "jobs-wordpress", "jobs-magento", "jobs-drupal"],
-    "nerdin": ["php", "laravel", "symfony", "codeigniter", "wordpress", "magento", "drupal"],
-    "upvagas": ["php", "laravel", "symfony", "codeigniter", "wordpress", "magento", "drupal"],
-    "github": ["phpdevbr/vagas", "backend-br/vagas"]
-  },
-  "self_author": {
-    "names": ["^wouerner\\b"],
-    "urls": ["linkedin\\.com/in/wouerner/?$"]
+  "ruby": {
+    "language": {
+      "name": "Ruby",
+      "slug": "ruby",
+      "examples": "Ruby, Ruby on Rails, Sinatra ou Hanami"
+    },
+    "core": "\\b(ruby\\s+on\\s+rails|ruby|rails|ror|sinatra|hanami)\\b",
+    "stack": [
+      ["Ruby", "\\bruby\\b"],
+      ["Rails", "\\brails\\b"],
+      ["Sinatra", "\\bsinatra\\b"],
+      ["Hanami", "\\bhanami\\b"],
+      ["Hotwire", "\\bhotwire\\b"],
+      ["Sidekiq", "\\bsidekiq\\b"],
+      ["RSpec", "\\brspec\\b"]
+    ],
+    "search": {
+      "linkedin": ["ruby on rails", "ruby"],
+      "posts": ["vaga ruby", "vaga rails", "desenvolvedor ruby", "desenvolvedor rails"],
+      "gupy": ["ruby", "rails"],
+      "solides": ["ruby", "rails"],
+      "catho": ["ruby", "ruby on rails"],
+      "remotar": ["ruby", "rails"],
+      "programathor": ["jobs-ruby", "jobs-ruby-on-rails"],
+      "nerdin": ["ruby", "rails"],
+      "upvagas": ["ruby", "rails"],
+      "github": ["rubydevbr/vagas", "backend-br/vagas"]
+    },
+    "self_author": {
+      "names": ["^wouerner\\b"],
+      "urls": ["linkedin\\.com/in/wouerner/?$"]
+    }
   }
 }

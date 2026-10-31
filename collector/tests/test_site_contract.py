@@ -20,8 +20,8 @@ def test_job_path_matches_site(case):
 class FakeStore(Store):
     """Store sem MySQL: grava o que publish_site_data mandaria para a base."""
 
-    def __init__(self, rows):
-        self.rows, self.meta, self.updates = rows, {}, []
+    def __init__(self, rows, tenant="php"):
+        self.rows, self.meta, self.updates, self.tenant = rows, {}, [], tenant
 
     def execute(self, sql, args=()):
         assert sql.startswith("SELECT"), sql
@@ -46,7 +46,7 @@ def test_refresh_derived_only_updates_what_changed():
     ]
     store = FakeStore(rows)
     assert store.refresh_derived() == 2
-    assert store.updates == [("acme", 1, "b"), (None, 0, "c")]
+    assert store.updates == [("acme", 1, "php", "b"), (None, 0, "php", "c")]
 
 
 def test_site_meta_is_json_with_taxonomy_in_filter_order(monkeypatch):

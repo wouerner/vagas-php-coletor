@@ -1,4 +1,4 @@
-"""Uso:
+"""Uso (--tenant ruby antes do comando, ou VAGAS_TENANT=ruby, para outra linguagem):
   python -m vagas collect <fonte>|all [--show]   # coleta agora e grava em data/ (fontes: store.SOURCES)
   python -m vagas list [--q laravel] [--source github] [--hours 24] [--limit 20]
   python -m vagas migrate-sqlite data/vagas.db       # copia a base SQLite antiga para o MySQL
@@ -45,7 +45,9 @@ def main() -> int:
     load_dotenv(ROOT / ".env")
     load_dotenv(ROOT.parent / ".env")  # monorepo: .env na raiz, fora do contêiner
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    parser = argparse.ArgumentParser(description="Vagas de engenharia de software com PHP.")
+    parser = argparse.ArgumentParser(description="Coletor de vagas de engenharia de software.")
+    parser.add_argument("--tenant", help="linguagem (tenant) dos dados: php, ruby... "
+                                         "(padrão: VAGAS_TENANT ou php)")
     sub = parser.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("collect", help="coleta vagas agora")
     c.add_argument("source", choices=[*SOURCES, "all"])
@@ -135,7 +137,7 @@ def main() -> int:
         print(entry)
         return 0
 
-    store = Store()
+    store = Store(tenant=args.tenant)
     if args.cmd == "migrate-sqlite":
         return migrate_sqlite.run(store, args.path, force=args.force)
     if args.cmd == "list":
