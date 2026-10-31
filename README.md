@@ -417,4 +417,7 @@ O CI (`.github/workflows/ci.yml`) roda os dois a cada push e pull request.
 
 ## Licença
 
-[MIT](LICENSE).
+Copyright (C) 2026 wouerner. [GNU AGPL v3](LICENSE) (`AGPL-3.0-only`): você pode usar, estudar,
+modificar e distribuir o código; quem distribuir uma versão, modificada ou não, precisa
+entregar o código-fonte sob a mesma licença, e quem rodar uma versão modificada como serviço
+(um site, uma API) precisa oferecer o código-fonte dela a quem usa o serviço.

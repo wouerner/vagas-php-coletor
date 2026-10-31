@@ -2,7 +2,7 @@
     "name": "wouerner/vagas-php-web",
     "description": "Site do Vagas PHP: lista as vagas PHP que o coletor (collector/, em Python) grava no MySQL.",
     "type": "project",
-    "license": "MIT",
+    "license": "AGPL-3.0-only",
     "require": {
         "php": ">=8.5",
         "ext-intl": "*",
