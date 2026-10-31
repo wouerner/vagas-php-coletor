@@ -381,6 +381,36 @@ final class Repo
         ];
     }
 
+    /**
+     * Acrescenta `clicks` a cada vaga: cliques no anúncio original (/out) desde que ela entrou
+     * na base. Um clique é sempre posterior ao first_seen da vaga, então só os cliques a partir
+     * do first_seen mais antigo entram na consulta (índice clicks_at). Falha na base: as vagas
+     * voltam sem `clicks` (o card não mostra o número).
+     *
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    public function withClicks(array $rows): array
+    {
+        if (!$rows) {
+            return $rows;
+        }
+        $ids = array_column($rows, 'id');
+        try {
+            $counts = array_column($this->db->all(
+                'SELECT job_id, count(*) n FROM clicks WHERE at >= ? AND job_id IN ('
+                    . implode(', ', array_fill(0, count($ids), '?')) . ') GROUP BY job_id',
+                [min(array_column($rows, 'first_seen')), ...$ids],
+            ), 'n', 'job_id');
+        } catch (\PDOException $e) {
+            if (!Db::isMissingTable($e)) {
+                error_log("cliques não lidos: {$e->getMessage()}");
+            }
+            return $rows;
+        }
+        return array_map(fn ($r) => $r + ['clicks' => (int) ($counts[$r['id']] ?? 0)], $rows);
+    }
+
     /** @return array<string, mixed>|null */
     public function jobBySeq(int $seq): ?array
     {

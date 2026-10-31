@@ -44,6 +44,10 @@ final class Site
     /** Idade da vaga: até quantas horas, classe do card e nome da faixa. */
     public const AGE_BANDS = [[6, 'new', 'nova'], [24, 'recent', 'recente'], [48, 'days', '1-2 dias'],
         [INF, 'old', 'antiga']];
+    /** Explicação do número de cliques do card (o mesmo CLICKS_TIP do JavaScript). */
+    public const CLICKS_TIP = 'Quantas vezes alguém abriu o anúncio original a partir do Vagas PHP desde que '
+        . 'a vaga entrou no site. Dá uma noção da concorrência, mas não inclui quem viu a vaga direto '
+        . 'na fonte (LinkedIn, Gupy...), e a mesma pessoa pode contar mais de uma vez.';
     public const PAGE = 30;  // vagas na primeira página da home (o mesmo PAGE do JavaScript)
     public const RECRUITERS_DAYS = 90;
     public const COMPANIES_DAYS = 90;
@@ -193,6 +197,17 @@ final class Site
             'source' => $job['source'] ?? '']);
     }
 
+    /**
+     * Cliques no anúncio original (Repo::withClicks), com a explicação num tooltip que abre
+     * no hover e no foco (toque no celular). clicksBadge() de templates/index.html monta o mesmo.
+     */
+    public static function clicksHtml(int $n): string
+    {
+        $label = $n === 0 ? 'nenhum clique ainda' : Text::plural($n, 'clique', 'cliques');
+        return "<span class=\"clicks\" tabindex=\"0\">$label<span class=\"tip\" role=\"tooltip\">"
+            . self::CLICKS_TIP . '</span></span>';
+    }
+
     /** Acrescenta `path`, a página da vaga no site (null para posts do LinkedIn). */
     public static function withPath(array $rows): array
     {
@@ -223,6 +238,9 @@ final class Site
             if ($t) {
                 $tags[] = '<span class="tag">' . $e($t) . '</span>';
             }
+        }
+        if ($url && isset($job['clicks'])) {  // sem anúncio original não há o que clicar
+            $tags[] = self::clicksHtml((int) $job['clicks']);
         }
         // Vaga de portal: o título leva à página da vaga no site e o anúncio original fica
         // na linha de baixo. Post do LinkedIn: o título leva ao post.
@@ -342,7 +360,7 @@ final class Site
                                ?array $jsonld = null, bool $noindex = false, int $status = 200): Response
     {
         $content = ['h1' => Text::e($h1), 'crumb' => $crumb, 'intro' => $intro,
-            'list' => implode('', array_map(fn ($j) => self::jobCard($j, $path), $jobs)), 'more' => $more,
+            'list' => implode('', array_map(fn ($j) => self::jobCard($j, $path), $this->repo->withClicks($jobs))), 'more' => $more,
             'related' => $related];
         return Response::html(Seo::render($request, 'tema.html', $title, $description, $path, $content, $jsonld, $noindex), $status);
     }
@@ -453,7 +471,8 @@ final class Site
     {
         $source = in_array($r->get('source'), $this->repo->sources(), true) ? $r->get('source') : null;
         [$rows, $st] = self::safe(fn () => [
-            self::withPath($this->repo->queryJobs(...['source' => $source, ...self::jobFilters($r), 'limit' => self::PAGE])),
+            $this->repo->withClicks(self::withPath($this->repo->queryJobs(...['source' => $source,
+                ...self::jobFilters($r), 'limit' => self::PAGE]))),
             $this->repo->stats(),
         ], [[], ['open_total' => 0, 'last_runs' => []]]);
         $total = $st['open_total'];
@@ -499,7 +518,7 @@ final class Site
         $limit = (int) self::number($r->get('limit'), 50, 1, 200);
         $rows = self::safe(fn () => $this->repo->queryJobs(...['source' => $source, ...self::jobFilters($r),
             'limit' => $limit + 1, 'offset' => (int) self::number($r->get('offset'), 0, 0, 1e6)]), []);
-        $jobs = array_map(Repo::publicJob(...), self::withPath(array_slice($rows, 0, $limit)));
+        $jobs = array_map(Repo::publicJob(...), $this->repo->withClicks(self::withPath(array_slice($rows, 0, $limit))));
         return Response::json(['jobs' => $jobs,
             'has_more' => count($rows) > $limit, 'max_age_hours' => Dates::maxAgeHours()]);
     }
@@ -786,14 +805,29 @@ final class Site
 
     // --- cliques no anúncio original -----------------------------------------------------
 
-    /** Conta o clique e redireciona para o anúncio original. URL que não é http(s): home. */
+    /**
+     * Conta o clique e redireciona para o anúncio original. URL que não é http(s): home.
+     * Robô (isBot) e HEAD são redirecionados sem contar: o número aparece nos cards.
+     */
     public function out(Request $r): Response
     {
         if (!($url = Text::safeUrl($r->get('url')))) {
             return Response::redirect('/', 302);
         }
-        $this->repo->logClick($r->get('job'), $url, $r->get('page'), $r->get('source'));
+        if ($r->method === 'GET' && !self::isBot($r->headers['user-agent'] ?? null)) {
+            $this->repo->logClick($r->get('job'), $url, $r->get('page'), $r->get('source'));
+        }
         return Response::redirect($url, 302, ['Cache-Control' => 'no-store']);
+    }
+
+    /** Crawler, pré-visualização de link, verificador ou cliente HTTP (sem user agent também). */
+    public static function isBot(?string $userAgent): bool
+    {
+        // Navegador de app (LinkedInApp, Instagram, FBAV...) é gente: só os robôs desses apps entram.
+        return trim((string) $userAgent) === '' || (bool) preg_match('/bot\b|bot\/|crawl|spider|slurp|'
+            . 'preview|externalhit|facebookcatalog|whatsapp|embedly|headless|lighthouse|pingdom|uptime|'
+            . 'monitor|scan|curl|wget|python|java\/|go-http|okhttp|axios|node-fetch|undici|httpclient|'
+            . 'libwww|scrapy/i', (string) $userAgent);
     }
 
     public function clicks(Request $r): Response
@@ -857,7 +891,8 @@ final class Site
      */
     public function robots(Request $r): Response
     {
-        return Response::text("User-agent: *\nAllow: /\n\nSitemap: " . Seo::siteUrl($r) . "/sitemap.xml\n");
+        // /out só redireciona para o anúncio e conta o clique: crawler fica fora.
+        return Response::text("User-agent: *\nAllow: /\nDisallow: /out\n\nSitemap: " . Seo::siteUrl($r) . "/sitemap.xml\n");
     }
 
     private function asset(string $name, string $type): Response

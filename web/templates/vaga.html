@@ -46,6 +46,14 @@
   .button { display: inline-block; padding: 10px 18px; border-radius: 10px; background: var(--accent); color: var(--surface);
             font-weight: 600; text-decoration: none; }
   .button:hover { filter: brightness(1.08); }
+  /* Cliques no anúncio original, ao lado do botão, com a explicação no hover e no foco (toque). */
+  .clicks { position: relative; display: inline-block; margin-left: 10px; font-size: 13px; color: var(--muted);
+            white-space: nowrap; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .clicks .tip { display: none; position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 2;
+                 width: max-content; max-width: min(300px, calc(100vw - 32px)); padding: 8px 10px;
+                 border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12px;
+                 line-height: 1.45; white-space: normal; box-shadow: 0 4px 14px rgb(0 0 0 / .2); }
+  .clicks:hover .tip, .clicks:focus .tip { display: block; }
   .description { overflow-wrap: anywhere; }
   .description p { margin: 0 0 10px; }
   .description h3 { font-size: 15px; margin: 16px 0 6px; }
@@ -62,6 +70,7 @@
     .facts { grid-template-columns: 1fr; gap: 0; }
     .facts dd { margin-bottom: 6px; }
     .button { display: block; text-align: center; }
+    .clicks { margin: 8px 0 0; }
   }
 </style>
 </head>

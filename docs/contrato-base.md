@@ -9,7 +9,7 @@ MySQL. Este é o contrato. Mudou algo aqui, mude os dois lados no mesmo pull req
 |---|---|---|
 | `jobs` | cria, insere e atualiza | lê |
 | `runs` | cria e insere (uma linha por coleta) | lê (dashboard, última coleta) |
-| `clicks` | cria | insere (`/out`) e lê (`/api/clicks`) |
+| `clicks` | cria | insere (`/out`) e lê (`/api/clicks` e o total de cada vaga nos cards) |
 | `site_meta` | cria e grava | lê |
 | `indexing_log` | cria e grava (Indexing API) | não usa |
 | `collector_config` | cria, grava os valores iniciais e lê | não usa |

@@ -195,6 +195,7 @@ composer test                                                         # Pest
 stack e período (1, 4, 6, 24, 48 ou 72 h; os filtros ficam na URL, para compartilhar). API em JSON:
 
 - `GET /api/jobs?q=laravel&source=github&workplace=Remoto&seniority=Pleno&stack=Laravel&hours=24&limit=30&offset=0`
+  (cada vaga traz `clicks`: cliques no anúncio original desde que entrou no site)
 - `GET /api/stats`
 - `GET /api/companies`
 - `GET /api/recruiters`
@@ -211,6 +212,12 @@ e responde `302` para `url` (com `Cache-Control: no-store`); `url` vazia ou que 
 (`page`) e fonte da vaga (`source`). Nada identifica quem clicou (sem IP nem user agent).
 Quem cria a tabela é o coletor; até ele subir com a versão nova, os cliques só geram um
 aviso no log e o redirecionamento funciona igual.
+
+Robô não conta: o `/out` redireciona, mas não grava, requisição `HEAD` nem user agent de
+crawler, pré-visualização de link ou cliente HTTP (`Site::isBot`; sem user agent também), e o
+`robots.txt` tira o `/out` do alcance dos crawlers. O total de cada vaga aparece no card
+(home, temas e página da vaga), para quem procura ter noção da concorrência, com um tooltip
+que explica o que o número conta e o que não conta.
 
 **Empresas** (`/empresas`): empresas que mais anunciaram vagas PHP nos portais nos últimos 90
 dias (2 ou mais vagas). Nomes escritos de jeitos diferentes são agrupados (`php.company_key`);

@@ -384,7 +384,8 @@ final class Vaga
         if (!empty($job['url']) && $isOpen) {
             $out[] = '<p class="apply"><a class="button" href="' . $e(Site::outHref($job['url'], $job, $here)) . '" '
                 . 'rel="nofollow noopener" target="_blank">Candidatar-se no site original '
-                . '(' . $e($source) . ')</a></p>';
+                . '(' . $e($source) . ')</a>'
+                . (isset($job['clicks']) ? ' ' . Site::clicksHtml((int) $job['clicks']) : '') . '</p>';
         }
         if (trim($job['description'] ?? '') !== '') {
             $out[] = '<h2>Descrição</h2><div class="description">'
@@ -437,7 +438,7 @@ final class Vaga
             if ($newest && $newest !== (int) $job['seq']) {
                 return ['redirect' => Seo::jobPath($repo->jobBySeq($newest))];
             }
-            return ['job' => $job, 'open' => self::isOpen($job), 'others' => $this->similar($job)];
+            return ['job' => $repo->withClicks([$job])[0], 'open' => self::isOpen($job), 'others' => $this->similar($job)];
         }, null);
         if ($found === null) {
             return $this->notFound($request);

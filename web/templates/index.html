@@ -136,6 +136,14 @@
   summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 8px 0; width: fit-content; }
   .desc { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 6px; max-height: 420px;
           overflow: auto; padding: 10px; border-radius: 8px; background: var(--bg); }
+  /* Cliques no anúncio original: no fim das tags, com a explicação no hover e no foco (toque). */
+  .clicks { position: relative; z-index: 1; margin-left: auto; font-size: 12px; color: var(--muted);
+            white-space: nowrap; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .clicks .tip { display: none; position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 2;
+                 width: max-content; max-width: min(300px, calc(100vw - 32px)); padding: 8px 10px;
+                 border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12px;
+                 line-height: 1.45; white-space: normal; box-shadow: 0 4px 14px rgb(0 0 0 / .2); }
+  .clicks:hover .tip, .clicks:focus .tip { display: block; }
   .empty, .more { text-align: center; color: var(--muted); padding: 28px 0; }
   .more button { cursor: pointer; padding: 8px 20px; }
   .themes { margin-top: 28px; }
@@ -323,6 +331,17 @@ function age(iso) {
   return { text, band, label, at: BRASILIA.format(date) };
 }
 
+// Cliques no anúncio original, com a explicação no tooltip (Site::clicksHtml no servidor).
+const CLICKS_TIP = "Quantas vezes alguém abriu o anúncio original a partir do Vagas PHP desde que "
+  + "a vaga entrou no site. Dá uma noção da concorrência, mas não inclui quem viu a vaga direto "
+  + "na fonte (LinkedIn, Gupy...), e a mesma pessoa pode contar mais de uma vez.";
+
+function clicksBadge(n) {
+  const label = n === 0 ? "nenhum clique ainda" : `${n} ${n === 1 ? "clique" : "cliques"}`;
+  return el("span", { className: "clicks", tabIndex: 0 }, label,
+    el("span", { className: "tip", role: "tooltip" }, CLICKS_TIP));
+}
+
 function card(job) {
   const url = safeUrl(job.url);
   const title = job.title || "(sem título)";
@@ -335,6 +354,7 @@ function card(job) {
   if (job.workplace) tags.append(el("span", { className: "tag" + (job.workplace === "Remoto" ? " remote" : "") }, job.workplace));
   for (const t of [job.seniority, job.contract, job.salary, ...(job.stack || "").split(",")])
     if (t) tags.append(el("span", { className: "tag" }, t));
+  if (url && job.clicks != null) tags.append(clicksBadge(job.clicks));  // sem anúncio, nada a clicar
 
   // Vaga de portal: o título leva à página da vaga no site (job.path) e o anúncio original
   // fica na linha de baixo. Post do LinkedIn: o título leva ao post.
