@@ -1,5 +1,8 @@
 # vagas-php
 
+I'm a programmer who earns only US$1,500 a month, and I support a family of four. Could you
+help me keep supporting my family here in Brazil? **[Sponsor me on GitHub](https://github.com/sponsors/wouerner)**
+
 Coleta e lista **vagas de engenharia de software com PHP** (PHP, Laravel, Symfony,
 CodeIgniter, Hyperf...). Monorepo com duas partes que conversam só pelo MySQL 8:
 
