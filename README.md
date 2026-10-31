@@ -229,6 +229,11 @@ composer test                                                         # Pest
 | `web/src/Seo.php` | `<head>` (título, canonical, Open Graph, JSON-LD) e o endereço das vagas |
 | `web/templates/` | as páginas (HTML, CSS e JavaScript de cada uma) |
 
+Toda resposta leva cabeçalhos de segurança (`Site::SECURITY_HEADERS`): HSTS, `nosniff`,
+`X-Frame-Options: DENY`, `Referrer-Policy` e uma CSP que aceita os scripts e estilos inline
+dos templates e, de fora, só o Google Analytics. Script ou recurso novo de outro domínio
+precisa entrar na CSP, senão o navegador bloqueia.
+
 `http://localhost:8780`: busca por texto e filtros de fonte, modalidade, senioridade,
 stack e período (1, 4, 6, 24, 48 ou 72 h; os filtros ficam na URL, para compartilhar). API em JSON:
 
@@ -243,13 +248,20 @@ stack e período (1, 4, 6, 24, 48 ou 72 h; os filtros ficam na URL, para compart
 
 **Cliques**: os links para o anúncio original (LinkedIn, Gupy...) nos cards da home, das
 páginas de tema e da página da vaga não apontam direto para a fonte, e sim para
-`/out?url=<url codificada>&job=<id>&page=<caminho>&source=<fonte>`. O `/out` grava o clique
-e responde `302` para `url` (com `Cache-Control: no-store`); `url` vazia ou que não começa com
-`http://`/`https://` volta para a home. Cada clique vira uma linha na tabela `clicks`: quando
-(`at`, ISO UTC), id da vaga (`job_id`), destino (`url`), página do site de onde saiu
-(`page`) e fonte da vaga (`source`). Nada identifica quem clicou (sem IP nem user agent).
-Quem cria a tabela é o coletor; até ele subir com a versão nova, os cliques só geram um
-aviso no log e o redirecionamento funciona igual.
+`/out?url=<url codificada>&job=<id>&page=<caminho>&source=<fonte>`. O `/out` procura a vaga
+`job` na base, grava o clique e responde `302` para o anúncio original **gravado na vaga**
+(com `Cache-Control: no-store`): o `url` do link não decide o destino, senão o `/out`
+redirecionaria para qualquer site (phishing com o nosso domínio). Vaga desconhecida ou sem
+anúncio `http://`/`https://` volta para a home. Cada clique vira uma linha na tabela
+`clicks`: quando (`at`, ISO UTC), id da vaga (`job_id`), destino (`url`), página do site de
+onde saiu (`page`, só caminho), fonte da vaga (`source`) e visitante (`visitor`).
+
+Conta **um clique por vaga e visitante por dia**: `visitor` é um HMAC de IP + user agent com
+o dia (Brasília), com o `DATABASE_URL` como chave (`Site::visitor`), e a chave única
+`(job_id, visitor)` descarta o repetido. Assim um script em loop não infla o número. O
+HMAC muda todo dia e não volta ao IP: nada identifica quem clicou. Quem cria a tabela é o
+coletor; até ele subir com a versão nova, os cliques só geram um aviso no log e o
+redirecionamento funciona igual.
 
 Robô não conta: o `/out` redireciona, mas não grava, requisição `HEAD` nem user agent de
 crawler, pré-visualização de link ou cliente HTTP (`Site::isBot`; sem user agent também), e o

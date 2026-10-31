@@ -39,6 +39,13 @@ site, padrão `php`). Regras:
 - `clicks` e `indexing_log` não têm tenant: são do site, e só o tenant `php` tem site
   (a Indexing API fica desligada nos outros).
 
+## Cliques
+
+`clicks` guarda um clique por vaga e visitante por dia: a chave única `(job_id, visitor)`
+descarta o repetido (o site grava com `ON DUPLICATE KEY UPDATE`). `visitor` é o HMAC diário
+de IP + user agent (`Site::visitor`); linhas de antes da coluna ficam com `NULL`, que não
+conflita na chave. O `url` gravado é o anúncio da vaga na base, nunca o do link.
+
 ## Datas
 
 Texto ISO 8601 em UTC com offset, `2026-10-30T12:00:00+00:00`, comparado como string.

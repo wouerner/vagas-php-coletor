@@ -98,7 +98,9 @@ SCHEMA = [
     url         TEXT NOT NULL,         -- destino do clique
     page        VARCHAR(255),          -- página do site de onde saiu o clique
     source      VARCHAR(32),           -- fonte da vaga, quando houver
-    INDEX clicks_at (at)
+    visitor     CHAR(16),              -- HMAC diário de IP + user agent (Site::visitor)
+    INDEX clicks_at (at),
+    UNIQUE KEY clicks_visitor (job_id, visitor)  -- um clique por vaga e visitante por dia
 )""",
     # Google Indexing API (indexing.py): última tentativa de publicar cada URL de vaga.
     # A chave é VARCHAR (o MySQL não aceita TEXT como chave primária sem prefixo).
@@ -256,7 +258,10 @@ class Store:
                                    ("runs", "failed", "INT AFTER listed"),
                                    ("jobs", "author_headline", "VARCHAR(512) AFTER author_url"),
                                    ("jobs", "company_key", "VARCHAR(255) AFTER stack"),
-                                   ("jobs", "author_recruiter", "TINYINT AFTER author_headline")):
+                                   ("jobs", "author_recruiter", "TINYINT AFTER author_headline"),
+                                   # A chave única entra junto com a coluna.
+                                   ("clicks", "visitor", "CHAR(16) AFTER source, "
+                                    "ADD UNIQUE KEY clicks_visitor (job_id, visitor)")):
             if (table, column) not in have:
                 self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 

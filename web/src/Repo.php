@@ -366,14 +366,25 @@ final class Repo
         return $out;
     }
 
-    /** Grava um clique para o anúncio original. Falha na base só vira aviso no log. */
-    public function logClick(?string $jobId, string $url, ?string $page, ?string $source): void
+    /** Vaga de um clique no /out (id, fonte e anúncio original), ou null se não existe. */
+    public function clickTarget(string $jobId): ?array
+    {
+        return $this->db->one('SELECT id, source, url FROM jobs WHERE tenant = ? AND id = ?', [$this->tenant, $jobId]);
+    }
+
+    /**
+     * Grava um clique para o anúncio original, um por vaga e visitante (Site::visitor, que
+     * muda todo dia): o repetido bate na chave única (job_id, visitor) e não conta. Falha na
+     * base só vira aviso no log.
+     */
+    public function logClick(string $jobId, string $url, ?string $page, ?string $source, string $visitor): void
     {
         $cut = fn (?string $s, int $n) => ($s === null || $s === '') ? null : mb_substr($s, 0, $n);
         try {
             $this->db->query(
-                'INSERT INTO clicks (at, job_id, url, page, source) VALUES (?, ?, ?, ?, ?)',
-                [Dates::utcIso(Dates::now()), $cut($jobId, 255), $url, $cut($page, 255), $cut($source, 32)],
+                'INSERT INTO clicks (at, job_id, url, page, source, visitor) VALUES (?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE id = id',
+                [Dates::utcIso(Dates::now()), $jobId, $url, $cut($page, 255), $source, $visitor],
             );
         } catch (\Throwable $e) {
             error_log("clique não gravado ({$e->getMessage()}): $url");

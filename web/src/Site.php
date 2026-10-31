@@ -48,6 +48,24 @@ final class Site
     public const CLICKS_TIP = 'Quantas vezes alguém abriu o anúncio original a partir do Vagas PHP desde que '
         . 'a vaga entrou no site. Dá uma noção da concorrência, mas não inclui quem viu a vaga direto '
         . 'na fonte (LinkedIn, Gupy...), e a mesma pessoa pode contar mais de uma vez.';
+    /**
+     * Cabeçalhos de segurança de toda resposta (quem responde pode trocar). A CSP aceita os
+     * <script> e <style> inline dos templates e só o Google Analytics de fora; nada embute o
+     * site em iframe.
+     */
+    public const SECURITY_HEADERS = [
+        'Strict-Transport-Security' => 'max-age=31536000',
+        'X-Content-Type-Options' => 'nosniff',
+        'X-Frame-Options' => 'DENY',
+        'Referrer-Policy' => 'strict-origin-when-cross-origin',
+        'Content-Security-Policy' => "default-src 'self'; "
+            . "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; "
+            . "style-src 'self' 'unsafe-inline'; "
+            . "img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com; "
+            . "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com "
+            . 'https://*.googletagmanager.com; '
+            . "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    ];
     public const PAGE = 30;  // vagas na primeira página da home (o mesmo PAGE do JavaScript)
     public const RECRUITERS_DAYS = 90;
     public const COMPANIES_DAYS = 90;
@@ -113,13 +131,17 @@ final class Site
         return $r;
     }
 
-    /** Respostas /api/* levam X-Robots-Tag: noindex: o Googlebot busca mas não indexa o JSON. */
+    /**
+     * Toda resposta leva SECURITY_HEADERS. Respostas /api/* levam X-Robots-Tag: noindex: o
+     * Googlebot busca mas não indexa o JSON.
+     */
     public function handle(Request $request): Response
     {
         $response = $this->router()->dispatch($request);
         if (str_starts_with($request->path, '/api/')) {
             $response->headers += ['X-Robots-Tag' => 'noindex'];
         }
+        $response->headers += self::SECURITY_HEADERS;
         return $response;
     }
 
@@ -806,18 +828,42 @@ final class Site
     // --- cliques no anúncio original -----------------------------------------------------
 
     /**
-     * Conta o clique e redireciona para o anúncio original. URL que não é http(s): home.
-     * Robô (isBot) e HEAD são redirecionados sem contar: o número aparece nos cards.
+     * Conta o clique e redireciona para o anúncio original da vaga `job`, o que está na base:
+     * o `url` do link não decide o destino (senão o /out redireciona para qualquer site).
+     * Vaga desconhecida ou sem anúncio: home. Robô (isBot) e HEAD são redirecionados sem
+     * contar: o número aparece nos cards.
      */
     public function out(Request $r): Response
     {
-        if (!($url = Text::safeUrl($r->get('url')))) {
+        $job = ($id = $r->get('job')) ? self::safe(fn () => $this->repo->clickTarget($id), null) : null;
+        if (!($url = Text::safeUrl($job['url'] ?? null))) {
             return Response::redirect('/', 302);
         }
         if ($r->method === 'GET' && !self::isBot($r->headers['user-agent'] ?? null)) {
-            $this->repo->logClick($r->get('job'), $url, $r->get('page'), $r->get('source'));
+            $this->repo->logClick($job['id'], $url, self::clickPage($r->get('page')), $job['source'], self::visitor($r));
         }
         return Response::redirect($url, 302, ['Cache-Control' => 'no-store']);
+    }
+
+    /** Página do site de onde saiu o clique: só caminho ("/vagas/laravel"); o resto não grava. */
+    public static function clickPage(?string $page): ?string
+    {
+        return $page !== null && str_starts_with($page, '/') && !str_starts_with($page, '//') ? $page : null;
+    }
+
+    /**
+     * Quem clicou, para contar um clique por vaga e visitante por dia (chave única
+     * job_id + visitor em clicks): HMAC do IP e do user agent com o dia em Brasília. Muda
+     * todo dia (não liga visitas de dias diferentes) e, sem a chave, não volta ao IP. A
+     * chave é o DATABASE_URL, segredo que o site já tem. IP: o do Cloudflare
+     * (CF-Connecting-IP), senão o primeiro do X-Forwarded-For, senão o de quem conectou.
+     */
+    public static function visitor(Request $r): string
+    {
+        $ip = trim(explode(',', $r->header('cf-connecting-ip') ?? $r->header('x-forwarded-for') ?? $r->ip)[0]);
+        $day = Dates::local(Dates::now())->format('Y-m-d');
+        $ua = (string) $r->header('user-agent');
+        return substr(hash_hmac('sha256', "$day|$ip|$ua", (string) getenv('DATABASE_URL')), 0, 16);
     }
 
     /** Crawler, pré-visualização de link, verificador ou cliente HTTP (sem user agent também). */

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace VagasPhp\Http;
 
-/** Requisição HTTP: método, caminho, query string e cabeçalhos (nomes em minúsculas). */
+/** Requisição HTTP: método, caminho, query string, cabeçalhos (nomes em minúsculas) e IP de quem conectou. */
 final class Request
 {
     /**
@@ -20,6 +20,8 @@ final class Request
         public readonly string $host = 'localhost',
         /** @var array<string, string> parâmetros do caminho (/vagas/{slug}) */
         public array $params = [],
+        /** REMOTE_ADDR: atrás do proxy é o IP dele (o do visitante vem nos cabeçalhos) */
+        public readonly string $ip = '',
     ) {
     }
 
@@ -42,6 +44,7 @@ final class Request
             $headers,
             $https ? 'https' : 'http',
             $host,
+            ip: (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
         );
     }
 
