@@ -121,6 +121,20 @@ Para outra linguagem: um bloco novo em `collector/vagas/config_defaults.json` (o
 `config set` com `--tenant`) e um serviço como o `collector-ruby`. Regras em
 [docs/contrato-base.md](docs/contrato-base.md#multi-tenant-uma-base-uma-linguagem-por-tenant).
 
+#### Próximas linguagens
+
+Na ordem prevista. Cada uma é um tenant novo, só de coleta, como o Ruby:
+
+| linguagem | tenant | termos e frameworks | atenção no filtro |
+|---|---|---|---|
+| Ruby | `ruby` | Ruby, Rails, Sinatra, Hanami | feito (só coleta) |
+| Java | `java` | Java, Spring, Spring Boot, Quarkus | buscas por "java" trazem vagas de JavaScript |
+| C# | `csharp` | C#, .NET, ASP.NET, Blazor | `\b` não casa em volta de `#` e `.`: `c#` e `.net` precisam de regex à parte |
+| Python | `python` | Python, Django, Flask, FastAPI | vagas de dados e ML citam Python sem ser de desenvolvimento |
+| Node.js | `node` | Node.js, NestJS, Express | "JavaScript" sozinho também é vaga de front-end |
+| Go | `go` | Go, Golang, Gin | "go" é palavra comum em inglês: buscar por "golang" |
+| Rust | `rust` | Rust, Tokio, Actix, Axum | poucas vagas no Brasil: conferir se as fontes rendem |
+
 ## Serviço (Docker)
 
 ```bash
