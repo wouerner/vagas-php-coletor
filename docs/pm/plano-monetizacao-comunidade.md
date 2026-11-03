@@ -39,7 +39,8 @@ Distribuição das 65 vagas abertas:
 | **Salário quase ausente** | 1 de 65 vagas com salário | **Médio** — limita o M1 (relatório de mercado); focar em volume/stack/senioridade/modalidade |
 | **Concentração em LinkedIn + posts** | 51 de 65 vagas (78%) | **Médio** — se o LinkedIn bloquear, o produto cai junto |
 | **5 fontes sem vaga aberta** | coodesh, inhire, programathor, recrutei, upvagas com `open: 0` | **Baixo** — coberturas caras que não estão rendendo; revisar termos/intervalo |
-| **Repo não público** | `github.com/wouerner/vagas-php-coletor` → 404 | **Médio** — comunidade de código não existe |
+| **Repo público** | `github.com/wouerner/vagas-php-coletor` → 200 | **Baixo** — comunidade de código já existe; agora falta contribuição externa |
+| **Repo público** | `github.com/wouerner/vagas-php-coletor` → 200 | **Baixo** — comunidade de código já existe; agora falta contribuição externa |
 | **Bot do LinkedIn quebrou no dev** | `linkedin_post.py:80`, seletor `#interop-outlet` → `TimeoutError` desde 16/out | **Médio** — confirmar se a produção também falha |
 | **Coletor do dev local desligado** | `data/config.json` com 13/13 fontes `enabled: false` | **Baixo** — não afeta produção; higiene de dev |
 | **Post sem URL na base** | vaga `post` "Estamos contratando na Leega!" com `url: null` | **Baixo** — post de divulgação sem link clicável; prejudica conversão |
@@ -99,6 +100,8 @@ Blog curto com páginas de cauda longa: "vagas PHP remoto", "salário desenvolve
 
 **Anel 4 — Open source e contribuição (mês 2–6)**
 Publicar o repo. Adicionar `CONTRIBUTING.md`, templates de issue, e uma issue recrutando fontes novas ("adicionar fonte X"). O motor é reutilizável e a curadoria é feita pela comunidade. Isso atrai dev PHP, que é exatamente o público-alvo, e reduz seu custo de manutenção para quase zero. **Cuidado:** abrir o código não entrega a receita; é a alavanca de custo e de comunidade.
+
+**Atualização 30/10/2026:** o repo saiu do 404 e hoje responde 200; a tese mudou de "abrir o repo" para "criar contribuição externa e prova social".
 
 **Anéis 5 e 6 (12m+):** eventos mensais com RHs (roda de contratação), programa de embaixadores (devs que divulgam), e spin-offs de nicho (M6).
 
