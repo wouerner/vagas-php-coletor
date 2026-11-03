@@ -144,6 +144,10 @@
                  border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12px;
                  line-height: 1.45; white-space: normal; box-shadow: 0 4px 14px rgb(0 0 0 / .2); }
   .clicks:hover .tip, .clicks:focus .tip { display: block; }
+  /* Rajada da mesma empresa (Bursts no servidor): um card que abre para mostrar as vagas. */
+  .burst-list > summary { color: var(--accent); font-weight: 600; }
+  .burst-jobs { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+  .burst-jobs .job { background: var(--surface); }
   .empty, .more { text-align: center; color: var(--muted); padding: 28px 0; }
   .more button { cursor: pointer; padding: 8px 20px; }
   .themes { margin-top: 28px; }
@@ -188,6 +192,7 @@
     .job .meta a { display: inline-block; padding: 4px 0; }  /* longe do resto do card, que leva à página */
     /* O card leva à página da vaga, que tem a descrição inteira. */
     .job:has(a.page) details { display: none; }
+    .job.burst > details.burst-list { display: block; }  /* a lista do grupo continua */
   }
 </style>
 </head>
@@ -285,7 +290,7 @@ const live = document.getElementById("live");
 const liveText = document.getElementById("live-text");
 const tickBar = document.getElementById("tick");
 const announce = document.getElementById("announce");
-let offset = 0, seq = 0, manualBusy = false;
+let offset = 0, seq = 0, manualBusy = false, shown = [];  // shown: vagas carregadas, na ordem
 // Vagas já mostradas e as que chegaram com a página aberta (id -> quando chegou).
 let seen = new Set(), fresh = new Map(), unseen = 0, lastUpdate = 0, autoTimer;
 const HHMM = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
@@ -376,6 +381,59 @@ function card(job) {
   return li;
 }
 
+// Rajadas da mesma empresa num card só (Bursts no servidor: mudou um, mude o outro).
+// burst_key vem de /api/jobs?burst=1 (null: GitHub ou sem empresa).
+const BURST_GAP_MS = 12 * 3600 * 1000;
+const jobTime = j => Date.parse(j.posted_at || j.first_seen);
+
+function bursts(jobs) {
+  const items = [], open = new Map();
+  for (const job of jobs) {
+    const key = job.burst_key, at = jobTime(job);
+    if (!key || isNaN(at)) { items.push([job]); continue; }
+    const cur = open.get(key);
+    if (cur && Math.abs(cur.at - at) <= BURST_GAP_MS) { items[cur.i].push(job); cur.at = at; }
+    else { items.push([job]); open.set(key, { i: items.length - 1, at }); }
+  }
+  return items;
+}
+
+function span(sec) {
+  const m = Math.floor(Math.max(0, sec) / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h` + (m % 60 ? ` ${m % 60} min` : "");
+}
+
+function summary(values, max, counts) {
+  const count = new Map();
+  for (let v of values) { v = (v || "").trim(); if (v) count.set(v, (count.get(v) || 0) + 1); }
+  const pairs = [...count].sort((a, b) => b[1] - a[1]);
+  const shownPairs = pairs.slice(0, max).map(([v, n]) => counts && n > 1 ? `${n}× ${v}` : v);
+  const rest = pairs.length - shownPairs.length;
+  return shownPairs.join(" · ") + (rest > 0 ? ` · e mais ${rest}` : "");
+}
+
+function burstCard(jobs) {
+  const newest = jobs[0], oldest = jobs[jobs.length - 1], n = jobs.length;
+  const a = age(newest.posted_at || newest.first_seen), first = age(oldest.posted_at || oldest.first_seen);
+  const when = `publicadas em ${span(Math.floor((jobTime(newest) - jobTime(oldest)) / 1000))}`
+    + (a && first ? `, de ${first.at} a ${a.at} (Brasília)` : "");
+  const titles = summary(jobs.map(j => j.title), 3, true);
+  const places = summary(jobs.map(j => j.location), 5, false);
+  const li = el("li", { className: "job burst" + (a ? " " + a.band : "") },
+    el("div", { className: "head" },
+      el("h2", {}, `${(newest.company || "").trim()} · ${n} vagas`),
+      a && el("span", { className: "age", title: `Vaga mais recente ${a.label}: publicada há ${a.text}` }, a.text)),
+    el("div", { className: "meta" }, when),
+    titles && el("div", { className: "meta titles" }, titles),
+    places && el("div", { className: "meta places" }, places),
+    el("div", { className: "tags" }, ...[...new Set(jobs.map(j => j.source))]
+      .map(s => el("span", { className: "tag src" }, SOURCE_NAMES[s] || s))),
+    el("details", { className: "burst-list" }, el("summary", {}, `Ver as ${n} vagas`),
+      el("ul", { className: "burst-jobs" }, ...jobs.map(card))));
+  li.dataset.id = "burst-" + oldest.id;
+  return li;
+}
+
 // Primeira vaga visível abaixo dos filtros, para manter a rolagem quando chegam vagas no topo.
 function scrollAnchor() {
   if (window.scrollY < 10) return null;
@@ -385,22 +443,27 @@ function scrollAnchor() {
 }
 
 function render(jobs, { append = false, auto = false } = {}) {
-  const open = new Set([...list.querySelectorAll("details[open]")].map(d => d.closest(".job").dataset.id));
+  // Descrições e grupos abertos continuam abertos depois de redesenhar.
+  const open = new Set([...list.querySelectorAll("details[open]")].map(d => d.closest("[data-id]").dataset.id));
   const anchor = auto && scrollAnchor();
   const now = Date.now();
   for (const [id, at] of fresh) if (now - at > FRESH_MS) fresh.delete(id);
-  if (!append) list.replaceChildren();
   let added = 0;
   for (const job of jobs) {
     if (auto && !seen.has(job.id)) { fresh.set(job.id, now); added++; }
     seen.add(job.id);
-    const li = card(job);
-    if (fresh.has(job.id)) {
-      li.classList.add("fresh");
-      li.querySelector(".tags").prepend(el("span", { className: "tag fresh" }, "acabou de chegar"));
-    }
-    if (open.has(job.id)) li.querySelector("details")?.setAttribute("open", "");
-    list.append(li);
+  }
+  // Redesenha tudo: uma rajada pode continuar na página seguinte ("Carregar mais").
+  shown = append ? shown.concat(jobs) : jobs;
+  list.replaceChildren(...bursts(shown).map(item => item.length > 1 ? burstCard(item) : card(item[0])));
+  const freshTag = node => node.querySelector(":scope > .tags")
+    .prepend(el("span", { className: "tag fresh" }, "acabou de chegar"));
+  for (const li of list.querySelectorAll("li[data-id]")) {
+    const isBurst = li.classList.contains("burst");
+    const arrived = isBurst ? [...li.querySelectorAll(".burst-jobs > li")].some(c => fresh.has(c.dataset.id))
+      : fresh.has(li.dataset.id);
+    if (arrived) { li.classList.add("fresh"); freshTag(li); }
+    if (open.has(li.dataset.id)) li.querySelector(":scope > details")?.setAttribute("open", "");
   }
   if (anchor) {
     const li = [...list.children].find(n => n.dataset.id === anchor.id);
@@ -419,6 +482,7 @@ async function load(mode = "reset") {
   for (const [k, v] of [...params]) if (!v) params.delete(k);
   params.set("limit", auto ? Math.min(Math.max(offset, PAGE), 200) : PAGE);
   params.set("offset", auto ? 0 : offset);
+  params.set("burst", "1");  // burst_key para agrupar rajadas da mesma empresa
   if (!auto) manualBusy = true;
   setLive("loading", "Atualizando…");
   try {

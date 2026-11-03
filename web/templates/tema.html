@@ -87,6 +87,10 @@
                  border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12px;
                  line-height: 1.45; white-space: normal; box-shadow: 0 4px 14px rgb(0 0 0 / .2); }
   .clicks:hover .tip, .clicks:focus .tip { display: block; }
+  /* Rajada da mesma empresa (Bursts): um card que abre para mostrar as vagas. */
+  .burst-list > summary { color: var(--accent); font-weight: 600; }
+  .burst-jobs { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+  .burst-jobs .job { background: var(--surface); }
   .more { margin: 16px 0 0; font-size: 14px; }
   .more:empty { display: none; }
 
@@ -107,6 +111,7 @@
     .job .when { display: none; }
     .job .meta a { display: inline-block; padding: 4px 0; }
     .job:has(a.page) details { display: none; }
+    .job.burst > details.burst-list { display: block; }  /* a lista do grupo continua */
   }
 </style>
 </head>

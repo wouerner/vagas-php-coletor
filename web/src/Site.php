@@ -14,7 +14,8 @@ use VagasPhp\Http\Router;
  *
  * Rotas: /             página (templates/index.html), com as primeiras vagas já no HTML
  *        /api/jobs     vagas em JSON (filtros: q, source, workplace, seniority, stack, hours,
- *                      include_closed, limit, offset); `path` é a página da vaga no site
+ *                      include_closed, limit, offset); `path` é a página da vaga no site;
+ *                      burst=1 acrescenta `burst_key` (agrupamento de rajadas, Bursts)
  *        /api/stats    totais por fonte, vagas abertas (open_total) e últimas coletas
  *        /vagas        temas (stack, modalidade, senioridade e combinações) com contagem
  *        /vagas/<tema> vagas abertas de um tema (templates/tema.html), ex.: /vagas/laravel-remoto
@@ -382,7 +383,7 @@ final class Site
                                ?array $jsonld = null, bool $noindex = false, int $status = 200): Response
     {
         $content = ['h1' => Text::e($h1), 'crumb' => $crumb, 'intro' => $intro,
-            'list' => implode('', array_map(fn ($j) => self::jobCard($j, $path), $this->repo->withClicks($jobs))), 'more' => $more,
+            'list' => Bursts::html($this->repo->withClicks($jobs), $path), 'more' => $more,
             'related' => $related];
         return Response::html(Seo::render($request, 'tema.html', $title, $description, $path, $content, $jsonld, $noindex), $status);
     }
@@ -524,7 +525,7 @@ final class Site
         $base = Seo::siteUrl($r);
         $jsonld = [['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => Seo::SITE_NAME,
             'url' => $base . '/', 'inLanguage' => 'pt-BR'], $this->jobList($r, 'Vagas PHP abertas', $rows)];
-        $list = implode('', array_map(fn ($j) => self::jobCard($j), $rows))
+        $list = Bursts::html($rows)
             ?: '<li class="empty">Nenhuma vaga encontrada com esses filtros.</li>';
         $html = Seo::render($r, 'index.html', $title, $description, '/',
             ['list' => $list, 'stats' => $statsHtml, 'themes' => $themesHtml], $jsonld);
@@ -540,7 +541,11 @@ final class Site
         $limit = (int) self::number($r->get('limit'), 50, 1, 200);
         $rows = self::safe(fn () => $this->repo->queryJobs(...['source' => $source, ...self::jobFilters($r),
             'limit' => $limit + 1, 'offset' => (int) self::number($r->get('offset'), 0, 0, 1e6)]), []);
-        $jobs = array_map(Repo::publicJob(...), $this->repo->withClicks(self::withPath(array_slice($rows, 0, $limit))));
+        // ?burst=1 (a home usa): cada vaga leva burst_key, a chave opaca da empresa para
+        // agrupar rajadas (Bursts). Sem o parâmetro a resposta é a de sempre.
+        $burst = in_array($r->get('burst'), ['1', 'true'], true);
+        $jobs = array_map(fn ($row) => Repo::publicJob($row) + ($burst ? ['burst_key' => Bursts::publicKey($row)] : []),
+            $this->repo->withClicks(self::withPath(array_slice($rows, 0, $limit))));
         return Response::json(['jobs' => $jobs,
             'has_more' => count($rows) > $limit, 'max_age_hours' => Dates::maxAgeHours()]);
     }
