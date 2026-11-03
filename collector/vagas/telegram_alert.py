@@ -1,10 +1,13 @@
 """Alerta de vagas no Telegram: lê as vagas novas da API pública do site (/api/jobs, sem
 acessar a base) e publica cada uma num chat pelo bot de VAGAS_TELEGRAM_TOKEN.
 
-Os ids já enviados ficam em data/telegram_alert_state.json (só os últimos 500). Cada
-execução envia no máximo `limit` vagas, para não inundar o chat: as mais recentes ainda
-não enviadas, em ordem de publicação. No modo agrupado (batch) vai UMA mensagem com todas
-as pendentes que couberem no limite do Telegram (format_digest). Cada envio bem-sucedido (vaga ou resumo semanal)
+Os ids já enviados ficam em data/telegram_alert_state.json (só os últimos 500). Rajadas
+(várias vagas da mesma empresa, cada uma a até BURST_GAP da anterior; ex.: a BairesDev
+publica uma vaga por cidade) viram um grupo só, como na listagem do site (group_bursts).
+Cada execução envia no máximo `limit` mensagens (grupos), para não inundar o chat: os
+grupos mais recentes ainda não enviados, em ordem de publicação. No modo agrupado (batch)
+vai UMA mensagem com todas as pendentes que couberem no limite do Telegram (format_digest),
+também com as rajadas num bloco só. Cada envio bem-sucedido (vaga ou resumo semanal)
 também entra em data/telegram_alert_log.json com data/hora (últimas 500 entradas), base
 do relatório diário do canal.
 
@@ -31,7 +34,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
 
@@ -58,6 +61,9 @@ INDENT = "    "  # recuo dos detalhes de cada vaga no resumo agrupado
 ATTEMPTS = 2
 HEADERS = {"User-Agent": "vagas-php"}
 DEDUPE_DAYS = 14  # janela do dedupe por conteúdo (content_key)
+# Maior intervalo entre publicações consecutivas da mesma empresa na mesma rajada (igual a
+# Bursts::GAP do site).
+BURST_GAP = timedelta(hours=12)
 # Referência de vaga no título: "REF#123", "Ref. 0086E", "ref: AB-12"...
 TITLE_REF = re.compile(r"\bref\b\.?\s*[#:]?\s*[a-z0-9-]*\d[a-z0-9-]*", re.IGNORECASE)
 
@@ -119,37 +125,137 @@ def format(job: dict) -> str:
     return "\n".join(x for x in lines if x)
 
 
-def digest_fit(jobs: list[dict]) -> tuple[str, int]:
-    """(mensagem, quantas vagas couberam) do resumo agrupado: as vagas do fim saem até a
-    mensagem caber em MESSAGE_MAX. Lista vazia: ("", 0)."""
-    if not jobs:
-        return "", 0
-    today = dates.now_utc().astimezone(dates.BRASILIA)
-    head = [f"<b>🐘 Vagas PHP</b> — {today:%d/%m}", "",
-            "Vagas de PHP, Laravel e Symfony publicadas nas últimas horas:"]
-    blocks = []
+def burst_key(job: dict) -> str | None:
+    """Chave da empresa para agrupar rajadas, ou None (não agrupa). Igual a Bursts::key do
+    site (web/src/Bursts.php): company_key (o do job, se vier, ou classify.company_key do
+    nome); sem ele, o nome normalizado (as duas chaves nunca se misturam). Issues do GitHub
+    (empresa vem de texto livre) e vagas sem empresa ficam sozinhas."""
+    if job.get("source") == "github":
+        return None
+    key = (job.get("company_key") or "").strip() or classify.company_key(job.get("company"))
+    if key:
+        return f"k:{key}"
+    name = _plain(job.get("company"))
+    return f"n:{name}" if name else None
+
+
+def burst_time(job: dict) -> datetime | None:
+    """Quando a vaga foi publicada (posted_at), ou None: sem data de publicação a vaga fica
+    sozinha (first_seen é quando o coletor a viu, não quando a empresa publicou)."""
+    try:
+        at = datetime.fromisoformat(job.get("posted_at") or "")
+    except (TypeError, ValueError):
+        return None
+    return at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+
+
+def group_bursts(jobs: list[dict]) -> list[list[dict]]:
+    """Separa `jobs` (mais recentes primeiro) em grupos: uma vaga sozinha ou uma rajada da
+    mesma empresa (burst_key) com cada publicação a até BURST_GAP da anterior do grupo
+    (encadeado). Igual a Bursts::group do site. O grupo fica na posição da vaga mais
+    recente dele; dentro, a ordem da lista. Sem chave ou sem data: sozinha."""
+    items: list[list[dict]] = []
+    open_: dict[str, tuple[int, datetime]] = {}  # chave -> (índice em items, última data)
     for job in jobs:
-        stack = ", ".join(s.strip() for s in (job.get("stack") or "").split(",") if s.strip())
-        details = " · ".join(escape(str(p).strip()) for p in (
-            job.get("company"), job.get("location"), job.get("workplace"),
-            job.get("seniority"), stack) if p and str(p).strip())
-        title = (job.get("title") or "").strip()
-        url = (job.get("url") or "").strip()
-        lines = [f"<b>{escape(title)}</b>" if title else None,
-                 f"{INDENT}{details}" if details else None,
-                 f'{INDENT}🔗 <a href="{escape(out_link(job))}">{escape(destiny(url))}</a>'
-                 if url else None]
-        blocks.append("\n".join(x for x in lines if x))
-    n = len(blocks)
-    while n:
-        text = "\n".join(head) + "\n\n" + "\n\n".join(blocks[:n])
+        key, at = burst_key(job), burst_time(job)
+        if key is None or at is None:
+            items.append([job])
+            continue
+        if key in open_ and abs(open_[key][1] - at) <= BURST_GAP:
+            items[open_[key][0]].append(job)
+            open_[key] = (open_[key][0], at)
+        else:
+            items.append([job])
+            open_[key] = (len(items) - 1, at)
+    return items
+
+
+def span(seconds: float) -> str:
+    """"45 min", "3 h", "3 h 31 min"."""
+    m = int(max(0, seconds)) // 60
+    if m < 60:
+        return f"{m} min"
+    return f"{m // 60} h" + (f" {m % 60} min" if m % 60 else "")
+
+
+def burst_header(group: list[dict]) -> str:
+    """"🏢 BairesDev · 6 vagas publicadas em 3 h 31 min (03/11 09:10 a 12:41, Brasília)"."""
+    newest, oldest = burst_time(group[0]), burst_time(group[-1])
+    company = escape((group[0].get("company") or "").strip())
+    text = f"🏢 <b>{company}</b> · {len(group)} vagas"
+    if newest and oldest:
+        a, b = oldest.astimezone(dates.BRASILIA), newest.astimezone(dates.BRASILIA)
+        end = f"{b:%H:%M}" if a.date() == b.date() else f"{b:%d/%m %H:%M}"
+        text += (f" publicadas em {span((newest - oldest).total_seconds())} "
+                 f"({a:%d/%m %H:%M} a {end}, Brasília)")
+    return text
+
+
+def job_block(job: dict, company: bool = True) -> str:
+    """Bloco da vaga nas mensagens com várias vagas: título em negrito e, recuados,
+    empresa · local · modalidade · senioridade · stack e o link. company=False: sem a
+    empresa (dentro de uma rajada, ela já está no cabeçalho)."""
+    stack = ", ".join(s.strip() for s in (job.get("stack") or "").split(",") if s.strip())
+    details = " · ".join(escape(str(p).strip()) for p in (
+        job.get("company") if company else None, job.get("location"), job.get("workplace"),
+        job.get("seniority"), stack) if p and str(p).strip())
+    title = (job.get("title") or "").strip()
+    url = (job.get("url") or "").strip()
+    lines = [f"<b>{escape(title)}</b>" if title else None,
+             f"{INDENT}{details}" if details else None,
+             f'{INDENT}🔗 <a href="{escape(out_link(job))}">{escape(destiny(url))}</a>'
+             if url else None]
+    return "\n".join(x for x in lines if x)
+
+
+def group_block(group: list[dict]) -> str:
+    """Bloco do grupo no resumo agrupado: a vaga sozinha, ou o cabeçalho da rajada e as vagas."""
+    if len(group) == 1:
+        return job_block(group[0])
+    return "\n".join([burst_header(group), *(job_block(j, company=False) for j in group)])
+
+
+def message_fit(group: list[dict]) -> tuple[str, list[dict]]:
+    """(mensagem, vagas incluídas) de um grupo no modo padrão: vaga sozinha com format;
+    rajada com o cabeçalho e as vagas. Rajada acima de MESSAGE_MAX perde as vagas do fim
+    (as mais antigas), que ficam pendentes para a próxima execução."""
+    for n in range(len(group), 0, -1):
+        part = group[:n]
+        text = format(part[0]) if n == 1 else "\n\n".join(
+            [burst_header(part), *(job_block(j, company=False) for j in part)])
         if len(text) <= MESSAGE_MAX:
-            break
+            if n < len(group):
+                log.warning("Rajada de %s acima de %d caracteres: couberam %d de %d vagas.",
+                            group[0].get("company"), MESSAGE_MAX, n, len(group))
+            return text, part
+    return "", []
+
+
+def digest_fit(jobs: list[dict]) -> tuple[str, list[dict]]:
+    """(mensagem, vagas incluídas) do resumo agrupado, com as rajadas (group_bursts) num
+    bloco só: os grupos do fim saem até a mensagem caber em MESSAGE_MAX (se nem o 1º grupo
+    couber, ele perde as vagas mais antigas). Lista vazia: ("", [])."""
+    if not jobs:
+        return "", []
+    today = dates.now_utc().astimezone(dates.BRASILIA)
+    head = "\n".join([f"<b>🐘 Vagas PHP</b> — {today:%d/%m}", "",
+                      "Vagas de PHP, Laravel e Symfony publicadas nas últimas horas:"])
+    groups = group_bursts(jobs)
+    blocks = [group_block(g) for g in groups]
+    n = len(blocks)
+    while n and len(text := "\n\n".join([head, *blocks[:n]])) > MESSAGE_MAX:
         n -= 1
-    if n < len(blocks):
+    included = [j for g in groups[:n] for j in g]
+    if not n:
+        first = groups[0]
+        for k in range(len(first) - 1, 0, -1):
+            if len(text := "\n\n".join([head, group_block(first[:k])])) <= MESSAGE_MAX:
+                included = first[:k]
+                break
+    if len(included) < len(jobs):
         log.warning("Resumo agrupado acima de %d caracteres: couberam %d de %d vagas.",
-                    MESSAGE_MAX, n, len(blocks))
-    return (text, n) if n else ("", 0)
+                    MESSAGE_MAX, len(included), len(jobs))
+    return (text, included) if included else ("", [])
 
 
 def format_digest(jobs: list[dict]) -> str:
@@ -414,9 +520,12 @@ def in_window(hour: int, start: int, end: int) -> bool:
 
 def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = False,
         batch: bool = False) -> dict:
-    """Envia as vagas ainda não enviadas (no máximo `limit`). dry_run: só imprime.
-    batch: UMA mensagem com todas as pendentes (format_digest), sem `limit`; as que não
-    couberem no limite do Telegram ficam pendentes para a próxima execução.
+    """Envia as vagas ainda não enviadas, uma mensagem por grupo (group_bursts: vaga sozinha
+    ou rajada da mesma empresa), no máximo `limit` mensagens. dry_run: só imprime.
+    batch: UMA mensagem com todas as pendentes (format_digest, rajadas num bloco só), sem
+    `limit`; as que não couberem no limite do Telegram ficam pendentes para a próxima
+    execução. Em qualquer modo, o estado e o log recebem cada id incluído numa mensagem
+    aceita pelo Telegram; numa falha, nada do grupo é gravado.
     Fora de VAGAS_TELEGRAM_ACTIVE_HOURS não envia nada (as vagas ficam pendentes para a
     próxima execução dentro da janela); force ignora a janela."""
     if not force:
@@ -446,51 +555,66 @@ def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = Fal
         state_save(data_dir, sent_ids)
     if batch:
         return run_batch(data_dir, jobs, pending, skipped, len(dups), dry_run)
-    to_send = list(reversed(pending[:limit]))  # as mais recentes, a mais antiga primeiro
-    log.info("%d vagas na API, %d ainda não enviadas (%d ignoradas sem URL, %d repetidas); "
-             "enviando %d%s.", len(jobs), len(pending), skipped, len(dups), len(to_send),
-             " (simulação)" if dry_run else "")
+    groups = group_bursts(pending)
+    to_send = list(reversed(groups[:limit]))  # os mais recentes, o mais antigo primeiro
+    log.info("%d vagas na API, %d ainda não enviadas (%d ignoradas sem URL, %d repetidas) "
+             "em %d grupo(s); enviando %d mensagem(ns) com %d vaga(s)%s.", len(jobs),
+             len(pending), skipped, len(dups), len(groups), len(to_send),
+             sum(len(g) for g in to_send), " (simulação)" if dry_run else "")
 
-    sent = 0
-    for job in to_send:
-        text = format(job)
+    sent = messages = 0
+    for group in to_send:
+        text, included = message_fit(group)
+        if not included:
+            log.error("Vaga %s acima de %d caracteres; não enviada.", group[0]["id"], MESSAGE_MAX)
+            continue
+        ids = [j["id"] for j in included]
         if dry_run:
-            print(f"--- {job['id']}\n{text}\n")
+            print(f"--- {', '.join(ids)}\n{text}\n")
             continue
         resp = send(VAGAS_TELEGRAM_TOKEN, VAGAS_TELEGRAM_CHAT_ID, text)
         if not resp.get("ok"):
-            # Para aqui: a vaga fica pendente e volta na próxima execução.
-            log.error("Telegram recusou a vaga %s: %s", job["id"], resp.get("description"))
+            # Para aqui: o grupo e os seguintes ficam pendentes e voltam na próxima execução.
+            log.error("Telegram recusou %s: %s", ", ".join(ids), resp.get("description"))
             break
-        sent_ids.append(job["id"])
-        state_save(data_dir, sent_ids)  # a cada envio: uma falha depois não reenvia esta
-        log_append(data_dir, {"kind": "job", "id": job["id"], "source": job.get("source"),
-                              "title": job.get("title"), "key": content_key(job)})
-        sent += 1
-        log.info("Vaga enviada: %s (%s)", job["id"], job.get("title"))
+        sent_ids += ids
+        state_save(data_dir, sent_ids)  # a cada envio: uma falha depois não reenvia este
+        for job in included:
+            entry = {"kind": "job", "id": job["id"], "source": job.get("source"),
+                     "title": job.get("title"), "key": content_key(job)}
+            log_append(data_dir, {**entry, "burst": len(included)} if len(included) > 1
+                       else entry)
+        sent += len(included)
+        messages += 1
+        log.info("Mensagem enviada com %d vaga(s): %s", len(included), ", ".join(ids))
         time.sleep(1)
     if dry_run:
         print(f"{skipped} vaga(s) ignorada(s) por falta de URL; {len(dups)} repetida(s).")
-    return {"api": len(jobs), "pending": len(pending), "sent": sent, "skipped": skipped,
+    return {"api": len(jobs), "pending": len(pending), "groups": len(groups),
+            "messages": messages, "sent": sent, "skipped": skipped,
             "duplicates": len(dups), "dry_run": dry_run}
 
 
 def run_batch(data_dir: Path, jobs: list[dict], pending: list[dict], skipped: int,
               duplicates: int, dry_run: bool) -> dict:
     """Modo agrupado de run: uma só mensagem com as vagas pendentes (mais recentes primeiro;
-    as mais antigas saem se passar do limite) e todas as enviadas gravadas no estado e no log."""
-    text, n = digest_fit(pending)
-    included = pending[:n]
+    rajadas da mesma empresa num bloco só; os grupos mais antigos saem se passar do limite) e
+    todas as enviadas gravadas no estado e no log."""
+    text, included = digest_fit(pending)
+    n = len(included)
+    groups = group_bursts(included)
     log.info("%d vagas na API, %d ainda não enviadas (%d ignoradas sem URL, %d repetidas); "
-             "enviando %d numa mensagem só (%d caracteres)%s.", len(jobs), len(pending),
-             skipped, duplicates, n, len(text), " (simulação)" if dry_run else "")
+             "enviando %d em %d grupo(s) numa mensagem só (%d caracteres)%s.", len(jobs),
+             len(pending), skipped, duplicates, n, len(groups), len(text),
+             " (simulação)" if dry_run else "")
     result = {"api": len(jobs), "pending": len(pending), "sent": 0, "skipped": skipped,
-              "duplicates": duplicates, "batch": True, "included": n, "chars": len(text),
-              "dry_run": dry_run}
+              "duplicates": duplicates, "batch": True, "included": n,
+              "groups": len(groups), "chars": len(text), "dry_run": dry_run}
     if not included:
         return result
     if dry_run:
-        print(f"--- mensagem única: {n} vaga(s), {len(text)} caracteres\n{text}\n")
+        print(f"--- mensagem única: {n} vaga(s) em {len(groups)} grupo(s), "
+              f"{len(text)} caracteres\n{text}\n")
         print(f"{skipped} vaga(s) ignorada(s) por falta de URL; {duplicates} repetida(s).")
         return result
     resp = send(VAGAS_TELEGRAM_TOKEN, VAGAS_TELEGRAM_CHAT_ID, text)
@@ -500,9 +624,10 @@ def run_batch(data_dir: Path, jobs: list[dict], pending: list[dict], skipped: in
         return result
     sent_ids = state_load(data_dir) + [j["id"] for j in included]
     state_save(data_dir, sent_ids)
-    for job in included:
-        log_append(data_dir, {"kind": "job", "id": job["id"], "source": job.get("source"),
-                              "title": job.get("title"), "key": content_key(job),
-                              "batch": True})
+    for group in groups:
+        for job in group:
+            entry = {"kind": "job", "id": job["id"], "source": job.get("source"),
+                     "title": job.get("title"), "key": content_key(job), "batch": True}
+            log_append(data_dir, {**entry, "burst": len(group)} if len(group) > 1 else entry)
     log.info("Resumo agrupado enviado com %d vaga(s).", n)
     return {**result, "sent": n}

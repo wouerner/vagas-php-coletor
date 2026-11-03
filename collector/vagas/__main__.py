@@ -71,11 +71,14 @@ def main() -> int:
     t = sub.add_parser("telegram-alert", help="envia ao Telegram as vagas novas da API pública")
     t.add_argument("--dry-run", action="store_true",
                    help="imprime as mensagens sem enviar e sem gravar o estado")
-    t.add_argument("--limit", type=int, default=5, help="máximo de vagas por execução")
+    t.add_argument("--limit", type=int, default=5,
+                   help="máximo de mensagens por execução; cada mensagem é uma vaga ou uma "
+                        "rajada da mesma empresa (vagas a até 12 h uma da outra)")
     t.add_argument("--force", action="store_true",
                    help="ignora a janela de VAGAS_TELEGRAM_ACTIVE_HOURS (uso manual/teste)")
     t.add_argument("--batch", action="store_true",
-                   help="agrupa todas as vagas pendentes numa mensagem só (ignora --limit)")
+                   help="agrupa todas as vagas pendentes numa mensagem só, com as rajadas "
+                        "da mesma empresa num bloco (ignora --limit)")
     d =sub.add_parser("telegram-digest",
                        help="envia ao Telegram o resumo semanal (print do dashboard + texto do "
                             "post do LinkedIn); uma vez por semana")

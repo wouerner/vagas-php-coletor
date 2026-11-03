@@ -197,10 +197,17 @@ O resumo semanal do [canal do Telegram](https://t.me/vagas_php) (`telegram-diges
 mesmo post: o mesmo print do dashboard e o mesmo texto.
 
 Os alertas de vagas novas do canal saem de `python -m vagas telegram-alert`, que lê a
-API pública do site e envia, por padrão, uma mensagem por vaga (no máximo `--limit`, 5).
-Com `--batch`, todas as vagas pendentes vão numa mensagem só (título em negrito e, abaixo,
-empresa · local · modalidade · senioridade · stack e o link); se a mensagem passar do limite
-de 4096 caracteres do Telegram, as mais antigas ficam para a próxima execução. A janela
+API pública do site e envia, por padrão, uma mensagem por grupo (no máximo `--limit`
+mensagens, 5). Como na listagem do site, vagas da mesma empresa publicadas a até 12 h uma
+da outra (ex.: a BairesDev, que publica a mesma vaga em várias cidades) formam uma rajada:
+uma mensagem só, com a empresa, quantas vagas e a janela de publicação no topo. Empresa pelo
+`company_key` do filtro (sem ele, o nome normalizado); vagas sem empresa ou sem data e
+issues do GitHub saem sozinhas. Com `--batch`, todas as vagas pendentes vão numa mensagem só
+(título em negrito e, abaixo, empresa · local · modalidade · senioridade · stack e o link;
+as rajadas num bloco com o mesmo cabeçalho), sem `--limit`; se a mensagem passar do limite
+de 4096 caracteres do Telegram, os grupos mais antigos ficam para a próxima execução. Cada
+id incluído numa mensagem aceita entra no estado; se o Telegram recusar, nada do grupo é
+gravado e ele volta na próxima execução. A janela
 `VAGAS_TELEGRAM_ACTIVE_HOURS` (padrão `8-19`, horário de Brasília) e o `--force` valem nos
 dois modos; `--dry-run` só imprime, sem enviar nem gravar o estado.
 
