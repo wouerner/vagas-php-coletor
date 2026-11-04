@@ -40,6 +40,12 @@ final class Repo
         $this->tenant = strtolower(trim($tenant ?? ((string) getenv('VAGAS_TENANT') ?: 'php')));
     }
 
+    /** Linguagem do tenant ("PHP", "Ruby"): sai das listas de stack (toda vaga do tenant a tem). */
+    private function lang(): string
+    {
+        return (Brand::BRANDS[$this->tenant] ?? Brand::BRANDS['php'])['lang'];
+    }
+
     /** Item de site_meta (JSON gravado pelo coletor), ou null. */
     public function meta(string $name): mixed
     {
@@ -207,7 +213,7 @@ final class Repo
         $stacks = [];
         foreach ($live as $r) {
             foreach (Text::stacks($r['stack']) as $s) {
-                if ($s !== 'PHP') {
+                if ($s !== $this->lang()) {
                     $stacks[] = $s;
                 }
             }
@@ -302,7 +308,7 @@ final class Repo
             }
             $p['jobs']++;
             foreach (Text::stacks($r['stack']) as $s) {
-                if ($s !== 'PHP') {
+                if ($s !== $this->lang()) {
                     $p['stack'][] = $s;
                 }
             }
@@ -346,7 +352,7 @@ final class Repo
             $c['sources'][] = $r['source'];
             $c['workplace'][] = $r['workplace'] ?: 'Não informado';
             foreach (Text::stacks($r['stack']) as $s) {
-                if ($s !== 'PHP') {
+                if ($s !== $this->lang()) {
                     $c['stack'][] = $s;
                 }
             }

@@ -12,22 +12,20 @@ namespace VagasPhp;
  */
 final class Themes
 {
-    public const STACK_WORKPLACE = ['Laravel' => ['Remoto', 'Híbrido', 'Presencial'], 'Symfony' => ['Remoto'],
-        'WordPress' => ['Remoto'], 'Magento' => ['Remoto'], 'CodeIgniter' => ['Remoto'], 'Drupal' => ['Remoto']];
-    public const STACK_SENIORITY = ['Laravel' => ['Júnior', 'Pleno', 'Sênior']];
+    // Combinações stack + modalidade e stack + senioridade: Brand (stack_workplace, stack_seniority).
     public const SENIORITY_WORKPLACE = ['Júnior' => ['Remoto'], 'Pleno' => ['Remoto'], 'Sênior' => ['Remoto']];
     public const WORKPLACE_PLURAL = ['Remoto' => 'remotas', 'Híbrido' => 'híbridas', 'Presencial' => 'presenciais'];
     public const GROUPS = ['Por stack', 'Por modalidade', 'Por senioridade', 'Combinações'];
 
     /** @var array<string, array> temas por slug */
     public readonly array $themes;
-    /** @var array<string, string> apelidos (/vagas/junior -> php-junior) */
+    /** @var array<string, string> apelidos (/vagas/junior -> php-junior; ruby-junior no Ruby) */
     public readonly array $aliases;
 
     /** @param array{stacks?: list<string>, workplaces?: list<string>, seniorities?: list<string>}|null $taxonomy */
     public function __construct(?array $taxonomy)
     {
-        $stacks = array_values(array_filter($taxonomy['stacks'] ?? [], fn ($s) => $s !== 'PHP'));
+        $stacks = array_values(array_filter($taxonomy['stacks'] ?? [], fn ($s) => $s !== Brand::lang()));
         $workplaces = $taxonomy['workplaces'] ?? [];
         $levels = $taxonomy['seniorities'] ?? [];
         $combos = [];
@@ -40,12 +38,12 @@ final class Themes
         foreach ($levels as $lv) {
             $combos[] = [2, null, null, $lv];
         }
-        foreach (self::STACK_WORKPLACE as $s => $ws) {
+        foreach (Brand::get('stack_workplace') as $s => $ws) {
             foreach ($ws as $w) {
                 $combos[] = [3, $s, $w, null];
             }
         }
-        foreach (self::STACK_SENIORITY as $s => $lvs) {
+        foreach (Brand::get('stack_seniority') as $s => $lvs) {
             foreach ($lvs as $lv) {
                 $combos[] = [3, $s, null, $lv];
             }
@@ -62,7 +60,7 @@ final class Themes
                 || ($level && !in_array($level, $levels, true))) {
                 continue;
             }
-            $parts = [$stack ? Text::slugify($stack) : ($level ? 'php' : null),
+            $parts = [$stack ? Text::slugify($stack) : ($level ? Brand::get('lang_lower') : null),
                 $level ? Text::slugify($level) : null, $workplace ? Text::slugify($workplace) : null];
             $slug = implode('-', array_filter($parts));
             $themes[$slug] = ['slug' => $slug, 'path' => "/vagas/$slug", 'group' => self::GROUPS[$group],
@@ -71,7 +69,7 @@ final class Themes
         }
         $aliases = [];
         foreach ($levels as $level) {
-            $aliases[Text::slugify($level)] = 'php-' . Text::slugify($level);
+            $aliases[Text::slugify($level)] = Brand::get('lang_lower') . '-' . Text::slugify($level);
         }
         $this->themes = $themes;
         $this->aliases = $aliases;
@@ -80,7 +78,7 @@ final class Themes
     /** "Vagas Laravel remotas", "Vagas PHP sênior remotas", "Vagas de estágio em PHP". */
     public static function name(?string $stack, ?string $workplace, ?string $seniority): string
     {
-        $tech = $stack ?: 'PHP';
+        $tech = $stack ?: Brand::lang();
         if ($seniority === 'Estágio') {
             $name = "Vagas de estágio em $tech";
         } else {

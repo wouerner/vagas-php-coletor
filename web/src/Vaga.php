@@ -70,13 +70,13 @@ final class Vaga
     /** Tema principal [nome, caminho]: a primeira stack além de PHP, ou PHP (/vagas). */
     public static function topic(array $job): array
     {
-        $other = array_values(array_filter(Text::stacks($job['stack'] ?? null), fn ($s) => $s !== 'PHP'));
-        return $other ? [$other[0], self::topicPath($other[0])] : ['PHP', '/vagas'];
+        $other = array_values(array_filter(Text::stacks($job['stack'] ?? null), fn ($s) => $s !== Brand::lang()));
+        return $other ? [$other[0], self::topicPath($other[0])] : [Brand::lang(), '/vagas'];
     }
 
     public static function topicPath(string $name): string
     {
-        return $name === 'PHP' ? '/vagas' : '/vagas/' . Text::slugify($name);
+        return $name === Brand::lang() ? '/vagas' : '/vagas/' . Text::slugify($name);
     }
 
     /** Empresa que contrata, para o hiringOrganization; null quando não dá para afirmar. */
@@ -297,21 +297,21 @@ final class Vaga
 
     public static function pageTitle(array $job, bool $isOpen): string
     {
-        $title = trim($job['title'] ?: 'Vaga PHP');
+        $title = trim($job['title'] ?: 'Vaga ' . Brand::lang());
         if (!empty($job['company'])) {
             $title .= ' — ' . trim($job['company']);
         }
         if (!empty($job['workplace'])) {
             $title .= " ({$job['workplace']})";
         }
-        return $title . ($isOpen ? '' : ' · encerrada') . ' | ' . Seo::SITE_NAME;
+        return $title . ($isOpen ? '' : ' · encerrada') . ' | ' . Seo::siteName();
     }
 
     /** Resumo para a meta description: cargo, empresa, modalidade e o começo do texto. */
     public static function summary(array $job, int $limit = 150): string
     {
         $facts = array_values(array_filter(array_map(fn ($k) => $job[$k] ?? null, ['seniority', 'workplace', 'contract'])));
-        $head = trim('Vaga ' . ($job['title'] ?: 'PHP'));
+        $head = trim('Vaga ' . ($job['title'] ?: Brand::lang()));
         if (!empty($job['company'])) {
             $head .= ' na ' . trim($job['company']);
         }
@@ -391,7 +391,7 @@ final class Vaga
         foreach ($items as $r) {
             $company = $r['source'] !== 'github' ? ($r['company'] ?? null) : null;  // texto livre lá
             $meta = implode(' · ', array_map(Text::e(...), array_filter([$company, self::place($r), $r['seniority'] ?? null])));
-            $lis .= '<li><a href="' . Text::e(Seo::jobPath($r)) . '">' . Text::e($r['title'] ?: 'Vaga PHP') . '</a>'
+            $lis .= '<li><a href="' . Text::e(Seo::jobPath($r)) . '">' . Text::e($r['title'] ?: 'Vaga ' . Brand::lang()) . '</a>'
                 . ($meta !== '' ? "<span class=\"meta\">$meta</span>" : '') . '</li>';
         }
         return '<section class="card similar" id="parecidas"><h2>' . Text::e($heading) . "</h2><ul>$lis</ul></section>";
@@ -422,7 +422,7 @@ final class Vaga
             $out[] = self::similarHtml($others, 'Vagas parecidas abertas');
         }
         $out[] = '<article class="card job' . ($isOpen ? '' : ' closed-job') . '">';
-        $out[] = '<h1 class="title">' . $e($job['title'] ?: 'Vaga PHP') . '</h1>';
+        $out[] = '<h1 class="title">' . $e($job['title'] ?: 'Vaga ' . Brand::lang()) . '</h1>';
         if (!empty($job['company'])) {
             $out[] = '<p class="company">' . $e($job['company']) . '</p>';
         }
@@ -474,7 +474,7 @@ final class Vaga
 
     private function notFound(Request $request): Response
     {
-        $html = Seo::render($request, 'vaga.html', 'Vaga não encontrada | ' . Seo::SITE_NAME,
+        $html = Seo::render($request, 'vaga.html', 'Vaga não encontrada | ' . Seo::siteName(),
             'Esta vaga não existe ou foi retirada do site.', $request->path,
             ['vaga' => '<article class="card job"><h1 class="title">Vaga não encontrada</h1>'
                 . '<p>Esta vaga não existe ou foi retirada do site.</p>'
@@ -512,7 +512,7 @@ final class Vaga
             return Response::redirect($path, 301);
         }
         [$name, $tpath] = self::topic($job);
-        $title = trim($job['title'] ?: 'Vaga PHP');
+        $title = trim($job['title'] ?: 'Vaga ' . Brand::lang());
         $trail = [['Início', '/'], ['Vagas', '/vagas']];
         if ($tpath !== '/vagas') {
             $trail[] = [$name, $tpath];

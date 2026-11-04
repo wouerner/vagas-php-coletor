@@ -19,7 +19,12 @@ use VagasPhp\Http\Response;
  */
 final class Mercado
 {
-    public const PATH = '/mercado-php';
+    /** Caminho da página: /mercado-php no PHP, /mercado-ruby no Ruby (Brand). */
+    public static function path(): string
+    {
+        return Brand::get('mercado_path');
+    }
+
     public const WEEKS = 8;  // semanas na tabela de vagas novas por semana
     public const SOURCE_NAMES = ['linkedin' => 'Vagas do LinkedIn', 'gupy' => 'Gupy', 'post' => 'Publicações do LinkedIn',
         'github' => 'GitHub', 'remotar' => 'Remotar', 'programathor' => 'Programathor', 'catho' => 'Catho',
@@ -148,7 +153,7 @@ final class Mercado
     public static function headline(array $d): string
     {
         [$k, $total] = [$d['kpis'], $d['kpis']['open']];
-        $text = 'Há ' . self::vagas($total) . ' PHP abertas no Brasil (publicadas nas últimas 72 horas)';
+        $text = 'Há ' . self::vagas($total) . ' ' . Brand::lang() . ' abertas no Brasil (publicadas nas últimas 72 horas)';
         if ($k['companies']) {
             $text .= ", de {$k['companies']} empresa" . ($k['companies'] === 1 ? '' : 's');
         }
@@ -167,7 +172,7 @@ final class Mercado
         $out = ['updated' => 'Atualizado em <time datetime="' . $e($d['updated']) . '">' . $e($when) . '</time>.'];
 
         $resumo = [$e(self::headline($d)) . ' Dados de ' . $e($when) . ' (horário de Brasília).'];
-        $resumo[] = 'Nas últimas 24 horas foram publicadas ' . self::vagas($k['new_24h'], 'vaga') . ' PHP novas; '
+        $resumo[] = 'Nas últimas 24 horas foram publicadas ' . self::vagas($k['new_24h'], 'vaga') . ' ' . Brand::lang() . ' novas; '
             . "nas 24 horas anteriores, {$k['prev_24h']}.";
         // Semanas completas: nem a atual nem a do começo da coleta (só parte dela foi coletada).
         $full = array_values(array_filter($d['weeks'], fn ($w) => !$w['current']
@@ -175,7 +180,7 @@ final class Mercado
         if ($full) {
             $w = end($full);
             $resumo[] = 'Na semana de ' . self::brDate($w['start']) . ' a ' . self::brDate($w['end']) . ' foram publicadas '
-                . self::vagas($w['jobs']) . ' PHP novas.';
+                . self::vagas($w['jobs']) . ' ' . Brand::lang() . ' novas.';
         }
         $out['resumo'] = implode('', array_map(fn ($p) => "<p>$p</p>", $resumo));
 
@@ -199,7 +204,7 @@ final class Mercado
             if (count($full) >= 2) {
                 [$a, $b] = array_slice($full, -2);
                 $text = '<p>Na semana de ' . self::brDate($b['start']) . ' a ' . self::brDate($b['end']) . ' foram '
-                    . 'publicadas ' . self::vagas($b['jobs']) . " PHP novas; na semana anterior, {$a['jobs']}.";
+                    . 'publicadas ' . self::vagas($b['jobs']) . " " . Brand::lang() . " novas; na semana anterior, {$a['jobs']}.";
                 $avg = array_sum(array_column($full, 'jobs')) / count($full);
                 $text .= ' Média das últimas ' . count($full) . ' semanas completas: '
                     . Text::round($avg) . ' vagas por semana.</p>';
@@ -217,7 +222,7 @@ final class Mercado
                 $out[$key] = self::empty('Nenhuma vaga aberta nas últimas 72 horas.');
             }
         } else {
-            $base = 'Das ' . self::vagas($total) . ' PHP abertas nas últimas 72 horas';
+            $base = 'Das ' . self::vagas($total) . ' ' . Brand::lang() . ' abertas nas últimas 72 horas';
             $wp = $d['workplace'];
             $parts = [];
             foreach ([['Remoto', 'remotas'], ['Híbrido', 'híbridas'], ['Presencial', 'presenciais']] as [$w, $word]) {
@@ -232,7 +237,7 @@ final class Mercado
             $ct = $d['contract'];
             $informed = $total - self::get($ct, self::MISSING);
             if ($informed) {
-                $text = 'Entre as vagas PHP abertas que informam o regime de contratação '
+                $text = 'Entre as vagas ' . Brand::lang() . ' abertas que informam o regime de contratação '
                     . "($informed de $total), " . Text::pct(self::get($ct, 'CLT'), $informed) . ' são CLT e '
                     . Text::pct(self::get($ct, 'PJ'), $informed) . ' são PJ';
                 if (self::get($ct, 'Freelance')) {
@@ -246,7 +251,7 @@ final class Mercado
 
             $sen = array_values(array_filter(self::sorted($d['seniority']), fn ($p) => $p[0] !== self::MISSING));
             if ($sen) {
-                $text = 'A senioridade mais pedida nas vagas PHP abertas é ' . mb_strtolower($sen[0][0])
+                $text = 'A senioridade mais pedida nas vagas ' . Brand::lang() . ' abertas é ' . mb_strtolower($sen[0][0])
                     . ' (' . Text::pct($sen[0][1], $total) . ' das vagas)';
                 if (count($sen) > 1) {
                     $text .= ', seguida de ' . Text::joinAnd(array_map(
@@ -264,12 +269,12 @@ final class Mercado
                 foreach (array_slice($stacks, 0, 3) as $i => [$s, $n]) {
                     $items[] = $i === 0 ? "$s aparece em " . Text::pct($n, $total) : "$s em " . Text::pct($n, $total);
                 }
-                $text = 'Entre as vagas PHP abertas, ' . Text::joinAnd($items) . '.';
+                $text = 'Entre as vagas ' . Brand::lang() . ' abertas, ' . Text::joinAnd($items) . '.';
                 $out['stacks'] = '<p>' . $e($text) . '</p>' . $this->table($stacks, $total, 'Framework / plataforma')
                     . '<p class="muted">Uma vaga pode citar mais de uma; as demais '
-                    . 'pedem PHP sem framework citado.</p>';
+                    . 'pedem ' . Brand::lang() . ' sem framework citado.</p>';
             } else {
-                $out['stacks'] = self::empty('As vagas abertas não citam frameworks além do PHP.');
+                $out['stacks'] = self::empty('As vagas abertas não citam frameworks além do ' . Brand::lang() . '.');
             }
         }
 
@@ -277,7 +282,7 @@ final class Mercado
         [$cs, $cdays] = [$d['companies_list'], $d['companies_days']];
         if ($cs) {
             $top = array_slice($cs, 0, 10);
-            $text = "Nos últimos $cdays dias, a empresa que mais anunciou vagas PHP foi "
+            $text = "Nos últimos $cdays dias, a empresa que mais anunciou vagas " . Brand::lang() . " foi "
                 . "{$top[0]['name']} (" . self::vagas($top[0]['jobs']) . ')';
             if (count($top) > 1) {
                 $text .= ', seguida de ' . Text::joinAnd(array_map(fn ($c) => "{$c['name']} ({$c['jobs']})", array_slice($top, 1, 2)));
@@ -303,12 +308,12 @@ final class Mercado
                 $items .= '<li>' . $e($r['name'] ?: 'Sem nome') . ': ' . self::vagas($r['jobs']) . '</li>';
             }
             $out['recrutadores'] = '<p>' . count($rs) . ' tech recruiter' . (count($rs) === 1 ? '' : 's') . ' '
-                . "publicaram {$d['recruiters_min']} ou mais vagas PHP no LinkedIn nos "
+                . "publicaram {$d['recruiters_min']} ou mais vagas " . Brand::lang() . " no LinkedIn nos "
                 . "últimos $rdays dias. Os que mais publicaram:</p><ol>$items</ol>"
                 . '<p><a href="/recrutadores">Ver todos os recrutadores</a></p>';
         } else {
             $out['recrutadores'] = self::empty("Ainda não há tech recruiters com {$d['recruiters_min']} ou mais "
-                . "vagas PHP publicadas no LinkedIn nos últimos $rdays dias.")
+                . "vagas " . Brand::lang() . " publicadas no LinkedIn nos últimos $rdays dias.")
                 . '<p><a href="/recrutadores">Página de recrutadores</a></p>';
         }
 
@@ -346,7 +351,7 @@ final class Mercado
         $out['metodologia'] = '<ul>'
             . "<li>Vagas coletadas várias vezes ao dia de {$d['sources_count']} fontes públicas "
             . '(portais de vagas, publicações do LinkedIn e repositórios de vagas no GitHub), ' . $e($since) . '.</li>'
-            . '<li>Entram só vagas de engenharia de software com PHP, segundo as '
+            . '<li>Entram só vagas de engenharia de software com ' . Brand::lang() . ', segundo as '
             . '<a href="/regras">regras de filtro do site</a>; o que não é vaga é descartado à mão.</li>'
             . '<li>A mesma vaga anunciada várias vezes (por cidade, por exemplo) conta uma vez.</li>'
             . '<li>Vagas abertas: publicadas nas últimas ' . Text::round($d['max_age_hours']) . ' horas e ainda no ar. '
@@ -376,21 +381,21 @@ final class Mercado
     public static function jsonld(Request $request, array $d): array
     {
         $base = Seo::siteUrl($request);
-        $site = ['@type' => 'Organization', 'name' => Seo::SITE_NAME, 'url' => $base . '/'];
+        $site = ['@type' => 'Organization', 'name' => Seo::siteName(), 'url' => $base . '/'];
         $dataset = [
             '@context' => 'https://schema.org', '@type' => 'Dataset',
-            'name' => 'Vagas de emprego PHP no Brasil',
-            'description' => 'Vagas de engenharia de software com PHP (Laravel, Symfony, WordPress e '
+            'name' => 'Vagas de emprego ' . Brand::lang() . ' no Brasil',
+            'description' => 'Vagas de engenharia de software com ' . Brand::lang() . ' (' . Brand::get('frameworks_list') . ' e '
                 . 'outros) anunciadas no Brasil, coletadas várias vezes ao dia de portais de '
                 . 'vagas, publicações do LinkedIn e repositórios do GitHub, com modalidade '
                 . '(remoto, híbrido, presencial), contratação (CLT, PJ), senioridade e stack. '
                 . self::headline($d),
-            'url' => $base . self::PATH, 'inLanguage' => 'pt-BR', 'isAccessibleForFree' => true,
+            'url' => $base . self::path(), 'inLanguage' => 'pt-BR', 'isAccessibleForFree' => true,
             'creator' => $site, 'publisher' => $site,
             'dateModified' => $d['updated'],
             'spatialCoverage' => ['@type' => 'Place', 'name' => 'Brasil'],
-            'keywords' => ['vagas PHP', 'mercado de trabalho PHP', 'Laravel', 'Symfony', 'WordPress',
-                'vagas remotas', 'desenvolvedor PHP', 'Brasil'],
+            'keywords' => ['vagas ' . Brand::lang(), 'mercado de trabalho ' . Brand::lang(), ...array_slice(Brand::get('stacks'), 0, 2), Brand::get('stacks_keyword'),
+                'vagas remotas', 'desenvolvedor ' . Brand::lang(), 'Brasil'],
             'variableMeasured' => ['vagas abertas', 'vagas novas por semana', 'modalidade',
                 'regime de contratação', 'senioridade', 'stack', 'empresa', 'fonte'],
             'distribution' => [
@@ -405,29 +410,29 @@ final class Mercado
         if ($d['since_day']) {
             $dataset['temporalCoverage'] = $d['since_day']->format('Y-m-d') . '/..';
         }
-        return [Seo::breadcrumbs($request, ['Vagas PHP', '/'], ['Mercado de trabalho PHP', self::PATH]), $dataset];
+        return [Seo::breadcrumbs($request, [Brand::name(), '/'], ['Mercado de trabalho ' . Brand::lang(), self::path()]), $dataset];
     }
 
     // --- rotas ---------------------------------------------------------------------------
 
     public function page(Request $request): Response
     {
-        $title = 'Mercado de trabalho PHP no Brasil';
+        $title = 'Mercado de trabalho ' . Brand::lang() . ' no Brasil';
         $d = Site::safe(fn () => $this->market(), null);
         if ($d === null) {  // tabelas ainda não criadas pelo coletor
-            $html = Seo::render($request, 'mercado.html', $title, 'Números do mercado de trabalho PHP no Brasil.',
-                self::PATH, ['resumo' => self::empty('Base ainda vazia: volte depois da primeira coleta.')], noindex: true);
+            $html = Seo::render($request, 'mercado.html', $title, 'Números do mercado de trabalho ' . Brand::lang() . ' no Brasil.',
+                self::path(), ['resumo' => self::empty('Base ainda vazia: volte depois da primeira coleta.')], noindex: true);
             return Response::html($html, 503);
         }
-        return Response::html(Seo::render($request, 'mercado.html', "$title · " . Seo::SITE_NAME,
-            self::description($d), self::PATH, $this->sections($d), self::jsonld($request, $d)));
+        return Response::html(Seo::render($request, 'mercado.html', "$title · " . Seo::siteName(),
+            self::description($d), self::path(), $this->sections($d), self::jsonld($request, $d)));
     }
 
     public function llmsText(Request $request): string
     {
         $base = Seo::siteUrl($request);
-        $lines = ['# ' . Seo::SITE_NAME, '',
-            '> Vagas de emprego para devs PHP no Brasil (Laravel, Symfony, WordPress...), '
+        $lines = ['# ' . Seo::siteName(), '',
+            '> Vagas de emprego para devs ' . Brand::lang() . ' no Brasil (' . Brand::get('frameworks_list') . '...), '
             . 'coletadas várias vezes ao dia de portais de vagas, do LinkedIn e do GitHub.', ''];
         $d = Site::safe(fn () => $this->market(), null);
         if ($d) {
@@ -445,12 +450,12 @@ final class Mercado
         }
         array_push($lines,
             '## Páginas', '',
-            "- [Vagas PHP abertas]($base/): vagas PHP publicadas nas últimas 72 horas, com filtros",
-            "- [Mercado de trabalho PHP no Brasil]($base" . self::PATH . '): números atuais: vagas abertas, '
+            "- [" . Brand::name() . " abertas]($base/): vagas " . Brand::lang() . " publicadas nas últimas 72 horas, com filtros",
+            "- [Mercado de trabalho " . Brand::lang() . " no Brasil]($base" . self::path() . '): números atuais: vagas abertas, '
             . 'vagas por semana, remoto x presencial, CLT x PJ, senioridade, stacks e empresas',
-            "- [Empresas]($base/empresas): empresas que mais anunciaram vagas PHP nos últimos 90 dias",
-            "- [Recrutadores]($base/recrutadores): tech recruiters que mais publicam vagas PHP no LinkedIn",
-            "- [Regras]($base/regras): como o site decide o que é vaga PHP",
+            "- [Empresas]($base/empresas): empresas que mais anunciaram vagas " . Brand::lang() . " nos últimos 90 dias",
+            "- [Recrutadores]($base/recrutadores): tech recruiters que mais publicam vagas " . Brand::lang() . " no LinkedIn",
+            "- [Regras]($base/regras): como o site decide o que é vaga " . Brand::lang(),
             "- [Dashboard]($base/dashboard): gráficos das vagas por fonte e por dia, e estado das coletas",
             '', '## Vagas por tema', '',
         );
@@ -461,10 +466,10 @@ final class Mercado
             '', '## API JSON pública', '',
             "- [$base/api/jobs]($base/api/jobs): vagas abertas (últimas 72 h). Parâmetros: q (busca), "
             . 'source (linkedin, gupy, post, github...), workplace (Remoto, Híbrido, Presencial), '
-            . 'seniority (Estágio, Júnior, Pleno, Sênior, Especialista), stack (Laravel, Symfony...), '
+            . 'seniority (Estágio, Júnior, Pleno, Sênior, Especialista), stack (' . implode(', ', array_slice(Brand::get('stacks'), 0, 2)) . '...), '
             . 'hours (1-72), include_closed (1), limit (1-200), offset',
-            "- [$base/api/companies]($base/api/companies): empresas com 2 ou mais vagas PHP nos últimos 90 dias",
-            "- [$base/api/recruiters]($base/api/recruiters): tech recruiters com vagas PHP nos últimos 90 dias",
+            "- [$base/api/companies]($base/api/companies): empresas com 2 ou mais vagas " . Brand::lang() . " nos últimos 90 dias",
+            "- [$base/api/recruiters]($base/api/recruiters): tech recruiters com vagas " . Brand::lang() . " nos últimos 90 dias",
             "- [$base/api/dashboard]($base/api/dashboard): números do mercado (vagas abertas, modalidade, "
             . 'contratação, senioridade, stacks, fontes) e série diária; days (3-90) muda o período da série',
             '',

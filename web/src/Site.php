@@ -10,7 +10,7 @@ use VagasPhp\Http\Response;
 use VagasPhp\Http\Router;
 
 /**
- * Site que lista as vagas PHP coletadas. Lê a base do coletor (MySQL); só grava os cliques.
+ * Site que lista as vagas coletadas do tenant (Brand: Vagas PHP ou Vagas Ruby). Lê a base do coletor (MySQL); só grava os cliques.
  *
  * Rotas: /             página (templates/index.html), com as primeiras vagas já no HTML
  *        /api/jobs     vagas em JSON (filtros: q, source, workplace, seniority, stack, hours,
@@ -28,7 +28,7 @@ use VagasPhp\Http\Router;
  *        /empresas     empresas que mais anunciam vagas PHP; /api/companies: a lista
  *        /contato      como falar com quem mantém o site
  *        /sitemap.xml, /robots.txt, /og.png, /webmcp.js
- *        /mercado-php  números do mercado PHP em texto (Mercado), e /llms.txt
+ *        /mercado-php  números do mercado em texto (Mercado; /mercado-ruby no Ruby), e /llms.txt
  *        /vaga/<seq>-<título>  página de uma vaga de portal, com JobPosting (Vaga)
  *        /out          conta o clique (tabela clicks) e redireciona para o anúncio original
  *        /api/clicks   cliques dos últimos `days` dias (padrão 7)
@@ -45,10 +45,15 @@ final class Site
     /** Idade da vaga: até quantas horas, classe do card e nome da faixa. */
     public const AGE_BANDS = [[6, 'new', 'nova'], [24, 'recent', 'recente'], [48, 'days', '1-2 dias'],
         [INF, 'old', 'antiga']];
-    /** Explicação do número de cliques do card (o mesmo CLICKS_TIP do JavaScript). */
-    public const CLICKS_TIP = 'Quantas vezes alguém abriu o anúncio original a partir do Vagas PHP desde que '
-        . 'a vaga entrou no site. Dá uma noção da concorrência, mas não inclui quem viu a vaga direto '
-        . 'na fonte (LinkedIn, Gupy...), e a mesma pessoa pode contar mais de uma vez.';
+    /** Explicação do número de cliques do card (o mesmo CLICKS_TIP do JavaScript), com o nome do site. */
+    public const CLICKS_TIP = 'Quantas vezes alguém abriu o anúncio original a partir do Vagas PHP desde que a vaga entrou no site. '
+        . 'Dá uma noção da concorrência, mas não inclui quem viu a vaga direto na fonte (LinkedIn, Gupy...), '
+        . 'e a mesma pessoa pode contar mais de uma vez.';
+
+    public static function clicksTip(): string
+    {
+        return str_replace('Vagas PHP', Brand::name(), self::CLICKS_TIP);
+    }
     /**
      * Cabeçalhos de segurança de toda resposta (quem responde pode trocar). A CSP aceita os
      * <script> e <style> inline dos templates e só o Google Analytics de fora; nada embute o
@@ -71,18 +76,25 @@ final class Site
     public const RECRUITERS_DAYS = 90;
     public const COMPANIES_DAYS = 90;
     public const COMPANIES_MIN = 2;
-    public const PAGES = ['/', '/vagas', '/dashboard', '/empresas', '/recrutadores', '/regras', '/mercado-php', '/contato'];
+    /** Páginas fixas do sitemap; a de mercado muda com o tenant (Mercado::path()). */
+    public static function pages(): array
+    {
+        return ['/', '/vagas', '/dashboard', '/empresas', '/recrutadores', '/regras', Mercado::path(), '/contato'];
+    }
     /** Grupos da página /regras: id nas regras do filtro, título e explicação. */
-    public const RULE_GROUPS = [
-        ['vagas', 'Vagas de portais', 'LinkedIn Vagas, Gupy, Sólides, Catho, Remotar, Programathor, '
-            . 'Coodesh, Nerdin, Recrutei, UpVagas, páginas de carreira de empresas na InHire e issues dos '
-            . 'repositórios de vagas no GitHub.'],
-        ['posts', 'Publicações do LinkedIn', 'Posts que anunciam vagas. Precisam falar de PHP, '
-            . 'anunciar uma vaga e não ser outra coisa.'],
-        ['empresas', 'Empresas', 'Quem aparece na página de empresas, entre as vagas de portais aceitas.'],
-        ['recrutadores', 'Recrutadores', 'Quem aparece na página de recrutadores, entre os autores das '
-            . 'publicações aceitas.'],
-    ];
+    public static function ruleGroups(): array
+    {
+        return [
+            ['vagas', 'Vagas de portais', 'LinkedIn Vagas, Gupy, Sólides, Catho, Remotar, Programathor, '
+                . 'Coodesh, Nerdin, Recrutei, UpVagas, páginas de carreira de empresas na InHire e issues dos '
+                . 'repositórios de vagas no GitHub.'],
+            ['posts', 'Publicações do LinkedIn', 'Posts que anunciam vagas. Precisam falar de ' . Brand::lang() . ', '
+                . 'anunciar uma vaga e não ser outra coisa.'],
+            ['empresas', 'Empresas', 'Quem aparece na página de empresas, entre as vagas de portais aceitas.'],
+            ['recrutadores', 'Recrutadores', 'Quem aparece na página de recrutadores, entre os autores das '
+                . 'publicações aceitas.'],
+        ];
+    }
 
     private ?Themes $themes = null;
     private ?array $openJobs = null;
@@ -126,7 +138,7 @@ final class Site
         $r->get('/out', $this->out(...));
         $r->get('/api/clicks', $this->clicks(...));
         $mercado = new Mercado($this);
-        $r->get(Mercado::PATH, $mercado->page(...));
+        $r->get(Mercado::path(), $mercado->page(...));
         $r->get('/llms.txt', $mercado->llmsTxt(...));
         $r->get('/vaga/{ref}', (new Vaga($this))->page(...));
         return $r;
@@ -240,7 +252,7 @@ final class Site
     {
         $label = $n === 0 ? 'nenhum clique ainda' : Text::plural($n, 'clique', 'cliques');
         return "<span class=\"clicks\" tabindex=\"0\">$label<span class=\"tip\" role=\"tooltip\">"
-            . self::CLICKS_TIP . '</span></span>';
+            . self::clicksTip() . '</span></span>';
     }
 
     /** Acrescenta `path`, a página da vaga no site (null para posts do LinkedIn). */
@@ -340,7 +352,7 @@ final class Site
     private static function themeIntro(array $theme, array $jobs, int $last90): array
     {
         $name = Text::lcfirst($theme['name']);
-        $tech = $theme['stack'] ?: 'PHP';
+        $tech = $theme['stack'] ?: Brand::lang();
         $hours = (int) Dates::maxAgeHours();
         $about = 'Vagas de engenharia de software com ' . Text::e($tech) . ' coletadas do LinkedIn, Gupy, '
             . 'Sólides, Catho, Remotar, Programathor, Coodesh e de outros sites de vagas, além '
@@ -349,10 +361,10 @@ final class Site
         if (!$jobs) {
             $text = '<p>Não há ' . Text::e($name) . " abertas agora (publicadas nas últimas $hours horas). "
                 . "$history Veja os temas relacionados abaixo ou "
-                . "<a href=\"/\">todas as vagas PHP</a>.</p><p>$about</p>";
+                . "<a href=\"/\">todas as vagas " . Brand::lang() . "</a>.</p><p>$about</p>";
             $desc = "{$theme['name']}: nenhuma aberta nas últimas $hours h. "
                 . ($last90 ? "$last90 nos últimos 90 dias. " : '')
-                . 'Veja vagas PHP relacionadas, atualizadas várias vezes por dia.';
+                . 'Veja vagas ' . Brand::lang() . ' relacionadas, atualizadas várias vezes por dia.';
             return [$text, $desc];
         }
         $n = count($jobs);
@@ -405,21 +417,21 @@ final class Site
         $jobs = $this->openJobs();
         $themes = $this->themes();
         $counts = $themes->counts($jobs);
-        $title = 'Vagas PHP por tema: Laravel, Symfony, WordPress, remotas, júnior e sênior | Vagas PHP';
-        $description = count($jobs) . ' vagas PHP abertas agora, separadas por stack (Laravel, Symfony, '
-            . 'WordPress, Magento...), modalidade (remoto, híbrido, presencial) e senioridade.';
+        $title = Brand::name() . ' por tema: ' . Brand::get('frameworks_list') . ', remotas, júnior e sênior | ' . Brand::name();
+        $description = count($jobs) . ' vagas ' . Brand::lang() . ' abertas agora, separadas por stack ('
+            . Brand::get('frameworks_etc') . '), modalidade (remoto, híbrido, presencial) e senioridade.';
         $base = Seo::siteUrl($request);
         $items = [];
         foreach (array_values($themes->themes) as $i => $t) {
             $items[] = ['@type' => 'ListItem', 'position' => $i + 1, 'url' => $base . $t['path'], 'name' => $t['name']];
         }
-        $jsonld = [Seo::breadcrumbs($request, ['Vagas PHP', '/'], ['Temas', '/vagas']),
-            ['@context' => 'https://schema.org', '@type' => 'ItemList', 'name' => 'Vagas PHP por tema',
+        $jsonld = [Seo::breadcrumbs($request, [Brand::name(), '/'], ['Temas', '/vagas']),
+            ['@context' => 'https://schema.org', '@type' => 'ItemList', 'name' => Brand::name() . ' por tema',
                 'itemListElement' => $items]];
         $intro = '<p>As <b>' . Text::plural(count($jobs), 'vaga aberta', 'vagas abertas') . '</b> do site '
             . '(publicadas nas últimas ' . (int) Dates::maxAgeHours() . ' horas), separadas por tema. '
             . 'O número ao lado de cada tema é quantas estão abertas agora.</p>';
-        return $this->themeHtml($request, $title, $description, '/vagas', 'Vagas PHP por tema', 'Temas', $intro,
+        return $this->themeHtml($request, $title, $description, '/vagas', Brand::name() . ' por tema', 'Temas', $intro,
             [], '', $themes->allHtml($counts), $jsonld);
     }
 
@@ -433,8 +445,8 @@ final class Site
         $jobs = $this->openJobs();
         $counts = $themes->counts($jobs);
         if (!($theme = $themes->themes[$slug] ?? null)) {
-            $intro = '<p>Esse tema não existe. Escolha um dos temas abaixo ou veja <a href="/">todas as vagas PHP</a>.</p>';
-            return $this->themeHtml($request, 'Tema não encontrado | Vagas PHP', 'Tema de vagas PHP não encontrado.',
+            $intro = '<p>Esse tema não existe. Escolha um dos temas abaixo ou veja <a href="/">todas as vagas ' . Brand::lang() . '</a>.</p>';
+            return $this->themeHtml($request, 'Tema não encontrado | ' . Brand::name(), 'Tema de vagas ' . Brand::lang() . ' não encontrado.',
                 '/vagas', 'Tema não encontrado', '<a href="/vagas">Temas</a>', $intro, [], '',
                 $themes->allHtml($counts), noindex: true, status: 404);
         }
@@ -442,15 +454,15 @@ final class Site
         $facets = self::safe(fn () => $this->repo->jobFacets(90), []);
         $last90 = count(array_filter($facets, fn ($j) => Themes::matches($theme, $j)));
         [$intro, $description] = self::themeIntro($theme, $mine, $last90);
-        $title = $mine ? "{$theme['name']}: " . Text::plural(count($mine), 'aberta', 'abertas') . ' agora | Vagas PHP'
-            : "{$theme['name']} | Vagas PHP";
+        $title = $mine ? "{$theme['name']}: " . Text::plural(count($mine), 'aberta', 'abertas') . ' agora | ' . Brand::name()
+            : "{$theme['name']} | " . Brand::name();
         $params = array_filter(['stack' => $theme['stack'], 'workplace' => $theme['workplace'], 'seniority' => $theme['seniority']]);
         $more = $mine ? '<a href="/?' . Text::e(Text::query($params)) . '">Ver na página inicial, com filtros e '
             . 'atualização automática</a>' : '';
         $related = '<section class="themes"><h2>Temas relacionados</h2><nav>'
             . Themes::links($themes->related($theme, $counts), $counts)
             . '<a href="/vagas">Todos os temas</a></nav></section>';
-        $jsonld = [Seo::breadcrumbs($request, ['Vagas PHP', '/'], ['Temas', '/vagas'], [$theme['name'], $theme['path']])];
+        $jsonld = [Seo::breadcrumbs($request, [Brand::name(), '/'], ['Temas', '/vagas'], [$theme['name'], $theme['path']])];
         if ($mine) {
             $jsonld[] = $this->jobList($request, $theme['name'], $mine);
         }
@@ -489,7 +501,7 @@ final class Site
             $chosen = preg_replace_callback("#<option( value=\"$v\">|>$v<)#",
                 fn ($o) => Seo::replaceOnce('<option', '<option selected', $o[0]), $options, 1);
             if ($chosen !== $options) {
-                $html = substr_replace($html, $chosen, $start, strlen($select));
+                $html = substr_replace($html, $chosen, (int) $start, strlen($select));
             }
         }
         if (in_array($source = $r->get('source'), $this->repo->sources(), true)) {
@@ -529,14 +541,14 @@ final class Site
         $counts = $themes->counts($this->openJobs());  // contagem dos temas: sempre sem filtro
         $singles = array_filter($themes->themes, fn ($t) => $t['group'] !== 'Combinações');
         $themesHtml = Themes::links($singles, $counts) . '<a href="/vagas">Todos os temas</a>';
-        $title = 'Vagas PHP, Laravel e Symfony — remotas e no Brasil | Vagas PHP';
-        $description = "$total vagas PHP abertas, publicadas nas últimas " . (int) Dates::maxAgeHours() . ' h: '
-            . 'Laravel, Symfony, WordPress e mais, remotas, híbridas e presenciais. '
+        $title = Brand::name() . ', ' . Brand::get('frameworks') . ' — remotas e no Brasil | ' . Brand::name();
+        $description = "$total vagas " . Brand::lang() . " abertas, publicadas nas últimas " . (int) Dates::maxAgeHours() . ' h: '
+            . Brand::get('frameworks_list') . ' e mais, remotas, híbridas e presenciais. '
             . 'Do LinkedIn, Gupy, Sólides, Catho, Remotar e outros sites, atualizadas '
             . 'várias vezes por dia.';
         $base = Seo::siteUrl($r);
-        $jsonld = [['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => Seo::SITE_NAME,
-            'url' => $base . '/', 'inLanguage' => 'pt-BR'], $this->jobList($r, 'Vagas PHP abertas', $rows)];
+        $jsonld = [['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => Seo::siteName(),
+            'url' => $base . '/', 'inLanguage' => 'pt-BR'], $this->jobList($r, Brand::name() . ' abertas', $rows)];
         $list = Bursts::html($rows)
             ?: '<li class="empty">Nenhuma vaga encontrada com esses filtros.</li>';
         $html = Seo::render($r, 'index.html', $title, $description, '/',
@@ -565,12 +577,12 @@ final class Site
     public function dashboardPage(Request $r): Response
     {
         $total = self::safe(fn () => $this->repo->openCount(), 0);
-        $description = "Mercado de vagas PHP em números: $total vagas abertas nas últimas "
+        $description = "Mercado de vagas " . Brand::lang() . " em números: $total vagas abertas nas últimas "
             . (int) Dates::maxAgeHours() . ' h, vagas novas por dia, por site, modalidade, '
             . 'senioridade, contratação, stack e empresas.';
         return Response::html(Seo::render($r, 'dashboard.html',
-            'Dashboard de vagas PHP: vagas por dia, stack e modalidade | Vagas PHP', $description, '/dashboard',
-            jsonld: Seo::breadcrumbs($r, ['Vagas PHP', '/'], ['Dashboard', '/dashboard'])));
+            'Dashboard de vagas ' . Brand::lang() . ': vagas por dia, stack e modalidade | ' . Brand::name(), $description, '/dashboard',
+            jsonld: Seo::breadcrumbs($r, [Brand::name(), '/'], ['Dashboard', '/dashboard'])));
     }
 
     public function dashboard(Request $r): Response
@@ -643,7 +655,7 @@ final class Site
     {
         $rules = $this->repo->meta('rules') ?? [];
         $out = '';
-        foreach (self::RULE_GROUPS as [$key, $title, $note]) {
+        foreach (self::ruleGroups() as [$key, $title, $note]) {
             $out .= '<h2>' . Text::e($title) . '</h2><p class="group-note">' . Text::e($note) . '</p>';
             $i = 0;
             foreach ($rules as $r) {
@@ -696,13 +708,13 @@ final class Site
     {
         $stats = $this->ruleStats();
         return Response::html(Seo::render($r, 'regras.html',
-            'Como as vagas PHP são filtradas: as regras do site | Vagas PHP',
-            'As regras que decidem quais vagas e publicações de PHP, Laravel e Symfony '
+            'Como as vagas ' . Brand::lang() . ' são filtradas: as regras do site | ' . Brand::name(),
+            'As regras que decidem quais vagas e publicações de ' . Brand::lang() . ', ' . Brand::get('frameworks') . ' '
             . 'aparecem no site, geradas do próprio código do filtro, e os sites que não '
             . 'coletamos.', '/regras',
             ['max_age' => (string) (int) Dates::maxAgeHours(), 'groups' => $this->rulesHtml((array) $stats['counts']),
                 'dismissed' => self::dismissedHtml($stats['dismissed'])],
-            Seo::breadcrumbs($r, ['Vagas PHP', '/'], ['Regras', '/regras'])));
+            Seo::breadcrumbs($r, [Brand::name(), '/'], ['Regras', '/regras'])));
     }
 
     public function rules(Request $r): Response
@@ -746,12 +758,12 @@ final class Site
         $cards = $cards ?: '<section class="card"><p style="margin:0;color:var(--muted)">Ainda não há recrutadores '
             . 'com vagas suficientes no período. Volte em alguns dias.</p></section>';
         $description = Text::plural(count($people), 'tech recruiter', 'tech recruiters') . ' que mais '
-            . 'publicaram vagas PHP, Laravel e Symfony no LinkedIn nos últimos '
+            . 'publicaram vagas ' . Brand::lang() . ', ' . Brand::get('frameworks') . ' no LinkedIn nos últimos '
             . self::RECRUITERS_DAYS . ' dias. Siga esses perfis para ver as vagas assim que saem.';
         return Response::html(Seo::render($r, 'recrutadores.html',
-            'Tech recruiters de vagas PHP para seguir no LinkedIn | Vagas PHP', $description, '/recrutadores',
+            'Tech recruiters de vagas ' . Brand::lang() . ' para seguir no LinkedIn | ' . Brand::name(), $description, '/recrutadores',
             ['list' => $cards, 'days' => (string) self::RECRUITERS_DAYS, 'min' => (string) self::recruitersMin()],
-            Seo::breadcrumbs($r, ['Vagas PHP', '/'], ['Recrutadores', '/recrutadores'])));
+            Seo::breadcrumbs($r, [Brand::name(), '/'], ['Recrutadores', '/recrutadores'])));
     }
 
     public function recruiters(Request $r): Response
@@ -807,16 +819,16 @@ final class Site
             . 'vagas suficientes no período.</p></section>';
         $top = $rows ? Text::joinAnd(array_map(fn ($c) => "{$c['name']} ({$c['jobs']})", array_slice($rows, 0, 3))) : '';
         $description = 'Ranking de ' . Text::plural(count($rows), 'empresa', 'empresas') . ' que mais anunciaram '
-            . 'vagas PHP, Laravel e Symfony nos últimos ' . self::COMPANIES_DAYS . ' dias' . ($top ? ": $top." : '.');
+            . 'vagas ' . Brand::lang() . ', ' . Brand::get('frameworks') . ' nos últimos ' . self::COMPANIES_DAYS . ' dias' . ($top ? ": $top." : '.');
         $base = Seo::siteUrl($r);
         $items = [];
         foreach (array_slice($rows, 0, 50) as $i => $c) {
             $items[] = ['@type' => 'ListItem', 'position' => $i + 1, 'item' => ['@type' => 'Organization', 'name' => $c['name']]];
         }
-        $jsonld = [Seo::breadcrumbs($r, ['Vagas PHP', '/'], ['Empresas', '/empresas']),
-            ['@context' => 'https://schema.org', '@type' => 'ItemList', 'name' => 'Empresas que mais anunciam vagas PHP',
+        $jsonld = [Seo::breadcrumbs($r, [Brand::name(), '/'], ['Empresas', '/empresas']),
+            ['@context' => 'https://schema.org', '@type' => 'ItemList', 'name' => 'Empresas que mais anunciam vagas ' . Brand::lang(),
                 'url' => $base . '/empresas', 'itemListElement' => $items]];
-        return Response::html(Seo::render($r, 'empresas.html', 'Empresas que mais contratam devs PHP | Vagas PHP',
+        return Response::html(Seo::render($r, 'empresas.html', 'Empresas que mais contratam devs ' . Brand::lang() . ' | ' . Brand::name(),
             $description, '/empresas',
             ['list' => $cards, 'days' => (string) self::COMPANIES_DAYS, 'min' => (string) self::COMPANIES_MIN], $jsonld));
     }
@@ -830,10 +842,10 @@ final class Site
     public function contatoPage(Request $r): Response
     {
         return Response::html(Seo::render($r, 'contato.html',
-            'Contato: vaga em destaque, correções e sugestões | Vagas PHP',
-            'Fale com quem mantém o Vagas PHP pelo LinkedIn para anunciar uma vaga em '
+            'Contato: vaga em destaque, correções e sugestões | ' . Brand::name(),
+            'Fale com quem mantém o ' . Brand::name() . ' pelo LinkedIn para anunciar uma vaga em '
             . 'destaque, corrigir ou remover uma vaga, ou sugerir uma fonte nova.', '/contato',
-            jsonld: Seo::breadcrumbs($r, ['Vagas PHP', '/'], ['Contato', '/contato'])));
+            jsonld: Seo::breadcrumbs($r, [Brand::name(), '/'], ['Contato', '/contato'])));
     }
 
     public function stats(Request $r): Response
@@ -916,7 +928,7 @@ final class Site
         $jobs = $this->openJobs();
         $newest = self::newest($jobs);
         $out = [];
-        foreach (self::PAGES as $path) {
+        foreach (self::pages() as $path) {
             $out[] = [$path, in_array($path, ['/', '/vagas'], true) ? $newest : null];
         }
         foreach ($this->themes()->themes as $t) {

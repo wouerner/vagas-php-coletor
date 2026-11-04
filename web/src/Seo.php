@@ -15,12 +15,22 @@ use VagasPhp\Http\Request;
  * VAGAS_SITE_URL (ex.: https://vagas.seudominio.com) fixa o endereço público usado no
  * canonical e no sitemap; sem ela, vem dos cabeçalhos do proxy (X-Forwarded-*).
  * VAGAS_ORIGIN_TRIAL: token do origin trial do WebMCP no Chrome (vale para uma origem).
+ * Nome, ícone e textos de marca vêm de Brand (VAGAS_TENANT): os templates passam por
+ * Brand::fill() antes do conteúdo do servidor entrar (dado da base não vira marca).
  */
 final class Seo
 {
-    public const SITE_NAME = 'Vagas PHP';
-    // Preview social (LinkedIn, Telegram, WhatsApp): assets/og.png, servida em /og.png.
-    public const OG_IMAGE_ALT = 'Vagas PHP — vagas de PHP, Laravel e Symfony';
+    /** Nome público do site ("Vagas PHP", "Vagas Ruby"): og:site_name, títulos e JSON-LD. */
+    public static function siteName(): string
+    {
+        return Brand::name();
+    }
+
+    /** Texto alternativo do preview social (LinkedIn, Telegram, WhatsApp), ou null sem imagem. */
+    public static function ogImageAlt(): ?string
+    {
+        return Brand::get('og_alt');
+    }
 
     public static function templates(): string
     {
@@ -67,26 +77,34 @@ final class Seo
                                 ?array $jsonld = null, bool $noindex = false): string
     {
         $base = self::siteUrl($request);
-        [$t, $d, $u, $img] = [Text::e($title), Text::e($description), Text::e($base . $path), Text::e($base . '/og.png')];
+        $og = Brand::get('og_image');
+        [$t, $d, $u] = [Text::e($title), Text::e($description), Text::e($base . $path)];
+        $img = $og === null ? null : Text::e($base . $og);
         $tags = [
             "<title>$t</title>",
             "<meta name=\"description\" content=\"$d\">",
             "<link rel=\"canonical\" href=\"$u\">",
             '<meta property="og:type" content="website">',
-            '<meta property="og:site_name" content="' . self::SITE_NAME . '">',
+            '<meta property="og:site_name" content="' . Text::e(self::siteName()) . '">',
             '<meta property="og:locale" content="pt_BR">',
             "<meta property=\"og:title\" content=\"$t\">",
             "<meta property=\"og:description\" content=\"$d\">",
             "<meta property=\"og:url\" content=\"$u\">",
-            "<meta property=\"og:image\" content=\"$img\">",
-            '<meta property="og:image:width" content="1200">',
-            '<meta property="og:image:height" content="630">',
-            '<meta property="og:image:alt" content="' . self::OG_IMAGE_ALT . '">',
-            '<meta name="twitter:card" content="summary_large_image">',
-            "<meta name=\"twitter:title\" content=\"$t\">",
-            "<meta name=\"twitter:description\" content=\"$d\">",
-            "<meta name=\"twitter:image\" content=\"$img\">",
         ];
+        if ($img !== null) {
+            array_push($tags,
+                "<meta property=\"og:image\" content=\"$img\">",
+                '<meta property="og:image:width" content="1200">',
+                '<meta property="og:image:height" content="630">',
+                '<meta property="og:image:alt" content="' . Text::e((string) self::ogImageAlt()) . '">',
+            );
+        }
+        $tags[] = '<meta name="twitter:card" content="' . ($img !== null ? 'summary_large_image' : 'summary') . '">';
+        $tags[] = "<meta name=\"twitter:title\" content=\"$t\">";
+        $tags[] = "<meta name=\"twitter:description\" content=\"$d\">";
+        if ($img !== null) {
+            $tags[] = "<meta name=\"twitter:image\" content=\"$img\">";
+        }
         if (($token = self::env('VAGAS_ORIGIN_TRIAL')) !== '') {
             array_unshift($tags, '<meta http-equiv="origin-trial" content="' . Text::e($token) . '">');
         }
@@ -103,7 +121,13 @@ final class Seo
     /** Template sem conteúdo do servidor, só com a tag do GA (fora de ?print=1). */
     public static function plain(Request $request, string $name): string
     {
-        return self::withAnalytics($request, (string) file_get_contents(self::templates() . "/$name"));
+        return self::withAnalytics($request, self::template($name));
+    }
+
+    /** Template com as marcas {{brand:...}} do tenant já trocadas (Brand::fill). */
+    public static function template(string $name): string
+    {
+        return Brand::fill((string) file_get_contents(self::templates() . "/$name"));
     }
 
     private static function withAnalytics(Request $request, string $html): string
@@ -133,7 +157,7 @@ final class Seo
                                   string $path, array $content = [], ?array $jsonld = null,
                                   bool $noindex = false): string
     {
-        $html = (string) file_get_contents(self::templates() . "/$name");
+        $html = self::template($name);
         $html = preg_replace('#\s*<title>.*?</title>|\s*<meta name="description"[^>]*>#s', '', $html);
         $tags = self::head($request, $title, $description, $path, $jsonld, $noindex);
         $html = self::replaceOnce('</head>', $tags . "\n</head>", $html);
