@@ -110,8 +110,9 @@ prioridade sobre a base.
 
 A base é multi-tenant: cada linguagem é um tenant (`php`, `ruby`), com as próprias vagas,
 coletas e configuração na mesma base. Cada coletor grava um tenant só (`VAGAS_TENANT`,
-padrão `php`), e o site mostra só o `php`. O serviço `collector-ruby` do compose coleta
-vagas de Ruby (Ruby on Rails, Sinatra, Hanami) nas fontes públicas, sem site:
+padrão `php`), e cada site mostra só o seu (`VAGAS_TENANT` do site). O serviço
+`collector-ruby` do compose coleta vagas de Ruby (Ruby on Rails, Sinatra, Hanami) nas
+fontes públicas:
 
 ```bash
 docker compose up -d collector-ruby                    # coleta agendada do Ruby
@@ -122,6 +123,16 @@ docker compose run --rm collector-ruby config search   # termos de busca do Ruby
 
 As variáveis de termos de busca do `.env` (`VAGAS_GUPY_TERMS`...) valem só para o tenant
 `php`: os outros usam só a configuração da base.
+
+O site do Ruby (Vagas Ruby, https://vagasruby.wouerner.dev) é o mesmo código do `web/`
+com `VAGAS_TENANT=ruby`: nome, ícone, cores, textos e filtro de stack vêm de
+`web/src/Brand.php`. No Coolify ele é uma aplicação à parte, só o site (`vagas-ruby-web`,
+build pack Dockerfile, base `/web`, porta 8000, mesmo `DATABASE_URL`); o coletor Ruby
+continua sendo o `collector-ruby` do compose principal. Para testar local:
+
+```bash
+docker compose run --rm -p 8001:8000 -e VAGAS_TENANT=ruby web   # http://localhost:8001
+```
 
 Para outra linguagem: um bloco novo em `collector/vagas/config_defaults.json` (ou
 `config set` com `--tenant`) e um serviço como o `collector-ruby`. Regras em

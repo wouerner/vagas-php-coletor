@@ -9,6 +9,9 @@
 #   - o site não publica porta: o domínio vai no serviço "web", porta 8000;
 #   - MCP desligado por padrão (VAGAS_MCP_ENABLED=false); ligado, ele e o noVNC (sem
 #     senha!) ficam só no 127.0.0.1 do servidor: use túnel SSH.
+# Este compose é um deploy só (o do PHP, com o collector-ruby). O site do Ruby NÃO usa
+# este arquivo: é outra aplicação no Coolify (vagas-ruby-web: Dockerfile em /web,
+# VAGAS_TENANT=ruby). Um segundo deploy deste compose subiria outro coletor PHP.
 services:
   vagas-php:
     build: ./collector

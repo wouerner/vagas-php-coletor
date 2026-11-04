@@ -36,8 +36,10 @@ site, padrão `php`). Regras:
 - `site_meta` e `collector_config` têm a chave `(tenant, name)`.
 - Linhas de antes do multi-tenant ficaram no tenant `php` (a coluna nasce com o padrão
   `'php'`).
-- `clicks` e `indexing_log` não têm tenant: são do site, e só o tenant `php` tem site
-  (a Indexing API fica desligada nos outros).
+- `clicks` e `indexing_log` não têm tenant. A Indexing API fica desligada nos outros
+  tenants, então `indexing_log` é só do `php`. Os sites PHP e Ruby gravam na mesma
+  `clicks`: a contagem por vaga (`job_id`) é a mesma nos dois sites quando a vaga está
+  nos dois tenants, e `/api/clicks` soma os cliques dos dois sites.
 
 ## Cliques
 
