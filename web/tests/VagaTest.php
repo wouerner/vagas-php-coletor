@@ -46,7 +46,9 @@ it('só gera JobPosting com empresa conhecida', function () {
         ->validThrough->toBe('2026-11-02T12:00:00+00:00')
         ->employmentType->toBe('CONTRACTOR')
         ->url->toBe('https://example.test/vaga/5-dev-php')
-        ->and(Vaga::jobPosting(['company_key' => null] + $job, 'https://example.test'))->toBeNull()
+        ->and(Vaga::jobPosting(['company_key' => null] + $job, 'https://example.test'))
+            ->hiringOrganization->name->toBe('Acme')
+        ->and(Vaga::jobPosting(['company' => '', 'company_key' => null] + $job, 'https://example.test'))->toBeNull()
         ->and(Vaga::jobPosting(['source' => 'github'] + $job, 'https://example.test'))->toBeNull();
 });
 
@@ -61,4 +63,21 @@ it('mostra a idade da vaga em faixas', function () {
         ->toBe(['text' => '40 min', 'band' => 'new', 'label' => 'nova', 'at' => '30/10, 11:20'])
         ->and(Site::age('2026-10-29T12:00:00+00:00'))->text->toBe('1 d 3 h')->band->toBe('days')
         ->and(Site::ago('2026-10-27T12:00:00+00:00'))->toBe('há 3 dias');
+});
+
+
+it('mostra confiança discreta quando houver níveis internos', function () {
+    $job = ['id' => 'gupy:1', 'seq' => 5, 'source' => 'gupy', 'title' => 'Dev PHP', 'description' => 'Texto',
+        'company' => 'Acme LTDA', 'company_key' => 'acme', 'author' => 'Maria Silva',
+        'author_url' => 'https://www.linkedin.com/in/maria/', 'posted_at' => '2026-10-30T12:00:00+00:00',
+        'first_seen' => '2026-10-30T12:00:00+00:00', 'workplace' => 'Remoto', 'contract' => 'PJ'];
+    $trustLevels = [
+        'companies' => ['acme' => ['level' => 'confiante', 'reason' => 'boa resposta']],
+        'recruiters' => ['https://www.linkedin.com/in/maria' => ['level' => 'desconfiado', 'reason' => 'vaga fantasma']],
+    ];
+    $html = Vaga::jobHtml($job, true, [], $trustLevels);
+    expect($html)->toContain('class="trust trust-confiante"')
+        ->and($html)->toContain('class="trust trust-desconfiado"')
+        ->and($html)->toContain('Confiança interna da empresa')
+        ->and($html)->toContain('Confiança interna do recrutador');
 });

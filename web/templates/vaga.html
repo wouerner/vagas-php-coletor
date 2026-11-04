@@ -39,6 +39,11 @@
   .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 14px 0 0; }
   .facts dt { color: var(--muted); font-size: 13px; padding-top: 1px; }
   .facts dd { margin: 0; overflow-wrap: anywhere; }
+  .trust-note { margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 6px; color: var(--muted); font-size: 12px; }
+  .trust { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; background: var(--chip); }
+  .trust-confiante { color: var(--accent); background: var(--accent-soft); }
+  .trust-neutro { color: var(--muted); }
+  .trust-desconfiado { color: var(--warn); background: var(--warn-soft); }
   .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
   .chip { font-size: 12px; padding: 1px 9px; border-radius: 999px; background: var(--chip); color: var(--muted); text-decoration: none; }
   a.chip:hover { color: var(--accent); background: var(--accent-soft); }

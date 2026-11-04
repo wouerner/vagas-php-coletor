@@ -9,6 +9,9 @@
   python -m vagas indexing-push [--limit 50] [--dry-run] [--force]  # vagas abertas na Google Indexing API
   python -m vagas config [NOME]                       # configuração dos coletores (linguagem, buscas...)
   python -m vagas config set NOME '<json>'            # grava um item e reaplica o filtro à base
+  python -m vagas trust list [--tipo empresa|recrutador]  # níveis de confiança (interno)
+  python -m vagas trust set empresa "Acme" confiante --motivo "pagou em dia"
+  python -m vagas trust set recrutador "Maria Silva" desconfiado --url https://www.linkedin.com/in/maria
 """
 
 import argparse
@@ -16,12 +19,36 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    def load_dotenv(*_a, **_k):
+        return False
 
-from . import classify, collect, migrate_sqlite
-from .bot import LoginError
-from .store import SOURCES, Store
+
+# collect, migrate_sqlite e bot (LoginError) são importados só nos comandos que os usam:
+# puxam o Playwright, que não precisa estar instalado para os demais.
+from . import classify
+
+# Coletores e trust levels sem importar o módulo de base no import do CLI: isso evita
+# puxar pymysql/playwright quando o usuário só quer comandos internos.
+SOURCES = ("linkedin", "gupy", "post", "github", "remotar", "programathor", "catho",
+           "solides", "inhire", "coodesh", "nerdin", "recrutei", "upvagas")
+TRUST_LEVELS = ("confiante", "neutro", "desconfiado")
+TRUST_NAMESPACES = ("companies", "recruiters")
+Store = None
+
+# Nomes do CLI (em português) para os namespaces de trust_levels.
+TRUST_KINDS = {"empresa": "companies", "recrutador": "recruiters"}
+
+def _store_cls():
+    global Store
+    if Store is None:
+        from .store import Store as _Store
+        Store = _Store
+    return Store
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
@@ -42,6 +69,11 @@ def history_readable(path: Path) -> bool:
 
 
 def main() -> int:
+    try:
+        from dotenv import load_dotenv
+    except ModuleNotFoundError:
+        def load_dotenv(*_a, **_k):
+            return False
     load_dotenv(ROOT / ".env")
     load_dotenv(ROOT.parent / ".env")  # monorepo: .env na raiz, fora do contêiner
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -99,6 +131,18 @@ def main() -> int:
     cf.add_argument("words", nargs="*", metavar="[set] NOME [JSON]",
                     help="sem argumentos: tudo; NOME: um item (language, core, stack, search, "
                          "self_author); set NOME JSON: grava o item")
+    tr = sub.add_parser("trust", help="níveis de confiança internos de empresas e recrutadores "
+                                      "(site_meta trust_levels; não aparece no site)")
+    tsub = tr.add_subparsers(dest="trust_cmd", required=True)
+    tl = tsub.add_parser("list", help="lista os níveis gravados")
+    tl.add_argument("--tipo", choices=list(TRUST_KINDS), help="só empresas ou só recrutadores")
+    ts = tsub.add_parser("set", help="grava o nível de uma empresa ou de um recrutador")
+    ts.add_argument("tipo", choices=list(TRUST_KINDS))
+    ts.add_argument("nome", help="nome da empresa ou do recrutador")
+    ts.add_argument("nivel", choices=TRUST_LEVELS)
+    ts.add_argument("--motivo", default="", help="por que este nível")
+    ts.add_argument("--url", help="recrutador: URL do perfil (author_url), usada como chave")
+    ts.add_argument("--fonte", default="manual", help="origem da decisão (padrão: manual)")
     args = parser.parse_args()
 
     if args.cmd == "telegram-digest":
@@ -140,9 +184,13 @@ def main() -> int:
         print(entry)
         return 0
 
-    store = Store(tenant=args.tenant)
+    StoreCls = _store_cls()
+    store = StoreCls(tenant=args.tenant)
     if args.cmd == "migrate-sqlite":
+        from . import migrate_sqlite
         return migrate_sqlite.run(store, args.path, force=args.force)
+    if args.cmd == "trust":
+        return trust_cmd(store, args)
     if args.cmd == "list":
         return list_jobs(store, args)
     if args.cmd == "site-data":
@@ -157,6 +205,8 @@ def main() -> int:
                                   dry_run=args.dry_run, force=args.force, store=store)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
+    from . import collect
+    from .bot import LoginError
     sources = SOURCES if args.source == "all" else (args.source,)
     status = 0
     for source in sources:
@@ -170,7 +220,7 @@ def main() -> int:
     return status
 
 
-def config_cmd(store: Store, args) -> int:
+def config_cmd(store, args) -> int:
     """Mostra a configuração (ou um item), ou grava um item e reaplica o filtro às vagas
     já salvas: trocar a linguagem ou os termos muda o que é relevante."""
     words = args.words
@@ -190,6 +240,33 @@ def config_cmd(store: Store, args) -> int:
     changed = store.reclassify_jobs() + store.reclassify("post", classify.is_hiring_post)
     store.publish_site_data()
     print(f"{name} gravado; {len(changed)} vagas mudaram de relevância")
+    return 0
+
+
+def trust_cmd(store, args) -> int:
+    """trust list: níveis de confiança por namespace; trust set: grava um nível."""
+    if args.trust_cmd == "set":
+        namespace = TRUST_KINDS[args.tipo]
+        try:
+            key = store.set_trust_level(namespace, args.nome, args.nivel, reason=args.motivo,
+                                        source=args.fonte, author_url=args.url)
+        except ValueError as e:
+            print(f"trust set: erro: {e}", file=sys.stderr)
+            return 1
+        print(f"{args.tipo} {key}: {args.nivel}")
+        return 0
+    only = TRUST_KINDS.get(args.tipo) if args.tipo else None
+    entries = store.list_trust_levels(only)
+    for namespace in TRUST_NAMESPACES:
+        if only not in (None, namespace):
+            continue
+        print(f"[{namespace}]")
+        rows = [e for e in entries if e["namespace"] == namespace]
+        for e in rows:
+            print(f"  {e['key']}: {e['level']} ({e['source']}, {e['updated_at']})"
+                  + (f" - {e['reason']}" if e["reason"] else ""))
+        if not rows:
+            print("  (nenhum)")
     return 0
 
 
@@ -309,7 +386,7 @@ def probe_composer(headless: bool = True) -> int:
     return 0
 
 
-def list_jobs(store: Store, args) -> int:
+def list_jobs(store, args) -> int:
     jobs = store.query_jobs(q=args.q, source=args.source, hours=args.hours, limit=args.limit)
     for i, j in enumerate(jobs, 1):
         tags = " · ".join(t for t in (j["workplace"], j["seniority"], j["contract"], j["stack"]) if t)

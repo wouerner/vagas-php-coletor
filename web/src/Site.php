@@ -171,6 +171,18 @@ final class Site
         return $this->themes ??= new Themes($this->repo->meta('taxonomy'));
     }
 
+    public function trustLevels(): array
+    {
+        $levels = $this->repo->meta('trust_levels');
+        if (!is_array($levels)) {
+            return ['companies' => [], 'recruiters' => []];
+        }
+        return [
+            'companies' => is_array($levels['companies'] ?? null) ? $levels['companies'] : [],
+            'recruiters' => is_array($levels['recruiters'] ?? null) ? $levels['recruiters'] : [],
+        ];
+    }
+
     public static function number(?string $value, float $default, float $low, float $high): float
     {
         return is_numeric($value) ? min(max((float) $value, $low), $high) : $default;

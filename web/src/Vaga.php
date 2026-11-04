@@ -21,8 +21,8 @@ use VagasPhp\Http\Response;
  *   expiradas), aviso e links para vagas parecidas abertas.
  *
  * O JobPosting só sai com empresa conhecida (hiringOrganization é obrigatório): sem
- * empresa, empresa que não diz quem contrata (company_key nulo) ou issue do GitHub (o
- * campo empresa vem de texto livre da issue), a página continua, sem o markup.
+ * empresa ou issue do GitHub (o campo empresa vem de texto livre da issue), a página
+ * continua, sem o markup.
  */
 final class Vaga
 {
@@ -83,7 +83,7 @@ final class Vaga
     public static function employer(array $job): ?string
     {
         $name = trim($job['company'] ?? '');
-        if (($job['source'] ?? null) === 'github' || empty($job['company_key'])) {
+        if (($job['source'] ?? null) === 'github' || $name === '') {
             return null;
         }
         return $name;
@@ -331,6 +331,57 @@ final class Vaga
         return $value ? '<dt>' . Text::e($label) . '</dt><dd>' . Text::e($value) . '</dd>' : '';
     }
 
+    private static function rowHtml(string $label, string $value): string
+    {
+        return trim($value) !== '' ? '<dt>' . Text::e($label) . '</dt><dd>' . $value . '</dd>' : '';
+    }
+
+    private static function trustNormalize(?string $value): ?string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+        $value = preg_replace('/\s+/u', ' ', Text::fold($value));
+        return $value !== '' ? $value : null;
+    }
+
+    private static function trustCompanyKey(array $job): ?string
+    {
+        $key = trim((string) ($job['company_key'] ?? ''));
+        return $key !== '' ? $key : self::trustNormalize($job['company'] ?? null);
+    }
+
+    private static function trustRecruiterKey(array $job): ?string
+    {
+        $url = trim((string) ($job['author_url'] ?? ''));
+        if ($url !== '') {
+            return rtrim(explode('?', $url)[0], '/');
+        }
+        return self::trustNormalize($job['author'] ?? null);
+    }
+
+    private static function trustEntry(array $trustLevels, string $namespace, ?string $key): ?array
+    {
+        $entry = $key !== null ? ($trustLevels[$namespace][$key] ?? null) : null;
+        return is_array($entry) ? $entry : null;
+    }
+
+    private static function trustChip(?array $entry, string $scope): string
+    {
+        $level = $entry['level'] ?? null;
+        if (!is_string($level) || $level === '') {
+            return '';
+        }
+        $reason = trim((string) ($entry['reason'] ?? ''));
+        $title = 'Confiança interna ' . $scope;
+        if ($reason !== '') {
+            $title .= ' · ' . $reason;
+        }
+        return '<span class="trust trust-' . Text::e($level) . '" title="' . Text::e($title) . '">'
+            . Text::e($level) . '</span>';
+    }
+
     public static function similarHtml(array $items, string $heading): string
     {
         if (!$items) {
@@ -352,11 +403,17 @@ final class Vaga
         return $h == (int) $h ? (string) (int) $h : (string) $h;
     }
 
-    public static function jobHtml(array $job, bool $isOpen, array $others): string
+    public static function jobHtml(array $job, bool $isOpen, array $others, array $trustLevels = []): string
     {
         $e = Text::e(...);
         [$name, $path] = self::topic($job);
         $source = self::SOURCE_NAMES[$job['source']] ?? $job['source'];
+        $companyTrust = self::trustEntry($trustLevels, 'companies', self::trustCompanyKey($job));
+        $recruiterTrust = self::trustEntry($trustLevels, 'recruiters', self::trustRecruiterKey($job));
+        $trustBits = array_filter([
+            self::trustChip($companyTrust, 'da empresa'),
+            self::trustChip($recruiterTrust, 'do recrutador'),
+        ]);
         $out = [];
         if (!$isOpen) {
             $out[] = '<p class="closed" role="status"><strong>Esta vaga não está mais aberta.</strong> '
@@ -368,6 +425,9 @@ final class Vaga
         $out[] = '<h1 class="title">' . $e($job['title'] ?: 'Vaga PHP') . '</h1>';
         if (!empty($job['company'])) {
             $out[] = '<p class="company">' . $e($job['company']) . '</p>';
+        }
+        if ($trustBits) {
+            $out[] = '<p class="trust-note">' . implode(' ', $trustBits) . '</p>';
         }
         $posted = self::posted($job);
         $out[] = '<dl class="facts">'
@@ -463,7 +523,7 @@ final class Vaga
             array_unshift($jsonld, $posting);
         }
         $html = Seo::render($request, 'vaga.html', self::pageTitle($job, $open), self::summary($job), $path,
-            ['crumbs' => self::crumbsHtml($trail), 'vaga' => self::jobHtml($job, $open, $others)], $jsonld, !$open);
+            ['crumbs' => self::crumbsHtml($trail), 'vaga' => self::jobHtml($job, $open, $others, $this->site->trustLevels())], $jsonld, !$open);
         return Response::html($html);
     }
 }

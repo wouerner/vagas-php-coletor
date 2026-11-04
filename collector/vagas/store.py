@@ -27,6 +27,7 @@ import re
 import ssl
 import threading
 import time
+import unicodedata
 from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -150,6 +151,33 @@ FIELDS = ("source", "relevant", "title", "company", "location", "workplace", "se
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+# Níveis de confiança internos (empresas e tech recruiters), em site_meta "trust_levels":
+# {"companies": {chave: entrada}, "recruiters": {chave: entrada}}, cada entrada com
+# level, reason, updated_at e source. Só o coletor usa; o site não lê nem expõe.
+TRUST_META = "trust_levels"
+TRUST_LEVELS = ("confiante", "neutro", "desconfiado")
+TRUST_NAMESPACES = ("companies", "recruiters")
+
+
+def _normalize_name(name: str | None) -> str | None:
+    """Minúsculas, sem acentos e com espaços colapsados; None se vazio."""
+    if not name:
+        return None
+    text = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    return " ".join(text.lower().split()) or None
+
+
+def trust_company_key(company: str | None) -> str | None:
+    """classify.company_key da empresa; se ela não der chave, o nome normalizado."""
+    return classify.company_key(company) or _normalize_name(company)
+
+
+def trust_recruiter_key(author: str | None, author_url: str | None = None) -> str | None:
+    """author_url (sem espaços e barra final) quando houver; senão o nome normalizado."""
+    url = (author_url or "").strip().rstrip("/")
+    return url or _normalize_name(author)
 
 
 def connect_args(url: str | None = None) -> dict:
@@ -582,9 +610,51 @@ class Store:
         self.execute("REPLACE INTO site_meta (tenant, name, value, updated_at) VALUES (?, ?, ?, ?)",
                      (self.tenant, name, json.dumps(value, ensure_ascii=False), now_iso()))
 
+    def get_meta(self, name: str, default=None, lock: bool = False):
+        """Lê um item de site_meta (JSON) do tenant; default se não existir. lock=True
+        trava a linha (SELECT ... FOR UPDATE) para ler e regravar dentro de tx()."""
+        row = self.execute("SELECT value FROM site_meta WHERE tenant = ? AND name = ?"
+                           + (" FOR UPDATE" if lock else ""), (self.tenant, name)).fetchone()
+        return json.loads(row[0]) if row else default
+
+    def get_trust_levels(self) -> dict:
+        """{"companies": {...}, "recruiters": {...}} de site_meta trust_levels."""
+        data = self.get_meta(TRUST_META) or {}
+        return {ns: dict(data.get(ns) or {}) for ns in TRUST_NAMESPACES}
+
+    def set_trust_level(self, namespace: str, name: str, level: str, reason: str = "",
+                        source: str = "manual", author_url: str | None = None) -> str:
+        """Grava o nível de confiança de uma empresa (namespace companies, chave
+        trust_company_key) ou de um recrutador (recruiters, chave trust_recruiter_key).
+        Retorna a chave usada."""
+        if namespace not in TRUST_NAMESPACES:
+            raise ValueError(f"namespace inválido: {namespace} (use {', '.join(TRUST_NAMESPACES)})")
+        if level not in TRUST_LEVELS:
+            raise ValueError(f"nível inválido: {level} (use {', '.join(TRUST_LEVELS)})")
+        key = (trust_company_key(name) if namespace == "companies"
+               else trust_recruiter_key(name, author_url))
+        if not key:
+            raise ValueError("informe o nome da empresa ou do recrutador")
+        with self.tx():
+            data = self.get_meta(TRUST_META, {}, lock=True) or {}
+            for ns in TRUST_NAMESPACES:
+                data.setdefault(ns, {})
+            data[namespace][key] = {"level": level, "reason": reason or "",
+                                    "updated_at": now_iso(), "source": source or "manual"}
+            self.set_meta(TRUST_META, data)
+        return key
+
+    def list_trust_levels(self, namespace: str | None = None) -> list[dict]:
+        """Entradas em ordem estável: companies antes de recruiters, depois pela chave."""
+        data = self.get_trust_levels()
+        return [{"namespace": ns, "key": key, **data[ns][key]}
+                for ns in TRUST_NAMESPACES if namespace in (None, ns)
+                for key in sorted(data[ns])]
+
     def publish_site_data(self) -> None:
         """Tudo o que o site precisa do filtro: colunas derivadas, taxonomia (stacks,
-        modalidades, senioridades e fontes, na ordem do filtro), regras e contagem por regra."""
+        modalidades, senioridades e fontes, na ordem do filtro), regras e contagem por regra.
+        Não mexe em trust_levels (interno do coletor)."""
         self.refresh_derived()
         self.set_meta("taxonomy", {
             "stacks": list(classify.STACK),
