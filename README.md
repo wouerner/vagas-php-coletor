@@ -125,23 +125,31 @@ docker compose run --rm collector-ruby config search   # termos de busca do Ruby
 As variáveis de termos de busca do `.env` (`VAGAS_GUPY_TERMS`...) valem só para o tenant
 `php`: os outros usam só a configuração da base.
 
-O site do Ruby (Vagas Ruby, https://vagasruby.wouerner.dev) é o mesmo código do `web/`
-com `VAGAS_TENANT=ruby`: nome, ícone, cores, textos e filtro de stack vêm de
-`web/src/Brand.php`. No Coolify ele é uma aplicação à parte, só o site (`vagas-ruby-web`,
-build pack Dockerfile, base `/web`, porta 8000, mesmo `DATABASE_URL`); o coletor Ruby
-continua sendo o `collector-ruby` do compose principal. Para testar local:
+Os sites (Vagas PHP, Vagas Ruby, Vagas Lua) são o mesmo código do `web/` e, em produção,
+**um container só**: o domínio da requisição escolhe o tenant (`VAGAS_SITES`, em
+`web/src/Sites.php`), e nome, ícone, cores, textos e filtro de stack vêm de
+`web/src/Brand.php`. No Coolify, o serviço `web` do compose principal tem os domínios de
+todos os sites:
+
+```
+VAGAS_SITES=vagasphp.wouerner.dev=php,vagasruby.wouerner.dev=ruby,vagaslua.wouerner.dev=lua
+```
+
+O primeiro é o padrão (Host desconhecido, como o healthcheck). `VAGAS_GA_ID` e
+`VAGAS_ORIGIN_TRIAL` valem só para ele; os outros sites usam as com sufixo
+(`VAGAS_GA_ID_RUBY`, `VAGAS_ORIGIN_TRIAL_LUA`...). Sem `VAGAS_SITES`, o container serve um
+site só (`VAGAS_TENANT`). Para testar local um site:
 
 ```bash
 docker compose run --rm -p 8001:8000 -e VAGAS_TENANT=ruby web   # http://localhost:8001
 ```
 
-O site do Lua (Vagas Lua, https://vagaslua.wouerner.dev) segue o mesmo modelo:
-`vagas-lua-web` no Coolify, com `VAGAS_TENANT=lua`, e o coletor `collector-lua` no compose
-principal. Em português "lua" também é o satélite: o filtro só aceita "lua" no título ou
-em 2+ menções na descrição de uma vaga de desenvolvimento.
+Em português "lua" também é o satélite: o filtro do Lua só aceita "lua" no título ou em 2+
+menções na descrição de uma vaga de desenvolvimento.
 
 Para outra linguagem: um bloco novo em `collector/vagas/config_defaults.json` (ou
-`config set` com `--tenant`) e um serviço como o `collector-ruby`. Regras em
+`config set` com `--tenant`), um serviço como o `collector-ruby`, a marca em `Brand.php` e
+o domínio em `VAGAS_SITES` e no serviço `web` do Coolify (skill `publicar-site`). Regras em
 [docs/contrato-base.md](docs/contrato-base.md#multi-tenant-uma-base-uma-linguagem-por-tenant).
 
 #### Próximas linguagens

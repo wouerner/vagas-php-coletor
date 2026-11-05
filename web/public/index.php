@@ -9,9 +9,12 @@ use VagasPhp\Db;
 use VagasPhp\Http\Request;
 use VagasPhp\Repo;
 use VagasPhp\Site;
+use VagasPhp\Sites;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 $request = Request::fromGlobals();
-$site = new Site(new Repo(Db::fromEnv()), dirname(__DIR__) . '/assets');
+// Vários sites no container (VAGAS_SITES): o domínio escolhe o tenant; sem a lista, VAGAS_TENANT.
+$tenant = Sites::select($request);
+$site = new Site(new Repo(Db::fromEnv(), $tenant), dirname(__DIR__) . '/assets');
 $site->handle($request)->send($request->method === 'HEAD');

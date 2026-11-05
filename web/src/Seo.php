@@ -15,6 +15,8 @@ use VagasPhp\Http\Request;
  * VAGAS_SITE_URL (ex.: https://vagas.seudominio.com) fixa o endereço público usado no
  * canonical e no sitemap; sem ela, vem dos cabeçalhos do proxy (X-Forwarded-*).
  * VAGAS_ORIGIN_TRIAL: token do origin trial do WebMCP no Chrome (vale para uma origem).
+ * Com vários sites no container (VAGAS_SITES), o endereço vem de Sites e cada site pode ter
+ * o próprio token e GA (VAGAS_ORIGIN_TRIAL_RUBY, VAGAS_GA_ID_LUA...).
  * Nome, ícone e textos de marca vêm de Brand (VAGAS_TENANT): os templates passam por
  * Brand::fill() antes do conteúdo do servidor entrar (dado da base não vira marca).
  */
@@ -37,9 +39,10 @@ final class Seo
         return dirname(__DIR__) . '/templates';
     }
 
+    /** Variável do site atual (Sites::env: VAGAS_GA_ID_RUBY no lugar de VAGAS_GA_ID...). */
     private static function env(string $name): string
     {
-        return trim((string) getenv($name));
+        return Sites::env($name);
     }
 
     /** Google Analytics (G-XXXXXXXXXX); vazio ou inválido: sem GA. */
@@ -52,6 +55,9 @@ final class Seo
     /** Endereço público do site, sem barra no fim. */
     public static function siteUrl(Request $request): string
     {
+        if (($site = Sites::url()) !== null) {  // vários sites: o domínio da lista (Sites)
+            return $site;
+        }
         $fixed = rtrim(self::env('VAGAS_SITE_URL'), '/');
         if ($fixed !== '') {
             return $fixed;

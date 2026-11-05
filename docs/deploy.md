@@ -28,7 +28,7 @@ Zona `wouerner.dev`, com os nameservers da Cloudflare.
 
 | Tipo | Nome | Conteúdo | Proxy |
 |---|---|---|---|
-| A | `vagasphp` | IP do servidor do Coolify | **Proxied** (nuvem laranja) |
+| A | `vagasphp`, `vagasruby`, `vagaslua` | IP do servidor do Coolify | **Proxied** (nuvem laranja) |
 
 - **SSL/TLS: Full.** A Cloudflare fala HTTPS com o servidor. O visitante vê o certificado
   da Cloudflare (renovado por ela), e o trecho Cloudflare → servidor também é cifrado com
@@ -47,7 +47,11 @@ Zona `wouerner.dev`, com os nameservers da Cloudflare.
 
 - Recurso: repositório deste projeto, branch `main`, build pack **Docker Compose**,
   *Docker Compose Location* `/docker-compose.coolify.yml`.
-- Domínio do serviço `web` (o site, em PHP, build de `web/`): `https://vagasphp.wouerner.dev`. A porta interna (8000) vem de
+- Domínios do serviço `web` (os sites, em PHP, build de `web/`): `https://vagasphp.wouerner.dev`,
+  `https://vagasruby.wouerner.dev` e `https://vagaslua.wouerner.dev`, separados por vírgula. Um
+  container serve os três: `VAGAS_SITES` diz o tenant de cada domínio (o primeiro é o padrão;
+  veja `web/src/Sites.php`). Domínio novo só no Coolify sem entrar em `VAGAS_SITES` mostra o
+  site padrão. A porta interna (8000) vem de
   `SERVICE_URL_WEB_8000` no compose, então não precisa ir no domínio. Com `http://` no
   lugar de `https://`, o Traefik não pede certificado e o site responde com o
   "TRAEFIK DEFAULT CERT".

@@ -9,10 +9,10 @@
 #   - o site não publica porta: o domínio vai no serviço "web", porta 8000;
 #   - MCP desligado por padrão (VAGAS_MCP_ENABLED=false); ligado, ele e o noVNC (sem
 #     senha!) ficam só no 127.0.0.1 do servidor: use túnel SSH.
-# Este compose é um deploy só (o do PHP, com o collector-ruby e o collector-lua). Os sites
-# do Ruby e do Lua NÃO usam este arquivo: são outras aplicações no Coolify (vagas-ruby-web
-# e vagas-lua-web: Dockerfile em /web, VAGAS_TENANT=ruby / lua). Um segundo deploy deste
-# compose subiria outro coletor PHP.
+# Este compose é um deploy só: os coletores (vagas-php, collector-ruby, collector-lua) e um
+# serviço web que serve todos os sites. O domínio escolhe o site (VAGAS_SITES, web/src/Sites.php):
+# no Coolify, o serviço web tem os domínios de todos os sites. Um segundo deploy deste compose
+# subiria outro coletor PHP.
 services:
   vagas-php:
     build: ./collector
@@ -138,6 +138,13 @@ services:
     restart: unless-stopped
     environment:
       SERVICE_URL_WEB_8000:          # o Coolify gera/usa o domínio do site
+      # Domínio de cada site e o tenant dele; o primeiro é o padrão (Host desconhecido).
+      VAGAS_SITES: ${VAGAS_SITES:-}
+      # GA e token do WebMCP de cada site além do padrão (os sem sufixo valem só para ele).
+      VAGAS_GA_ID_RUBY: ${VAGAS_GA_ID_RUBY:-}
+      VAGAS_GA_ID_LUA: ${VAGAS_GA_ID_LUA:-}
+      VAGAS_ORIGIN_TRIAL_RUBY: ${VAGAS_ORIGIN_TRIAL_RUBY:-}
+      VAGAS_ORIGIN_TRIAL_LUA: ${VAGAS_ORIGIN_TRIAL_LUA:-}
       VAGAS_GA_ID: ${VAGAS_GA_ID:-}  # Google Analytics (G-XXXXXXXXXX); vazio: sem GA
       VAGAS_SITE_URL: ${VAGAS_SITE_URL:-}  # endereço público (canonical, sitemap); vazio: do proxy
       VAGAS_ORIGIN_TRIAL: ${VAGAS_ORIGIN_TRIAL:-}  # token do origin trial do WebMCP (Chrome); vazio: sem
