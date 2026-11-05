@@ -108,11 +108,12 @@ prioridade sobre a base.
 
 ### Várias linguagens (multi-tenant)
 
-A base é multi-tenant: cada linguagem é um tenant (`php`, `ruby`), com as próprias vagas,
+A base é multi-tenant: cada linguagem é um tenant (`php`, `ruby`, `lua`), com as próprias vagas,
 coletas e configuração na mesma base. Cada coletor grava um tenant só (`VAGAS_TENANT`,
 padrão `php`), e cada site mostra só o seu (`VAGAS_TENANT` do site). O serviço
 `collector-ruby` do compose coleta vagas de Ruby (Ruby on Rails, Sinatra, Hanami) nas
-fontes públicas:
+fontes públicas, e o `collector-lua`, de Lua (LuaJIT, OpenResty, Roblox/Luau, LÖVE,
+Defold):
 
 ```bash
 docker compose up -d collector-ruby                    # coleta agendada do Ruby
@@ -134,6 +135,11 @@ continua sendo o `collector-ruby` do compose principal. Para testar local:
 docker compose run --rm -p 8001:8000 -e VAGAS_TENANT=ruby web   # http://localhost:8001
 ```
 
+O site do Lua (Vagas Lua, https://vagaslua.wouerner.dev) segue o mesmo modelo:
+`vagas-lua-web` no Coolify, com `VAGAS_TENANT=lua`, e o coletor `collector-lua` no compose
+principal. Em português "lua" também é o satélite: o filtro só aceita "lua" no título ou
+em 2+ menções na descrição de uma vaga de desenvolvimento.
+
 Para outra linguagem: um bloco novo em `collector/vagas/config_defaults.json` (ou
 `config set` com `--tenant`) e um serviço como o `collector-ruby`. Regras em
 [docs/contrato-base.md](docs/contrato-base.md#multi-tenant-uma-base-uma-linguagem-por-tenant).
@@ -144,7 +150,8 @@ Na ordem prevista. Cada uma é um tenant novo, só de coleta, como o Ruby:
 
 | linguagem | tenant | termos e frameworks | atenção no filtro |
 |---|---|---|---|
-| Ruby | `ruby` | Ruby, Rails, Sinatra, Hanami | feito (só coleta) |
+| Ruby | `ruby` | Ruby, Rails, Sinatra, Hanami | feito (site e coleta) |
+| Lua | `lua` | Lua, LuaJIT, OpenResty, Roblox (Luau), LÖVE, Defold | feito (site e coleta); "lua" também é palavra comum em português |
 | Java | `java` | Java, Spring, Spring Boot, Quarkus | buscas por "java" trazem vagas de JavaScript |
 | C# | `csharp` | C#, .NET, ASP.NET, Blazor | `\b` não casa em volta de `#` e `.`: `c#` e `.net` precisam de regex à parte |
 | Python | `python` | Python, Django, Flask, FastAPI | vagas de dados e ML citam Python sem ser de desenvolvimento |

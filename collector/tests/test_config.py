@@ -67,6 +67,24 @@ def test_ruby_tenant_defaults():
     assert classify.is_relevant_job("Desenvolvedor PHP Laravel")
 
 
+def test_lua_tenant_defaults():
+    try:
+        config.load({}, "lua")
+        assert config.tenant == "lua"
+        assert classify.is_relevant_job("Desenvolvedor Lua Sênior")
+        assert classify.is_relevant_job("Backend Engineer (OpenResty)")
+        assert classify.is_relevant_job("Roblox Developer")
+        assert not classify.is_relevant_job("Desenvolvedor PHP Laravel")
+        assert not classify.is_relevant_job("Backend Engineer", "Go e Kubernetes. Scripts em Lua.")
+        assert classify.is_relevant_job("Backend Engineer", "Lua no gateway. LuaJIT e OpenResty.")
+        assert classify.details("Dev Lua", "LuaJIT, OpenResty e Nginx")["stack"] == "Lua,LuaJIT,OpenResty,Nginx"
+        assert config.search("programathor", "VAGAS_PROGRAMATHOR_PAGES") == ["jobs-lua"]
+    finally:
+        config.load({}, "php")
+    assert config.tenant == "php"
+    assert classify.is_relevant_job("Desenvolvedor PHP Laravel")
+
+
 def test_unknown_tenant_never_inherits_another():
     with pytest.raises(ValueError, match="sem configuração"):
         config.load({"language": RUBY["language"]}, "elixir")

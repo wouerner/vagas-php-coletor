@@ -70,5 +70,40 @@
       "names": ["^wouerner\\b"],
       "urls": ["linkedin\\.com/in/wouerner/?$"]
     }
+  },
+  "lua": {
+    "language": {
+      "name": "Lua",
+      "slug": "lua",
+      "examples": "Lua, LuaJIT, OpenResty ou Roblox (Luau)"
+    },
+    "core": "\\b(lua|luajit|luau|openresty|love2d|löve|defold|roblox)\\b",
+    "stack": [
+      ["Lua", "\\blua\\b"],
+      ["LuaJIT", "\\bluajit\\b"],
+      ["Luau", "\\bluau\\b"],
+      ["OpenResty", "\\bopenresty\\b"],
+      ["Nginx", "\\bnginx\\b"],
+      ["Roblox", "\\broblox\\b"],
+      ["LÖVE", "\\b(love2d|löve)\\b"],
+      ["Defold", "\\bdefold\\b"],
+      ["Neovim", "\\bneovim\\b"]
+    ],
+    "search": {
+      "linkedin": ["lua", "openresty", "roblox developer"],
+      "posts": ["vaga lua", "desenvolvedor lua", "vaga roblox"],
+      "gupy": ["lua"],
+      "solides": ["lua"],
+      "catho": ["lua"],
+      "remotar": ["lua"],
+      "programathor": ["jobs-lua"],
+      "nerdin": ["lua"],
+      "upvagas": ["lua"],
+      "github": ["backend-br/vagas"]
+    },
+    "self_author": {
+      "names": ["^wouerner\\b"],
+      "urls": ["linkedin\\.com/in/wouerner/?$"]
+    }
   }
 }

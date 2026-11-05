@@ -24,3 +24,15 @@ it('usa a paleta vermelho-rubi e a marca no tenant ruby', function () {
         ->toContain('<option>Rails</option>')->toContain('Ruby, Rails e Sinatra')
         ->not->toContain('Laravel')->not->toContain('Symfony')->not->toContain('WordPress');
 });
+
+it('usa a paleta azul-marinho e a marca no tenant lua', function () {
+    Brand::use('lua');
+    foreach (['index.html', 'tema.html', 'dashboard.html', 'empresas.html', 'vaga.html'] as $t) {
+        $html = Seo::template($t);
+        expect($html)->toContain('#1f3d99')->not->toContain('#5b5fa0')->not->toContain('#a3a7e6')
+            ->not->toContain('Vagas PHP');
+    }
+    expect(Seo::template('index.html'))->toContain('<h1>Vagas <span>Lua</span></h1>')
+        ->toContain('<option>OpenResty</option>')->toContain('Lua, OpenResty e Roblox')
+        ->not->toContain('Laravel')->not->toContain('Symfony')->not->toContain('WordPress');
+});

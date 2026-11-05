@@ -22,7 +22,7 @@ existe, responde vazio (`Site::safe()` trata os erros `42S02` e `42S22`).
 
 ## Multi-tenant: uma base, uma linguagem por tenant
 
-`jobs`, `runs`, `site_meta` e `collector_config` têm a coluna `tenant` (`php`, `ruby`...).
+`jobs`, `runs`, `site_meta` e `collector_config` têm a coluna `tenant` (`php`, `ruby`, `lua`...).
 Cada processo coletor grava um tenant só (`VAGAS_TENANT`, padrão `php`; na linha de
 comando, `python -m vagas --tenant ruby ...`), e o site lê só o dele (`VAGAS_TENANT` do
 site, padrão `php`). Regras:

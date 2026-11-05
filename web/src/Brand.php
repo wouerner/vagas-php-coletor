@@ -8,7 +8,7 @@ namespace VagasPhp;
  * Identidade pública do site por tenant (VAGAS_TENANT, padrão "php"; o mesmo de Repo):
  * nome, linguagem, frameworks citados nos textos, ícone, canais (Telegram/Instagram),
  * caminho da página de mercado e as stacks do filtro da home. O mesmo código serve o
- * Vagas PHP e o Vagas Ruby; só muda o deploy (VAGAS_TENANT) e o domínio.
+ * Vagas PHP, o Vagas Ruby e o Vagas Lua; só muda o deploy (VAGAS_TENANT) e o domínio.
  *
  * Os templates marcam os textos de marca com {{brand:chave}} (fill() troca); o PHP usa
  * get(). Os valores de "php" são exatamente os textos de antes do multi-tenant.
@@ -24,6 +24,12 @@ final class Brand
         . "<polygon points='50,94 30,40 50,10 70,40' fill='%23E0584F'/>"
         . "<polyline points='6,40 94,40' stroke='%23A91401' stroke-width='3' fill='none'/></svg>";
 
+    // Lua: círculo azul-marinho com uma lua menor em órbita (no espírito do logotipo do Lua).
+    private const ICON_LUA = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+        . "<circle cx='44' cy='56' r='40' fill='%2300007F'/><circle cx='86' cy='14' r='12' fill='%2300007F'/>"
+        . "<text x='44' y='66' font-size='28' font-family='Arial' font-weight='bold' text-anchor='middle' "
+        . "fill='white'>lua</text></svg>";
+
     /**
      * Cores do Ruby: troca, nos templates, cada cor da paleta do PHP (roxo, com neutros
      * levemente azulados) pela equivalente em vermelho-rubi (neutros levemente quentes).
@@ -37,6 +43,16 @@ final class Brand
         // escuro
         '#a3a7e6' => '#f2928a', '#2a2b45' => '#45211e', '#13131b' => '#1b1313', '#1c1c27' => '#271c1b',
         '#2d2d3c' => '#3c2d2c', '#262634' => '#342625', '#e8e8f0' => '#f0e8e7', '#a0a2b4' => '#b4a2a0',
+    ];
+
+    /** Cores do Lua: o mesmo esquema do Ruby, com azul-marinho no lugar do roxo do PHP. */
+    private const PALETTE_LUA = [
+        // claro
+        '#5b5fa0' => '#1f3d99', '#ebecf7' => '#e6ecfa', '#f6f6fa' => '#f5f7fb', '#f0f0f5' => '#eef1f7',
+        '#e3e3ec' => '#e0e5ef', '#1d1d2b' => '#1a1f2e', '#5d6070' => '#5a6276',
+        // escuro
+        '#a3a7e6' => '#8fb0f5', '#2a2b45' => '#1d2b52', '#13131b' => '#11141c', '#1c1c27' => '#191d29',
+        '#2d2d3c' => '#2a2f40', '#262634' => '#232838', '#e8e8f0' => '#e6e9f1', '#a0a2b4' => '#9ea6ba',
     ];
 
     private const GITHUB = 'https://github.com/wouerner/vagas-php-coletor';
@@ -90,6 +106,29 @@ final class Brand
             'stack_workplace' => ['Rails' => ['Remoto', 'Híbrido', 'Presencial']],
             'stack_seniority' => ['Rails' => ['Júnior', 'Pleno', 'Sênior']],
             'palette' => self::PALETTE_RUBY,
+        ],
+        'lua' => [
+            'lang' => 'Lua',
+            'lang_lower' => 'lua',
+            'name' => 'Vagas Lua',
+            'frameworks' => 'OpenResty e Roblox',
+            'frameworks_list' => 'OpenResty, Roblox, LÖVE',
+            'frameworks_etc' => 'OpenResty, Roblox, LÖVE, Defold...',
+            'icon' => self::ICON_LUA,
+            'telegram' => null,
+            'instagram' => null,
+            'github' => self::GITHUB,
+            'mercado_path' => '/mercado-lua',
+            'og_image' => null,
+            'og_alt' => null,
+            'stack_example' => 'openresty',
+            'stacks_keyword' => 'LuaJIT',
+            // As stacks do coletor (collector/vagas/config_defaults.json, tenant lua), sem a linguagem.
+            'stacks' => ['LuaJIT', 'Luau', 'OpenResty', 'Nginx', 'Roblox', 'LÖVE', 'Defold', 'Neovim'],
+            // Pouco volume de vagas: sem páginas de combinação por stack.
+            'stack_workplace' => [],
+            'stack_seniority' => [],
+            'palette' => self::PALETTE_LUA,
         ],
     ];
 

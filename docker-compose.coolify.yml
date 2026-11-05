@@ -9,9 +9,10 @@
 #   - o site não publica porta: o domínio vai no serviço "web", porta 8000;
 #   - MCP desligado por padrão (VAGAS_MCP_ENABLED=false); ligado, ele e o noVNC (sem
 #     senha!) ficam só no 127.0.0.1 do servidor: use túnel SSH.
-# Este compose é um deploy só (o do PHP, com o collector-ruby). O site do Ruby NÃO usa
-# este arquivo: é outra aplicação no Coolify (vagas-ruby-web: Dockerfile em /web,
-# VAGAS_TENANT=ruby). Um segundo deploy deste compose subiria outro coletor PHP.
+# Este compose é um deploy só (o do PHP, com o collector-ruby e o collector-lua). Os sites
+# do Ruby e do Lua NÃO usam este arquivo: são outras aplicações no Coolify (vagas-ruby-web
+# e vagas-lua-web: Dockerfile em /web, VAGAS_TENANT=ruby / lua). Um segundo deploy deste
+# compose subiria outro coletor PHP.
 services:
   vagas-php:
     build: ./collector
@@ -110,6 +111,28 @@ services:
     volumes:
       - ruby-data:/app/data
 
+  # Coletor do tenant lua (multi-tenant: mesma base, VAGAS_TENANT=lua). Só coleta: sem
+  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+  # variáveis listadas aqui: os termos de busca do Lua vêm da base (collector_config),
+  # nunca dos VAGAS_*_TERMS do PHP.
+  collector-lua:
+    build: ./collector
+    command: ["serve"]
+    restart: unless-stopped
+    user: pwuser
+    environment:
+      TZ: America/Sao_Paulo
+      VAGAS_TENANT: lua
+      VAGAS_MCP_ENABLED: "false"
+      VAGAS_POSTS_ENABLED: "false"
+      VAGAS_LINKEDIN_DAILY_POST: "false"
+      VAGAS_INDEXING_ENABLED: "false"
+      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+      DATABASE_URL: ${DATABASE_URL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+    volumes:
+      - lua-data:/app/data
+
   web:
     build: ./web
     restart: unless-stopped
@@ -131,5 +154,6 @@ services:
 
 volumes:
   ruby-data:
+  lua-data:
   vagas-data:
   linkedin-session:
