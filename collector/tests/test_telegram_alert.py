@@ -36,8 +36,8 @@ def test_bairesdev_burst_collapses_into_one_group():
     assert ids(groups) == [["b0", "b1", "b2", "b3", "b4"], ["acme"]]
     text, included = telegram_alert.message_fit(groups[0])
     assert len(included) == 5
-    assert text.startswith("🏢 <b>BairesDev</b> · 5 vagas publicadas em 3 h 20 min")
-    assert text.count("🔗") == 5
+    assert text.startswith("BairesDev · 5 vagas · 3 h 20 min")
+    assert text.count("linkedin.com/jobs") == 5
 
 
 def test_gap_over_12h_splits_the_company_in_two_groups():
@@ -103,5 +103,125 @@ def test_batch_puts_the_burst_in_one_block(alert):
     data_dir, sent, _ = alert
     result = telegram_alert.run(data_dir, force=True, batch=True)
     assert len(sent) == 1 and result["groups"] == 2 and result["sent"] == 6
-    assert sent[0].count("🏢 <b>BairesDev</b> · 5 vagas") == 1
+    assert sent[0].count("BairesDev · 5 vagas") == 1
     assert sorted(telegram_alert.state_load(data_dir)) == ["acme", "b0", "b1", "b2", "b3", "b4"]
+
+
+# Texto enxuto: sem rótulos com emoji e sem repetir "PHP" (o canal já é de PHP).
+
+def test_single_job_message_is_compact():
+    j = {**job("123", "Acme", 0, title="Dev Backend"), "location": "São Paulo, SP",
+         "workplace": "Remoto", "seniority": "Pleno", "contract": "CLT",
+         "stack": "PHP, Laravel, MySQL"}
+    link = telegram_alert.out_link(j).replace("&", "&amp;")
+    assert telegram_alert.format(j) == (
+        "<b>Dev Backend</b>\n"
+        "Acme · São Paulo, SP · Remoto · Pleno · CLT · Laravel, MySQL\n"
+        f'<a href="{link}">abrir</a>')
+
+def test_single_job_message_skips_empty_fields_and_php_only_stack():
+    j = {**job("9", None, 0, title="Dev PHP"), "stack": "php"}
+    text = telegram_alert.format(j)
+    assert text.splitlines()[0] == "<b>Dev PHP</b>"
+    assert len(text.splitlines()) == 2 and text.splitlines()[1].startswith("<a href=")
+
+
+def test_digest_header_is_short_and_generic(monkeypatch):
+    at_brasilia(monkeypatch, 2026, 11, 4)
+    text = telegram_alert.format_digest([job("acme", "Acme", 0)])
+    head = text.split("\n\n")[0]
+    assert head == "<b>Novas vagas</b> · 04/11"
+    assert "PHP" not in head and "🐘" not in text
+
+
+# Rodapé de encorajamento: uma frase por dia, no fim de UMA mensagem de vagas.
+
+def at_brasilia(monkeypatch, year, month, day, hour=10):
+    """Fixa o relógio do módulo em `day` às `hour` h de Brasília."""
+    now = datetime(year, month, day, hour, tzinfo=telegram_alert.dates.BRASILIA)
+    monkeypatch.setattr(telegram_alert.dates, "now_utc",
+                        lambda: now.astimezone(timezone.utc))
+
+
+def footers(messages):
+    return [m for m in messages if any(p in m for p in telegram_alert.ENCOURAGEMENTS)]
+
+
+def test_encouragement_rotates_by_day_and_is_deterministic():
+    days = [T0.date() + timedelta(days=i) for i in range(6)]
+    phrases = [telegram_alert.encouragement(d) for d in days]
+    assert phrases == [telegram_alert.encouragement(d) for d in days]  # mesma data, mesma frase
+    assert all(a != b for a, b in zip(phrases, phrases[1:]))  # dias seguidos trocam
+    assert set(phrases) == set(telegram_alert.ENCOURAGEMENTS)
+    assert all("PHP" not in phrase for phrase in phrases)
+
+
+def test_footer_goes_on_one_message_at_the_very_end(alert, monkeypatch):
+    data_dir, sent, _ = alert
+    at_brasilia(monkeypatch, 2026, 11, 4)
+    plain = [telegram_alert.message_fit(g)[0]
+             for g in reversed(telegram_alert.group_bursts(bairesdev_burst()))]
+    telegram_alert.run(data_dir, limit=5, force=True)
+    assert len(sent) == 2 and len(footers(sent)) == 1
+    phrase = telegram_alert.encouragement(telegram_alert.today_brasilia())
+    # Só a 1ª mensagem do dia leva o rodapé, no fim, e o resto do texto fica igual.
+    assert sent[0] == f"{plain[0]}\n\n<i>{phrase}</i>"
+    assert sent[1] == plain[1]
+    state = json.loads((data_dir / telegram_alert.ENCOURAGEMENT_STATE_FILE).read_text())
+    assert state["date"] == "2026-11-04"
+
+
+def test_footer_only_once_per_day_across_runs(alert, monkeypatch):
+    data_dir, sent, _ = alert
+    at_brasilia(monkeypatch, 2026, 11, 4, hour=9)
+    telegram_alert.run(data_dir, limit=1, force=True)  # rajada da BairesDev, com rodapé
+    at_brasilia(monkeypatch, 2026, 11, 4, hour=15)
+    telegram_alert.run(data_dir, limit=1, force=True)  # Acme, mesmo dia: sem rodapé
+    assert len(sent) == 2 and footers(sent) == [sent[0]]
+    # No dia seguinte volta, com outra frase.
+    (data_dir / telegram_alert.STATE_FILE).unlink()
+    (data_dir / telegram_alert.LOG_FILE).unlink()
+    at_brasilia(monkeypatch, 2026, 11, 5, hour=9)
+    telegram_alert.run(data_dir, limit=1, force=True)
+    assert footers(sent) == [sent[0], sent[2]]
+    assert sent[2].endswith(f"<i>{telegram_alert.encouragement(T0.date() + timedelta(days=2))}</i>")
+    assert telegram_alert.encouragement(T0.date() + timedelta(days=1)) in sent[0]
+
+
+def test_refused_message_does_not_spend_the_footer(alert, monkeypatch):
+    data_dir, sent, replies = alert
+    at_brasilia(monkeypatch, 2026, 11, 4)
+    replies += [{"ok": False, "description": "Bad Request"}]
+    telegram_alert.run(data_dir, limit=5, force=True)
+    assert len(sent) == 1 and footers(sent) == sent
+    assert not (data_dir / telegram_alert.ENCOURAGEMENT_STATE_FILE).exists()
+    telegram_alert.run(data_dir, limit=5, force=True)  # tenta de novo: rodapé na 1ª aceita
+    assert len(sent) == 3 and footers(sent[1:]) == [sent[1]]
+
+
+def test_dry_run_shows_footer_once_and_records_nothing(alert, monkeypatch, capsys):
+    data_dir, sent, _ = alert
+    at_brasilia(monkeypatch, 2026, 11, 4)
+    telegram_alert.run(data_dir, limit=5, force=True, dry_run=True)
+    phrase = telegram_alert.encouragement(telegram_alert.today_brasilia())
+    assert capsys.readouterr().out.count(phrase) == 1 and not sent
+    assert not (data_dir / telegram_alert.ENCOURAGEMENT_STATE_FILE).exists()
+
+
+def test_batch_gets_footer_at_the_end_once_per_day(alert, monkeypatch):
+    data_dir, sent, _ = alert
+    at_brasilia(monkeypatch, 2026, 11, 4)
+    plain = telegram_alert.format_digest(bairesdev_burst())
+    telegram_alert.run(data_dir, force=True, batch=True)
+    phrase = telegram_alert.encouragement(telegram_alert.today_brasilia())
+    assert sent == [f"{plain}\n\n<i>{phrase}</i>"]
+    # Outra execução no mesmo dia, com vagas novas: sai sem rodapé.
+    (data_dir / telegram_alert.STATE_FILE).unlink()
+    (data_dir / telegram_alert.LOG_FILE).unlink()
+    telegram_alert.run(data_dir, force=True, batch=True)
+    assert len(sent) == 2 and sent[1] == plain
+
+
+def test_footer_is_skipped_when_it_does_not_fit():
+    assert telegram_alert.with_encouragement("x" * telegram_alert.MESSAGE_MAX,
+                                             T0.date()) is None

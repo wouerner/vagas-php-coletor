@@ -21,6 +21,12 @@ empresa nem autor não há chave: vale só o id. Entradas antigas do log, sem `k
 só pelo título normalizado. Log ilegível derruba a execução (tratá-lo como vazio
 reenviaria tudo).
 
+Rodapé de encorajamento: a primeira mensagem de vagas aceita pelo Telegram em cada dia
+(horário de Brasília) leva, no fim, uma frase curta (ENCOURAGEMENTS, uma por dia, em rodízio
+pela data). Só uma mensagem por dia, mesmo com várias execuções: o dia já atendido fica em
+data/telegram_encouragement_state.json. Se a frase não couber em MESSAGE_MAX, a mensagem sai
+sem ela e a próxima tenta de novo.
+
 send_weekly manda, uma vez por semana, o mesmo post do LinkedIn (print do dashboard +
 texto de resumo); a semana já enviada fica em data/telegram_digest_state.json."""
 
@@ -34,7 +40,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
 
@@ -53,6 +59,13 @@ STATE_MAX = 500
 LOG_FILE = "telegram_alert_log.json"
 LOG_MAX = 500
 DIGEST_STATE_FILE = "telegram_digest_state.json"
+ENCOURAGEMENT_STATE_FILE = "telegram_encouragement_state.json"
+# Rodapé diário dos alertas (encouragement): uma frase por dia, em rodízio pela data.
+ENCOURAGEMENTS = (
+    "Buscar há meses cansa. Cada aplicação boa conta.",
+    "Você não está parado. Está filtrando melhor.",
+    "Nem todo dia rende resposta. O importante é manter o ritmo.",
+)
 CAPTION_MAX = 1024  # limite da legenda de foto no Telegram
 # Limite de sendMessage. O Telegram conta o texto já sem as tags; aqui conta o HTML inteiro,
 # então a mensagem que cabe fica bem abaixo do limite real.
@@ -107,21 +120,23 @@ def destiny(url: str) -> str:
     return text if len(text) <= 40 else text[:39] + "…"
 
 
-def format(job: dict) -> str:
-    """Mensagem da vaga em HTML do Telegram. Campos vazios ficam de fora."""
-    def line(emoji: str, *parts) -> str | None:
-        text = " · ".join(escape(str(p).strip()) for p in parts if p and str(p).strip())
-        return f"{emoji} {text}" if text else None
+def stack_label(stack: str | None) -> str:
+    """Stack para mostrar no Telegram, sem repetir PHP à toa."""
+    items = [s.strip() for s in (stack or "").split(",") if s.strip()]
+    items = [s for s in items if s.casefold() != "php"]
+    return ", ".join(items)
 
+
+def format(job: dict) -> str:
+    """Mensagem da vaga em HTML do Telegram, em 3 linhas: título; detalhes; link."""
     title = (job.get("title") or "").strip()
-    stack = ", ".join(s.strip() for s in (job.get("stack") or "").split(",") if s.strip())
     url = (job.get("url") or "").strip()
+    details = " · ".join(escape(str(p).strip()) for p in (
+        job.get("company"), job.get("location"), job.get("workplace"), job.get("seniority"),
+        job.get("contract"), stack_label(job.get("stack"))) if p and str(p).strip())
     lines = [f"<b>{escape(title)}</b>" if title else None,
-             line("🏢", job.get("company")),
-             line("📍", job.get("location")),
-             line("💼", job.get("workplace"), job.get("seniority"), job.get("contract")),
-             line("🐘", stack),
-             f'🔗 <a href="{escape(out_link(job))}">{escape(destiny(url))}</a>' if url else None]
+             details or None,
+             f'<a href="{escape(out_link(job))}">abrir</a>' if url else None]
     return "\n".join(x for x in lines if x)
 
 
@@ -182,12 +197,9 @@ def burst_header(group: list[dict]) -> str:
     """"🏢 BairesDev · 6 vagas publicadas em 3 h 31 min (03/11 09:10 a 12:41, Brasília)"."""
     newest, oldest = burst_time(group[0]), burst_time(group[-1])
     company = escape((group[0].get("company") or "").strip())
-    text = f"🏢 <b>{company}</b> · {len(group)} vagas"
+    text = f"{company} · {len(group)} vagas"
     if newest and oldest:
-        a, b = oldest.astimezone(dates.BRASILIA), newest.astimezone(dates.BRASILIA)
-        end = f"{b:%H:%M}" if a.date() == b.date() else f"{b:%d/%m %H:%M}"
-        text += (f" publicadas em {span((newest - oldest).total_seconds())} "
-                 f"({a:%d/%m %H:%M} a {end}, Brasília)")
+        text += f" · {span((newest - oldest).total_seconds())}"
     return text
 
 
@@ -195,7 +207,7 @@ def job_block(job: dict, company: bool = True) -> str:
     """Bloco da vaga nas mensagens com várias vagas: título em negrito e, recuados,
     empresa · local · modalidade · senioridade · stack e o link. company=False: sem a
     empresa (dentro de uma rajada, ela já está no cabeçalho)."""
-    stack = ", ".join(s.strip() for s in (job.get("stack") or "").split(",") if s.strip())
+    stack = stack_label(job.get("stack"))
     details = " · ".join(escape(str(p).strip()) for p in (
         job.get("company") if company else None, job.get("location"), job.get("workplace"),
         job.get("seniority"), stack) if p and str(p).strip())
@@ -238,8 +250,7 @@ def digest_fit(jobs: list[dict]) -> tuple[str, list[dict]]:
     if not jobs:
         return "", []
     today = dates.now_utc().astimezone(dates.BRASILIA)
-    head = "\n".join([f"<b>🐘 Vagas PHP</b> — {today:%d/%m}", "",
-                      "Vagas de PHP, Laravel e Symfony publicadas nas últimas horas:"])
+    head = f"<b>Novas vagas</b> · {today:%d/%m}"
     groups = group_bursts(jobs)
     blocks = [group_block(g) for g in groups]
     n = len(blocks)
@@ -263,10 +274,49 @@ def format_digest(jobs: list[dict]) -> str:
     return digest_fit(jobs)[0]
 
 
+def today_brasilia() -> date:
+    return dates.now_utc().astimezone(dates.BRASILIA).date()
+
+
+def encouragement(day: date) -> str:
+    """Frase do dia: rodízio determinístico de ENCOURAGEMENTS pela data (dias seguidos
+    trocam de frase)."""
+    return ENCOURAGEMENTS[day.toordinal() % len(ENCOURAGEMENTS)]
+
+
+def with_encouragement(text: str, day: date) -> str | None:
+    """`text` com a frase do dia no fim (linha em branco + itálico), ou None se passar de
+    MESSAGE_MAX. O resto da mensagem fica igual."""
+    full = f"{text}\n\n<i>{escape(encouragement(day))}</i>"
+    return full if len(full) <= MESSAGE_MAX else None
+
+
+def encouragement_sent_day(data_dir: Path) -> str | None:
+    """Dia (ISO) em que o rodapé já saiu, ou None (sem arquivo ou ilegível)."""
+    try:
+        state = json.loads((data_dir / ENCOURAGEMENT_STATE_FILE).read_text())
+    except (OSError, ValueError):
+        return None
+    return state.get("date") if isinstance(state, dict) else None
+
+
+def encouragement_save(data_dir: Path, day: date) -> None:
+    """Marca `day` como atendido. Uma falha ao gravar só vira aviso: não derruba o envio."""
+    try:
+        path = data_dir / ENCOURAGEMENT_STATE_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"date": day.isoformat(), "text": encouragement(day)},
+                                  ensure_ascii=False, indent=1))
+        tmp.replace(path)
+    except OSError as e:
+        log.warning("Não foi possível gravar %s: %s", ENCOURAGEMENT_STATE_FILE, e)
+
+
 def send(token: str, chat_id: str, text: str) -> dict:
     """sendMessage do Telegram; devolve o JSON da resposta (também nos erros HTTP)."""
     data = urllib.parse.urlencode({"chat_id": chat_id, "text": text, "parse_mode": "HTML",
-                                   "disable_web_page_preview": "false"}).encode()
+                                   "disable_web_page_preview": "true"}).encode()
     req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage",
                                  data=data, headers=HEADERS)
     for retry in (True, False):
@@ -553,8 +603,11 @@ def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = Fal
         # O id entra no estado para a vaga não ser reavaliada a cada execução.
         sent_ids += [j["id"] for j in dups]
         state_save(data_dir, sent_ids)
+    today = today_brasilia()
+    footer_due = encouragement_sent_day(data_dir) != today.isoformat()
     if batch:
-        return run_batch(data_dir, jobs, pending, skipped, len(dups), dry_run)
+        return run_batch(data_dir, jobs, pending, skipped, len(dups), dry_run, today,
+                         footer_due)
     groups = group_bursts(pending)
     to_send = list(reversed(groups[:limit]))  # os mais recentes, o mais antigo primeiro
     log.info("%d vagas na API, %d ainda não enviadas (%d ignoradas sem URL, %d repetidas) "
@@ -569,14 +622,21 @@ def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = Fal
             log.error("Vaga %s acima de %d caracteres; não enviada.", group[0]["id"], MESSAGE_MAX)
             continue
         ids = [j["id"] for j in included]
+        footed = with_encouragement(text, today) if footer_due else None
+        if footed:
+            text = footed
         if dry_run:
             print(f"--- {', '.join(ids)}\n{text}\n")
+            footer_due = footer_due and not footed
             continue
         resp = send(VAGAS_TELEGRAM_TOKEN, VAGAS_TELEGRAM_CHAT_ID, text)
         if not resp.get("ok"):
             # Para aqui: o grupo e os seguintes ficam pendentes e voltam na próxima execução.
             log.error("Telegram recusou %s: %s", ", ".join(ids), resp.get("description"))
             break
+        if footed:
+            encouragement_save(data_dir, today)
+            footer_due = False
         sent_ids += ids
         state_save(data_dir, sent_ids)  # a cada envio: uma falha depois não reenvia este
         for job in included:
@@ -596,11 +656,16 @@ def run(data_dir: Path, limit: int = 5, dry_run: bool = False, force: bool = Fal
 
 
 def run_batch(data_dir: Path, jobs: list[dict], pending: list[dict], skipped: int,
-              duplicates: int, dry_run: bool) -> dict:
+              duplicates: int, dry_run: bool, today: date | None = None,
+              footer_due: bool = False) -> dict:
     """Modo agrupado de run: uma só mensagem com as vagas pendentes (mais recentes primeiro;
     rajadas da mesma empresa num bloco só; os grupos mais antigos saem se passar do limite) e
-    todas as enviadas gravadas no estado e no log."""
+    todas as enviadas gravadas no estado e no log. footer_due: a mensagem leva o rodapé de
+    encorajamento do dia `today`, se couber."""
     text, included = digest_fit(pending)
+    footed = with_encouragement(text, today) if footer_due and included else None
+    if footed:
+        text = footed
     n = len(included)
     groups = group_bursts(included)
     log.info("%d vagas na API, %d ainda não enviadas (%d ignoradas sem URL, %d repetidas); "
@@ -622,6 +687,8 @@ def run_batch(data_dir: Path, jobs: list[dict], pending: list[dict], skipped: in
         # Nada gravado: as vagas ficam pendentes e voltam na próxima execução.
         log.error("Telegram recusou o resumo agrupado: %s", resp.get("description"))
         return result
+    if footed:
+        encouragement_save(data_dir, today)
     sent_ids = state_load(data_dir) + [j["id"] for j in included]
     state_save(data_dir, sent_ids)
     for group in groups:
