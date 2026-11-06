@@ -270,7 +270,7 @@ final class Site
         $out = $url ? self::outHref($url, $job, $page) : null;
         $title = $e($job['title'] ?: '(sem título)');
         $location = trim((string) ($job['location'] ?? ''));
-        $flag = self::countryFlag($location);
+        $flag = Vaga::countryFlag($location);
         if ($flag !== null && !str_starts_with($location, $flag)) {
             $location = $flag . ' ' . $location;
         }

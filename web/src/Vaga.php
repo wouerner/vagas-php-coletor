@@ -293,7 +293,7 @@ final class Vaga
     }
 
     /** Marca Portugal com emoji quando o local indica Portugal. */
-    private static function countryFlag(?string $location): ?string
+    public static function countryFlag(?string $location): ?string
     {
         $loc = self::lower(Text::fold(trim((string) $location)));
         if ($loc === '') {
