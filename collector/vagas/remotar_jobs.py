@@ -48,6 +48,11 @@ def search(term: str, since: datetime, max_pages: int = 5) -> list[dict]:
                 return jobs  # daqui para frente, só mais antigas
             if not it.get("active") or it.get("expired"):
                 continue
+            if it.get("integrationSource"):
+                continue
+            external = (it.get("externalLink") or "").strip()
+            if external and "remotar.com.br" not in external:
+                continue
             company = it.get("company") or {}
             tags = [t["tag"]["name"] for t in it.get("jobTags") or [] if t.get("tag")]
             reqs = [r["description"] for r in it.get("jobRequirements") or [] if r.get("description")]
