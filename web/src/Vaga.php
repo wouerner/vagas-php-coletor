@@ -281,7 +281,35 @@ final class Vaga
         return Dates::local(new DateTimeImmutable($iso))->format('d/m/Y \à\s H:i');
     }
 
-    /** "Remoto", "Híbrido · São Paulo, SP", "São Paulo, SP"... */
+    /** Normaliza texto livre para chaves internas de confiança. */
+    private static function trustNormalize(?string $value): ?string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+        $value = preg_replace('/\s+/u', ' ', Text::fold($value));
+        return $value !== '' ? $value : null;
+    }
+
+    /** Marca Portugal com emoji quando o local indica Portugal. */
+    private static function countryFlag(?string $location): ?string
+    {
+        $loc = self::lower(Text::fold(trim((string) $location)));
+        if ($loc === '') {
+            return null;
+        }
+        if (str_contains($loc, 'portugal')) {
+            return '🇵🇹';
+        }
+        foreach (['lisboa', 'porto', 'braga', 'coimbra', 'faro', 'aveiro', 'setubal', 'leiria', 'madeira', 'acores'] as $city) {
+            if (preg_match('/\b' . preg_quote($city, '/') . '\b/u', $loc)) {
+                return '🇵🇹';
+            }
+        }
+        return null;
+    }
+
     public static function place(array $job): ?string
     {
         $loc = trim($job['location'] ?? '');
@@ -290,6 +318,10 @@ final class Vaga
         }
         if (($job['workplace'] ?? null) === 'Remoto' && in_array(self::lower($loc), self::NO_PLACE, true)) {
             $loc = '';
+        }
+        $flag = self::countryFlag($loc);
+        if ($flag !== null && !str_starts_with($loc, $flag)) {
+            $loc = $flag . ' ' . $loc;
         }
         $out = implode(' · ', array_filter([$job['workplace'] ?? null, $loc]));
         return $out !== '' ? $out : null;
@@ -334,16 +366,6 @@ final class Vaga
     private static function rowHtml(string $label, string $value): string
     {
         return trim($value) !== '' ? '<dt>' . Text::e($label) . '</dt><dd>' . $value . '</dd>' : '';
-    }
-
-    private static function trustNormalize(?string $value): ?string
-    {
-        $value = trim((string) $value);
-        if ($value === '') {
-            return null;
-        }
-        $value = preg_replace('/\s+/u', ' ', Text::fold($value));
-        return $value !== '' ? $value : null;
     }
 
     private static function trustCompanyKey(array $job): ?string

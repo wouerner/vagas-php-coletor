@@ -324,6 +324,16 @@ function ago(iso) {
 const AGE_BANDS = [[6, "new", "nova"], [24, "recent", "recente"], [48, "days", "1-2 dias"],
                    [Infinity, "old", "antiga"]];
 
+function locationLabel(location) {
+  const loc = (location || "").trim();
+  if (!loc) return null;
+  const folded = loc.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  if (folded.includes("portugal") || /\b(lisboa|porto|braga|coimbra|faro|aveiro|setubal|leiria|madeira|acores)\b/.test(folded)) {
+    return `🇵🇹 ${loc}`;
+  }
+  return loc;
+}
+
 function age(iso) {
   const date = new Date(iso);
   if (!iso || isNaN(date)) return null;
@@ -350,7 +360,7 @@ function clicksBadge(n) {
 function card(job) {
   const url = safeUrl(job.url);
   const title = job.title || "(sem título)";
-  const who = [job.company, job.source === "post" ? job.author : null, job.location]
+  const who = [job.company, job.source === "post" ? job.author : null, locationLabel(job.location)]
     .filter(Boolean).join(" · ");
   const a = age(job.posted_at || job.first_seen);
   const tags = el("div", { className: "tags" },
@@ -418,7 +428,7 @@ function burstCard(jobs) {
   const when = `publicadas em ${span(Math.floor((jobTime(newest) - jobTime(oldest)) / 1000))}`
     + (a && first ? `, de ${first.at} a ${a.at} (Brasília)` : "");
   const titles = summary(jobs.map(j => j.title), 3, true);
-  const places = summary(jobs.map(j => j.location), 5, false);
+  const places = summary(jobs.map(j => locationLabel(j.location)), 5, false);
   const li = el("li", { className: "job burst" + (a ? " " + a.band : "") },
     el("div", { className: "head" },
       el("h2", {}, `${(newest.company || "").trim()} · ${n} vagas`),

@@ -269,8 +269,13 @@ final class Site
         $path = $job['path'] ?? null;
         $out = $url ? self::outHref($url, $job, $page) : null;
         $title = $e($job['title'] ?: '(sem título)');
+        $location = trim((string) ($job['location'] ?? ''));
+        $flag = self::countryFlag($location);
+        if ($flag !== null && !str_starts_with($location, $flag)) {
+            $location = $flag . ' ' . $location;
+        }
         $who = implode(' · ', array_filter([$job['company'] ?? null,
-            ($job['source'] ?? null) === 'post' ? ($job['author'] ?? null) : null, $job['location'] ?? null]));
+            ($job['source'] ?? null) === 'post' ? ($job['author'] ?? null) : null, $location]));
         $a = self::age($job['posted_at'] ?: $job['first_seen']);
         $tags = ['<span class="tag src">' . $e(self::SOURCE_NAMES[$job['source']] ?? $job['source']) . '</span>'];
         if (!empty($job['closed_at'])) {

@@ -31,6 +31,16 @@ it('monta o endereço (PostalAddress) a partir do local', function (array $job, 
     'GitHub: só o país' => [['source' => 'github', 'location' => 'São Paulo'], []],
 ]);
 
+it('marca Portugal com bandeira e não marca Brasil', function () {
+    $job = ['id' => 'gupy:2', 'seq' => 6, 'source' => 'gupy', 'title' => 'Dev PHP', 'description' => 'Texto',
+        'company' => 'Acme', 'company_key' => 'acme', 'posted_at' => '2026-10-30T12:00:00+00:00',
+        'first_seen' => '2026-10-30T12:00:00+00:00', 'workplace' => 'Remoto', 'contract' => 'PJ',
+        'location' => 'Lisboa, Portugal'];
+    $html = Vaga::jobHtml($job, true, []);
+    expect($html)->toContain('🇵🇹')
+        ->and($html)->not->toContain('🇧🇷');
+});
+
 it('escapa a descrição e formata o Markdown', function () {
     $html = Vaga::descriptionHtml("## Requisitos\n**PHP 8** e <script>\n\n[site](https://x.dev) [mail](mailto:a@b.c)", true);
     expect($html)->toBe("<h3>Requisitos</h3>\n<p><strong>PHP 8</strong> e &lt;script&gt;</p>\n"
