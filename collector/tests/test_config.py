@@ -85,6 +85,33 @@ def test_lua_tenant_defaults():
     assert classify.is_relevant_job("Desenvolvedor PHP Laravel")
 
 
+def test_java_tenant_defaults():
+    try:
+        config.load({}, "java")
+        assert config.tenant == "java"
+        assert classify.is_relevant_job("Desenvolvedor Java Sênior")
+        assert classify.is_relevant_job("Backend Developer (Spring Boot)")
+        assert classify.is_relevant_job("Engenheiro de Software Quarkus")
+        assert classify.is_relevant_job("Backend Engineer", "Micronaut e Hibernate. APIs em Jakarta EE.")
+        # JavaScript não é Java.
+        assert not classify.is_relevant_job("Desenvolvedor JavaScript Pleno")
+        assert not classify.is_relevant_job("Desenvolvedor Java Script Pleno")
+        assert not classify.is_relevant_job("Desenvolvedor PHP Laravel")
+        assert not classify.is_relevant_job("Frontend Engineer", "React e JavaScript. Backend em Java.")
+        assert (classify.details("Dev Java", "Spring Boot, Spring Cloud, Hibernate e Jakarta EE")["stack"]
+                == "Java,Spring Boot,Spring,Jakarta EE,Hibernate")
+        assert classify.details("Dev JavaScript", "Node")["stack"] is None
+        assert config.search("programathor", "VAGAS_PROGRAMATHOR_PAGES") == [
+            "jobs-java", "jobs-spring-boot", "jobs-spring", "jobs-hibernate"]
+        assert config.search("gupy", "VAGAS_GUPY_TERMS") == [
+            "java", "spring boot", "spring", "quarkus", "micronaut", "jakarta ee", "hibernate"]
+    finally:
+        config.load({}, "php")
+    assert config.tenant == "php"
+    assert classify.is_relevant_job("Desenvolvedor PHP Laravel")
+    assert not classify.is_relevant_job("Desenvolvedor Java Spring Boot")
+
+
 def test_unknown_tenant_never_inherits_another():
     with pytest.raises(ValueError, match="sem configuração"):
         config.load({"language": RUBY["language"]}, "elixir")

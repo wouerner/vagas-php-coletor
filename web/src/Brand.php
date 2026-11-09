@@ -8,7 +8,8 @@ namespace VagasPhp;
  * Identidade pública do site por tenant (VAGAS_TENANT, padrão "php"; o mesmo de Repo):
  * nome, linguagem, frameworks citados nos textos, ícone, canais (Telegram/Instagram),
  * caminho da página de mercado e as stacks do filtro da home. O mesmo código serve o
- * Vagas PHP, o Vagas Ruby e o Vagas Lua; só muda o deploy (VAGAS_TENANT) e o domínio.
+ * Vagas PHP, o Vagas Ruby, o Vagas Lua e o Vagas Java; só muda o deploy (VAGAS_TENANT)
+ * e o domínio.
  *
  * Os templates marcam os textos de marca com {{brand:chave}} (fill() troca); o PHP usa
  * get(). Os valores de "php" são exatamente os textos de antes do multi-tenant.
@@ -29,6 +30,12 @@ final class Brand
         . "<circle cx='44' cy='56' r='40' fill='%2300007F'/><circle cx='86' cy='14' r='12' fill='%2300007F'/>"
         . "<text x='44' y='66' font-size='28' font-family='Arial' font-weight='bold' text-anchor='middle' "
         . "fill='white'>lua</text></svg>";
+
+    // Java: quadrado laranja-café com chaves e o nome; sem a xícara (marca registrada).
+    private const ICON_JAVA = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+        . "<rect x='4' y='16' width='92' height='68' rx='16' fill='%23A34F12'/>"
+        . "<text x='50' y='61' font-size='28' font-family='Arial' font-weight='bold' text-anchor='middle' "
+        . "fill='white'>java</text></svg>";
 
     /**
      * Cores do Ruby: troca, nos templates, cada cor da paleta do PHP (roxo, com neutros
@@ -53,6 +60,16 @@ final class Brand
         // escuro
         '#a3a7e6' => '#8fb0f5', '#2a2b45' => '#1d2b52', '#13131b' => '#11141c', '#1c1c27' => '#191d29',
         '#2d2d3c' => '#2a2f40', '#262634' => '#232838', '#e8e8f0' => '#e6e9f1', '#a0a2b4' => '#9ea6ba',
+    ];
+
+    /** Cores do Java: o mesmo esquema do Ruby, com laranja-café no lugar do roxo do PHP. */
+    private const PALETTE_JAVA = [
+        // claro
+        '#5b5fa0' => '#a34f12', '#ebecf7' => '#fbeee3', '#f6f6fa' => '#faf7f4', '#f0f0f5' => '#f5f0eb',
+        '#e3e3ec' => '#ede4dc', '#1d1d2b' => '#2b211a', '#5d6070' => '#6b6058',
+        // escuro
+        '#a3a7e6' => '#f0a868', '#2a2b45' => '#45301e', '#13131b' => '#1b1613', '#1c1c27' => '#271f1a',
+        '#2d2d3c' => '#3c322b', '#262634' => '#342b25', '#e8e8f0' => '#f0ebe7', '#a0a2b4' => '#b4a89f',
     ];
 
     private const GITHUB = 'https://github.com/wouerner/vagas-php-coletor';
@@ -129,6 +146,28 @@ final class Brand
             'stack_workplace' => [],
             'stack_seniority' => [],
             'palette' => self::PALETTE_LUA,
+        ],
+        'java' => [
+            'lang' => 'Java',
+            'lang_lower' => 'java',
+            'name' => 'Vagas Java',
+            'frameworks' => 'Spring Boot e Quarkus',
+            'frameworks_list' => 'Spring Boot, Quarkus, Micronaut',
+            'frameworks_etc' => 'Spring Boot, Quarkus, Micronaut, Jakarta EE...',
+            'icon' => self::ICON_JAVA,
+            'telegram' => null,
+            'instagram' => null,
+            'github' => self::GITHUB,
+            'mercado_path' => '/mercado-java',
+            'og_image' => null,
+            'og_alt' => null,
+            'stack_example' => 'spring-boot',
+            'stacks_keyword' => 'Quarkus',
+            // As stacks do coletor (collector/vagas/config_defaults.json, tenant java), sem a linguagem.
+            'stacks' => ['Spring Boot', 'Spring', 'Quarkus', 'Micronaut', 'Jakarta EE', 'Hibernate'],
+            'stack_workplace' => ['Spring Boot' => ['Remoto', 'Híbrido', 'Presencial']],
+            'stack_seniority' => ['Spring Boot' => ['Júnior', 'Pleno', 'Sênior']],
+            'palette' => self::PALETTE_JAVA,
         ],
     ];
 

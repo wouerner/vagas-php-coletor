@@ -105,5 +105,38 @@
       "names": ["^wouerner\\b"],
       "urls": ["linkedin\\.com/in/wouerner/?$"]
     }
+  },
+  "java": {
+    "language": {
+      "name": "Java",
+      "slug": "java",
+      "examples": "Java, Spring Boot, Quarkus, Micronaut, Jakarta EE ou Hibernate"
+    },
+    "core": "\\b(java(?!\\s*script)|spring\\s?boot|spring\\s+(framework|cloud|mvc|batch|data|security|webflux)|quarkus|micronaut|jakarta\\s?ee|java\\s?ee|j2ee|hibernate)\\b",
+    "stack": [
+      ["Java", "\\bjava\\b(?!\\s*script)"],
+      ["Spring Boot", "\\bspring\\s?boot\\b"],
+      ["Spring", "\\bspring\\b(?!\\s?boot)"],
+      ["Quarkus", "\\bquarkus\\b"],
+      ["Micronaut", "\\bmicronaut\\b"],
+      ["Jakarta EE", "\\b(jakarta\\s?ee|java\\s?ee|j2ee)\\b"],
+      ["Hibernate", "\\bhibernate\\b"]
+    ],
+    "search": {
+      "linkedin": ["java", "spring boot", "spring", "quarkus", "micronaut", "jakarta ee", "hibernate"],
+      "posts": ["vaga java", "vaga spring boot", "desenvolvedor java", "pessoa desenvolvedora java", "oportunidade java", "vaga quarkus"],
+      "gupy": ["java", "spring boot", "spring", "quarkus", "micronaut", "jakarta ee", "hibernate"],
+      "solides": ["java", "spring boot", "spring", "quarkus", "micronaut", "jakarta ee", "hibernate"],
+      "catho": ["java", "spring boot", "spring", "quarkus", "micronaut", "jakarta ee", "hibernate"],
+      "remotar": ["java", "spring boot", "spring", "quarkus", "micronaut", "jakarta ee", "hibernate"],
+      "programathor": ["jobs-java", "jobs-spring-boot", "jobs-spring", "jobs-hibernate"],
+      "nerdin": ["java", "spring boot", "spring", "quarkus", "micronaut", "jakarta ee", "hibernate"],
+      "upvagas": ["java", "spring boot", "spring", "quarkus", "micronaut", "jakarta ee", "hibernate"],
+      "github": ["backend-br/vagas"]
+    },
+    "self_author": {
+      "names": ["^wouerner\\b"],
+      "urls": ["linkedin\\.com/in/wouerner/?$"]
+    }
   }
 }

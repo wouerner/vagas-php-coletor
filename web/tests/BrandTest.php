@@ -36,3 +36,15 @@ it('usa a paleta azul-marinho e a marca no tenant lua', function () {
         ->toContain('<option>OpenResty</option>')->toContain('Lua, OpenResty e Roblox')
         ->not->toContain('Laravel')->not->toContain('Symfony')->not->toContain('WordPress');
 });
+
+it('usa a paleta marrom-alaranjada e a marca no tenant java', function () {
+    Brand::use('java');
+    foreach (['index.html', 'tema.html', 'dashboard.html', 'empresas.html', 'vaga.html'] as $t) {
+        $html = Seo::template($t);
+        expect($html)->toContain('#a34f12')->not->toContain('#5b5fa0')->not->toContain('#a3a7e6')
+            ->not->toContain('Vagas PHP');
+    }
+    expect(Seo::template('index.html'))->toContain('<h1>Vagas <span>Java</span></h1>')
+        ->toContain('<option>Spring Boot</option>')->toContain('Java, Spring Boot, Quarkus, Micronaut')
+        ->not->toContain('Laravel')->not->toContain('Symfony')->not->toContain('WordPress');
+});
