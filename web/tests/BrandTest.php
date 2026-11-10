@@ -48,3 +48,15 @@ it('usa a paleta marrom-alaranjada e a marca no tenant java', function () {
         ->toContain('<option>Spring Boot</option>')->toContain('Java, Spring Boot e Quarkus')
         ->not->toContain('Laravel')->not->toContain('Symfony')->not->toContain('WordPress');
 });
+
+it('usa a paleta azul e amarela e a marca no tenant python', function () {
+    Brand::use('python');
+    foreach (['index.html', 'tema.html', 'dashboard.html', 'empresas.html', 'vaga.html'] as $t) {
+        $html = Seo::template($t);
+        expect($html)->toContain('#2b6a9e')->toContain('#ffd43b')->not->toContain('#5b5fa0')
+            ->not->toContain('#a3a7e6')->not->toContain('Vagas PHP');
+    }
+    expect(Seo::template('index.html'))->toContain('<h1>Vagas <span>Python</span></h1>')
+        ->toContain('<option>Django</option>')->toContain('Python, Django e FastAPI')
+        ->not->toContain('Laravel')->not->toContain('Symfony')->not->toContain('WordPress');
+});

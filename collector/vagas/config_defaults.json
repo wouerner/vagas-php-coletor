@@ -138,5 +138,38 @@
       "names": ["^wouerner\\b"],
       "urls": ["linkedin\\.com/in/wouerner/?$"]
     }
+  },
+  "python": {
+    "language": {
+      "name": "Python",
+      "slug": "python",
+      "examples": "Python, Django, Flask ou FastAPI"
+    },
+    "core": "\\b(python[23]?|django|flask|fast\\s?api)\\b",
+    "stack": [
+      ["Python", "\\bpython[23]?\\b"],
+      ["Django", "\\bdjango\\b"],
+      ["Flask", "\\bflask\\b"],
+      ["FastAPI", "\\bfast\\s?api\\b"],
+      ["Celery", "\\bcelery\\b"],
+      ["SQLAlchemy", "\\bsql\\s?alchemy\\b"],
+      ["Pytest", "\\bpytest\\b"]
+    ],
+    "search": {
+      "linkedin": ["python", "django", "flask", "fastapi"],
+      "posts": ["vaga python", "vaga django", "desenvolvedor python", "pessoa desenvolvedora python", "oportunidade python", "vaga fastapi"],
+      "gupy": ["python", "django", "flask", "fastapi"],
+      "solides": ["python", "django", "flask", "fastapi"],
+      "catho": ["python", "django", "flask", "fastapi"],
+      "remotar": ["python", "django", "flask", "fastapi"],
+      "programathor": ["jobs-python", "jobs-django", "jobs-flask"],
+      "nerdin": ["python", "django", "flask", "fastapi"],
+      "upvagas": ["python", "django", "flask", "fastapi"],
+      "github": ["backend-br/vagas"]
+    },
+    "self_author": {
+      "names": ["^wouerner\\b"],
+      "urls": ["linkedin\\.com/in/wouerner/?$"]
+    }
   }
 }

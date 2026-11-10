@@ -112,6 +112,33 @@ def test_java_tenant_defaults():
     assert not classify.is_relevant_job("Desenvolvedor Java Spring Boot")
 
 
+def test_python_tenant_defaults():
+    try:
+        config.load({}, "python")
+        assert config.tenant == "python"
+        assert classify.is_relevant_job("Desenvolvedor Python Sênior")
+        assert classify.is_relevant_job("Backend Developer (Django)")
+        assert classify.is_relevant_job("Engenheiro de Software Python3/FastAPI")
+        assert classify.is_relevant_job("Pessoa Desenvolvedora Fast API Pleno")
+        assert classify.is_relevant_job("Backend Engineer", "APIs em Flask e Django, com Celery.")
+        assert not classify.is_relevant_job("Desenvolvedor PHP Laravel")
+        # Python citado uma vez só, ou em vaga que não é de desenvolvimento, não entra.
+        assert not classify.is_relevant_job("Frontend Engineer", "React e TypeScript. Scripts em Python.")
+        assert not classify.is_relevant_job("Analista de Dados", "Python, pandas e SQL. Python avançado.")
+        assert not classify.is_relevant_job("Analista de BI", "PySpark e Power BI.")
+        assert (classify.details("Dev Python", "Django, Fast API, Celery, SQLAlchemy e pytest")["stack"]
+                == "Python,Django,FastAPI,Celery,SQLAlchemy,Pytest")
+        assert classify.details("Analista de BI", "PySpark")["stack"] is None
+        assert config.search("programathor", "VAGAS_PROGRAMATHOR_PAGES") == [
+            "jobs-python", "jobs-django", "jobs-flask"]
+        assert config.search("gupy", "VAGAS_GUPY_TERMS") == ["python", "django", "flask", "fastapi"]
+    finally:
+        config.load({}, "php")
+    assert config.tenant == "php"
+    assert classify.is_relevant_job("Desenvolvedor PHP Laravel")
+    assert not classify.is_relevant_job("Desenvolvedor Python Django")
+
+
 def test_unknown_tenant_never_inherits_another():
     with pytest.raises(ValueError, match="sem configuração"):
         config.load({"language": RUBY["language"]}, "elixir")

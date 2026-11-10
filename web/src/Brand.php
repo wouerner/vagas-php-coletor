@@ -8,7 +8,7 @@ namespace VagasPhp;
  * Identidade pública do site por tenant (VAGAS_TENANT, padrão "php"; o mesmo de Repo):
  * nome, linguagem, frameworks citados nos textos, ícone, canais (Telegram/Instagram),
  * caminho da página de mercado e as stacks do filtro da home. O mesmo código serve o
- * Vagas PHP, o Vagas Ruby, o Vagas Lua e o Vagas Java; só muda o deploy (VAGAS_TENANT)
+ * Vagas PHP, o Vagas Ruby, o Vagas Lua, o Vagas Java e o Vagas Python; só muda o deploy (VAGAS_TENANT)
  * e o domínio.
  *
  * Os templates marcam os textos de marca com {{brand:chave}} (fill() troca); o PHP usa
@@ -36,6 +36,14 @@ final class Brand
         . "<rect x='4' y='16' width='92' height='68' rx='16' fill='%23A34F12'/>"
         . "<text x='50' y='61' font-size='28' font-family='Arial' font-weight='bold' text-anchor='middle' "
         . "fill='white'>java</text></svg>";
+
+    // Python: dois quadrados sobrepostos, azul e amarelo (as cores da linguagem), com "py";
+    // sem as cobras do logotipo (marca registrada).
+    private const ICON_PYTHON = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+        . "<rect x='28' y='28' width='68' height='68' rx='16' fill='%23FFD43B'/>"
+        . "<rect x='4' y='4' width='68' height='68' rx='16' fill='%233776AB'/>"
+        . "<text x='38' y='49' font-size='34' font-family='Arial' font-weight='bold' text-anchor='middle' "
+        . "fill='white'>py</text></svg>";
 
     /**
      * Cores do Ruby: troca, nos templates, cada cor da paleta do PHP (roxo, com neutros
@@ -70,6 +78,19 @@ final class Brand
         // escuro
         '#a3a7e6' => '#f0a868', '#2a2b45' => '#45301e', '#13131b' => '#1b1613', '#1c1c27' => '#271f1a',
         '#2d2d3c' => '#3c322b', '#262634' => '#342b25', '#e8e8f0' => '#f0ebe7', '#a0a2b4' => '#b4a89f',
+    ];
+
+    /**
+     * Cores do Python: o mesmo esquema do Ruby, com o azul do Python no lugar do roxo do PHP
+     * no tema claro e o amarelo no escuro (o amarelo não tem contraste sobre fundo claro).
+     */
+    private const PALETTE_PYTHON = [
+        // claro
+        '#5b5fa0' => '#2b6a9e', '#ebecf7' => '#e4eff8', '#f6f6fa' => '#f5f8fa', '#f0f0f5' => '#eef2f5',
+        '#e3e3ec' => '#dfe6ec', '#1d1d2b' => '#1a232b', '#5d6070' => '#586570',
+        // escuro
+        '#a3a7e6' => '#ffd43b', '#2a2b45' => '#3d3514', '#13131b' => '#12161a', '#1c1c27' => '#1a2026',
+        '#2d2d3c' => '#2b333b', '#262634' => '#242b32', '#e8e8f0' => '#e7ecf0', '#a0a2b4' => '#9faab4',
     ];
 
     private const GITHUB = 'https://github.com/wouerner/vagas-php-coletor';
@@ -168,6 +189,28 @@ final class Brand
             'stack_workplace' => ['Spring Boot' => ['Remoto', 'Híbrido', 'Presencial']],
             'stack_seniority' => ['Spring Boot' => ['Júnior', 'Pleno', 'Sênior']],
             'palette' => self::PALETTE_JAVA,
+        ],
+        'python' => [
+            'lang' => 'Python',
+            'lang_lower' => 'python',
+            'name' => 'Vagas Python',
+            'frameworks' => 'Django e FastAPI',
+            'frameworks_list' => 'Django, Flask, FastAPI',
+            'frameworks_etc' => 'Django, Flask, FastAPI, Celery...',
+            'icon' => self::ICON_PYTHON,
+            'telegram' => null,
+            'instagram' => null,
+            'github' => self::GITHUB,
+            'mercado_path' => '/mercado-python',
+            'og_image' => null,
+            'og_alt' => null,
+            'stack_example' => 'django',
+            'stacks_keyword' => 'FastAPI',
+            // As stacks do coletor (collector/vagas/config_defaults.json, tenant python), sem a linguagem.
+            'stacks' => ['Django', 'Flask', 'FastAPI', 'Celery', 'SQLAlchemy', 'Pytest'],
+            'stack_workplace' => ['Django' => ['Remoto', 'Híbrido', 'Presencial']],
+            'stack_seniority' => ['Django' => ['Júnior', 'Pleno', 'Sênior']],
+            'palette' => self::PALETTE_PYTHON,
         ],
     ];
 
