@@ -28,7 +28,7 @@ Zona `wouerner.dev`, com os nameservers da Cloudflare.
 
 | Tipo | Nome | Conteúdo | Proxy |
 |---|---|---|---|
-| A | `vagasphp`, `vagasruby`, `vagaslua`, `vagasjava`, `vagaspython`, `vagasnodejs` | IP do servidor do Coolify | **Proxied** (nuvem laranja) |
+| A | `vagasphp`, `vagasruby`, `vagaslua`, `vagasjava`, `vagaspython`, `vagasnodejs`, `vagasdotnet` | IP do servidor do Coolify | **Proxied** (nuvem laranja) |
 
 - **SSL/TLS: Full.** A Cloudflare fala HTTPS com o servidor. O visitante vê o certificado
   da Cloudflare (renovado por ela), e o trecho Cloudflare → servidor também é cifrado com
@@ -49,8 +49,8 @@ Zona `wouerner.dev`, com os nameservers da Cloudflare.
   *Docker Compose Location* `/docker-compose.coolify.yml`.
 - Domínios do serviço `web` (os sites, em PHP, build de `web/`): `https://vagasphp.wouerner.dev`,
   `https://vagasruby.wouerner.dev`, `https://vagaslua.wouerner.dev`,
-  `https://vagasjava.wouerner.dev`, `https://vagaspython.wouerner.dev` e
-  `https://vagasnodejs.wouerner.dev`, separados por vírgula. Um container serve todos: `VAGAS_SITES` diz o tenant de cada domínio (o primeiro é o padrão;
+  `https://vagasjava.wouerner.dev`, `https://vagaspython.wouerner.dev`,
+  `https://vagasnodejs.wouerner.dev` e `https://vagasdotnet.wouerner.dev`, separados por vírgula. Um container serve todos: `VAGAS_SITES` diz o tenant de cada domínio (o primeiro é o padrão;
   veja `web/src/Sites.php`). Domínio novo só no Coolify sem entrar em `VAGAS_SITES` mostra o
   site padrão. A porta interna (8000) vem de
   `SERVICE_URL_WEB_8000` no compose, então não precisa ir no domínio. Com `http://` no

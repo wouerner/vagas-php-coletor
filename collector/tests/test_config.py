@@ -179,6 +179,47 @@ def test_nodejs_tenant_defaults():
     assert not classify.is_relevant_job("Desenvolvedor Node.js")
 
 
+def test_dotnet_tenant_defaults():
+    try:
+        config.load({}, "dotnet")
+        assert config.tenant == "dotnet"
+        assert classify.is_relevant_job("Desenvolvedor .NET Sênior")
+        assert classify.is_relevant_job("Desenvolvedor C# Pleno")
+        assert classify.is_relevant_job("Pessoa Desenvolvedora C#/.NET")
+        assert classify.is_relevant_job("Backend Developer (ASP.NET Core)")
+        assert classify.is_relevant_job("Desenvolvedor Dotnet Júnior")
+        assert classify.is_relevant_job("Programador VB.NET")
+        # Título vindo do endereço da vaga (Programathor, Nerdin...): sem "#" nem ponto.
+        assert classify.is_relevant_job("desenvolvedor c sharp pleno")
+        assert classify.is_relevant_job("desenvolvedor net senior")
+        assert classify.is_relevant_job("Backend Engineer", "APIs em ASP.NET Core com Entity Framework e Blazor.")
+        # "\b" não casa em volta de "#" e ".": C e C++ não são C#, e ".net" de endereço não conta.
+        assert not classify.is_relevant_job("Desenvolvedor C Embarcado")
+        assert not classify.is_relevant_job("Desenvolvedor C++ Sênior")
+        assert not classify.is_relevant_job("Analista de Redes", "Acesse empresa.net e www.provedor.net/vagas.")
+        assert not classify.is_relevant_job("Analista de Marketing", "Net promoter score e internet.")
+        assert not classify.is_relevant_job("Desenvolvedor PHP Laravel")
+        assert not classify.is_relevant_job("Desenvolvedor Java Spring Boot")
+        assert not classify.is_relevant_job("Frontend Engineer", "React e TypeScript. Backend em .NET.")
+        assert (classify.details("Dev .NET", "C#, ASP.NET Core, Entity Framework e Blazor")["stack"]
+                == ".NET,C#,ASP.NET,Blazor,Entity Framework")
+        assert classify.details("Dev C Sharp", "Xamarin, .NET MAUI, WPF, F# e VB.NET")["stack"] == (
+            ".NET,C#,MAUI,Xamarin,WPF,F#,VB.NET")
+        assert classify.details("Dev C++", "Linux embarcado")["stack"] is None
+        assert config.search("programathor", "VAGAS_PROGRAMATHOR_PAGES")[:3] == [
+            "jobs-net", "jobs-c-sharp", "jobs-asp-net"]
+        assert config.search("gupy", "VAGAS_GUPY_TERMS") == [
+            "c#", ".net", "dotnet", "asp.net", "blazor", "entity framework"]
+        assert config.search("github", "VAGAS_GITHUB_REPOS") == ["dotnetdevbr/vagas", "backend-br/vagas"]
+        rules = {r["id"]: r for r in classify.RULES}
+        assert rules["lang_title"]["title"].startswith(".NET")
+    finally:
+        config.load({}, "php")
+    assert config.tenant == "php"
+    assert classify.is_relevant_job("Desenvolvedor PHP Laravel")
+    assert not classify.is_relevant_job("Desenvolvedor .NET")
+
+
 def test_unknown_tenant_never_inherits_another():
     with pytest.raises(ValueError, match="sem configuração"):
         config.load({"language": RUBY["language"]}, "elixir")

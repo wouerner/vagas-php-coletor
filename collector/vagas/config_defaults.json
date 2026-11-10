@@ -204,5 +204,41 @@
       "names": ["^wouerner\\b"],
       "urls": ["linkedin\\.com/in/wouerner/?$"]
     }
+  },
+  "dotnet": {
+    "language": {
+      "name": ".NET",
+      "slug": "dotnet",
+      "examples": ".NET, C#, ASP.NET, Blazor ou Entity Framework"
+    },
+    "core": "(?<![\\w#+.])[cf]#(?![\\w#])|\\b([cf][\\s-]?sharp|dot[\\s-]?net|asp[\\s.-]?net|vb[\\s.-]?net|ado\\.net|net[\\s-]?(core|framework|maui)|blazor|entity[\\s-]?framework|ef[\\s-]?core|xamarin|wpf|win(dows)?[\\s-]?forms)\\b|(?<!\\w)\\.net\\b|\\b(dev|desenvolvedor|desenvolvedora|developer|programador|programadora|engenheir[oa]|engineer|back[\\s-]?end|full[\\s-]?stack)\\W{1,3}net\\b|\\bnet\\W{1,3}(developer|engineer|dev)\\b",
+    "stack": [
+      [".NET", "(?<!\\w)\\.net\\b|\\b(dot[\\s-]?net|net[\\s-]?(core|framework))\\b|\\b(dev|desenvolvedor|desenvolvedora|developer|programador|programadora|engenheir[oa]|engineer|back[\\s-]?end|full[\\s-]?stack)\\W{1,3}net\\b|\\bnet\\W{1,3}(developer|engineer|dev)\\b"],
+      ["C#", "(?<![\\w#+.])c#(?![\\w#])|\\bc[\\s-]?sharp\\b"],
+      ["ASP.NET", "\\basp[\\s.-]?net\\b"],
+      ["Blazor", "\\bblazor\\b"],
+      ["Entity Framework", "\\b(entity[\\s-]?framework|ef[\\s-]?core)\\b"],
+      ["MAUI", "\\bnet[\\s-]?maui\\b"],
+      ["Xamarin", "\\bxamarin\\b"],
+      ["WPF", "\\bwpf\\b"],
+      ["F#", "(?<![\\w#+.])f#(?![\\w#])|\\bf[\\s-]?sharp\\b"],
+      ["VB.NET", "\\bvb[\\s.-]?net\\b"]
+    ],
+    "search": {
+      "linkedin": ["c#", ".net", "dotnet", "asp.net", "blazor", "entity framework"],
+      "posts": ["vaga .net", "vaga c#", "vaga dotnet", "desenvolvedor .net", "pessoa desenvolvedora .net", "oportunidade .net"],
+      "gupy": ["c#", ".net", "dotnet", "asp.net", "blazor", "entity framework"],
+      "solides": ["c#", ".net", "dotnet", "asp.net", "blazor", "entity framework"],
+      "catho": ["dotnet", "c sharp", "asp net", "blazor"],
+      "remotar": ["c#", ".net", "dotnet", "asp.net", "blazor", "entity framework"],
+      "programathor": ["jobs-net", "jobs-c-sharp", "jobs-asp-net", "jobs-net-core", "jobs-asp-net-core", "jobs-entity-framework", "jobs-xamarin", "jobs-f-sharp", "jobs-vb-net"],
+      "nerdin": ["c#", ".net", "dotnet", "asp.net", "blazor", "entity framework"],
+      "upvagas": ["c#", ".net", "dotnet", "asp.net", "blazor", "entity framework"],
+      "github": ["dotnetdevbr/vagas", "backend-br/vagas"]
+    },
+    "self_author": {
+      "names": ["^wouerner\\b"],
+      "urls": ["linkedin\\.com/in/wouerner/?$"]
+    }
   }
 }

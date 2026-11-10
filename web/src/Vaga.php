@@ -76,7 +76,7 @@ final class Vaga
 
     public static function topicPath(string $name): string
     {
-        return $name === Brand::lang() ? '/vagas' : '/vagas/' . Text::slugify($name);
+        return $name === Brand::lang() ? '/vagas' : '/vagas/' . Text::techSlug($name);
     }
 
     /** Empresa que contrata, para o hiringOrganization; null quando não dá para afirmar. */

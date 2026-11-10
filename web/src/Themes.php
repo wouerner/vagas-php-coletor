@@ -60,7 +60,7 @@ final class Themes
                 || ($level && !in_array($level, $levels, true))) {
                 continue;
             }
-            $parts = [$stack ? Text::slugify($stack) : ($level ? Brand::get('lang_lower') : null),
+            $parts = [$stack ? Text::techSlug($stack) : ($level ? Brand::get('lang_lower') : null),
                 $level ? Text::slugify($level) : null, $workplace ? Text::slugify($workplace) : null];
             $slug = implode('-', array_filter($parts));
             $themes[$slug] = ['slug' => $slug, 'path' => "/vagas/$slug", 'group' => self::GROUPS[$group],

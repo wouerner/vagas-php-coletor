@@ -75,3 +75,22 @@ it('usa a paleta verde e a marca no tenant nodejs', function () {
     expect(Seo::template('index.html'))->toContain('/mercado-nodejs')->not->toContain('/mercado-php');
     expect(Brand::get('lang_lower'))->toBe('nodejs');
 });
+
+it('usa a paleta violeta e a marca no tenant dotnet', function () {
+    Brand::use('dotnet');
+    foreach (['index.html', 'tema.html', 'dashboard.html', 'empresas.html', 'vaga.html'] as $t) {
+        $html = Seo::template($t);
+        expect($html)->toContain('#512bd4')->not->toContain('#5b5fa0')->not->toContain('#a3a7e6')
+            ->not->toContain('Vagas PHP');
+    }
+    expect(Seo::template('index.html'))->toContain('<h1>Vagas <span>.NET</span></h1>')
+        ->toContain('<option>C#</option>')->toContain('.NET, C# e ASP.NET')
+        ->not->toContain('Laravel')->not->toContain('Symfony')->not->toContain('WordPress');
+    // O ponto de ".NET" e o "#" de "C#" ficam fora dos endereços.
+    expect(Seo::template('index.html'))->toContain('/mercado-dotnet')->not->toContain('/mercado-php');
+    expect(Brand::get('lang_lower'))->toBe('dotnet');
+    expect(VagasPhp\Text::techSlug('C#'))->toBe('c-sharp')
+        ->and(VagasPhp\Text::techSlug('F#'))->toBe('f-sharp')
+        ->and(VagasPhp\Text::techSlug('ASP.NET'))->toBe('asp-net')
+        ->and(VagasPhp\Text::techSlug('Ruby on Rails'))->toBe('ruby-on-rails');
+});

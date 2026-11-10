@@ -8,7 +8,7 @@ namespace VagasPhp;
  * Identidade pública do site por tenant (VAGAS_TENANT, padrão "php"; o mesmo de Repo):
  * nome, linguagem, frameworks citados nos textos, ícone, canais (Telegram/Instagram),
  * caminho da página de mercado e as stacks do filtro da home. O mesmo código serve o
- * Vagas PHP, o Vagas Ruby, o Vagas Lua, o Vagas Java, o Vagas Python e o Vagas Node.js; só muda o deploy (VAGAS_TENANT)
+ * Vagas PHP, o Vagas Ruby, o Vagas Lua, o Vagas Java, o Vagas Python, o Vagas Node.js e o Vagas .NET; só muda o deploy (VAGAS_TENANT)
  * e o domínio.
  *
  * Os templates marcam os textos de marca com {{brand:chave}} (fill() troca); o PHP usa
@@ -50,6 +50,12 @@ final class Brand
         . "<polygon points='50,3 91,26 91,74 50,97 9,74 9,26' fill='%2329722D'/>"
         . "<text x='50' y='59' font-size='26' font-family='Arial' font-weight='bold' text-anchor='middle' "
         . "fill='white'>node</text></svg>";
+
+    // .NET: quadrado violeta com o nome (forma genérica; não é o logotipo, marca registrada).
+    private const ICON_DOTNET = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+        . "<rect width='100' height='100' rx='18' fill='%23512BD4'/>"
+        . "<text x='50' y='61' font-size='30' font-family='Arial' font-weight='bold' text-anchor='middle' "
+        . "fill='white'>.NET</text></svg>";
 
     /**
      * Cores do Ruby: troca, nos templates, cada cor da paleta do PHP (roxo, com neutros
@@ -111,6 +117,19 @@ final class Brand
         // escuro
         '#a3a7e6' => '#8ccf8a', '#2a2b45' => '#1f3d22', '#13131b' => '#121712', '#1c1c27' => '#1a211a',
         '#2d2d3c' => '#2c362c', '#262634' => '#252e25', '#e8e8f0' => '#e7eee7', '#a0a2b4' => '#a0aea1',
+    ];
+
+    /**
+     * Cores do .NET: o mesmo esquema do Ruby, com o violeta da marca (#512BD4) no lugar do
+     * roxo acinzentado do PHP; no tema escuro entra um tom mais claro dele.
+     */
+    private const PALETTE_DOTNET = [
+        // claro
+        '#5b5fa0' => '#512bd4', '#ebecf7' => '#ece8fb', '#f6f6fa' => '#f7f6fc', '#f0f0f5' => '#f1eff8',
+        '#e3e3ec' => '#e4e1f0', '#1d1d2b' => '#1c1830', '#5d6070' => '#5e5a75',
+        // escuro
+        '#a3a7e6' => '#b9a8ff', '#2a2b45' => '#2e2460', '#13131b' => '#13111c', '#1c1c27' => '#1b1929',
+        '#2d2d3c' => '#2f2b40', '#262634' => '#272337', '#e8e8f0' => '#eae8f3', '#a0a2b4' => '#a5a1b9',
     ];
 
     private const GITHUB = 'https://github.com/wouerner/vagas-php-coletor';
@@ -254,6 +273,29 @@ final class Brand
             'stack_workplace' => ['NestJS' => ['Remoto', 'Híbrido', 'Presencial']],
             'stack_seniority' => ['NestJS' => ['Júnior', 'Pleno', 'Sênior']],
             'palette' => self::PALETTE_NODEJS,
+        ],
+        'dotnet' => [
+            'lang' => '.NET',
+            // Sem o ponto: entra em endereços (/vagas/dotnet-senior).
+            'lang_lower' => 'dotnet',
+            'name' => 'Vagas .NET',
+            'frameworks' => 'C# e ASP.NET',
+            'frameworks_list' => 'C#, ASP.NET, Blazor',
+            'frameworks_etc' => 'C#, ASP.NET, Blazor, Entity Framework...',
+            'icon' => self::ICON_DOTNET,
+            'telegram' => null,
+            'instagram' => null,
+            'github' => self::GITHUB,
+            'mercado_path' => '/mercado-dotnet',
+            'og_image' => null,
+            'og_alt' => null,
+            'stack_example' => 'c-sharp',
+            'stacks_keyword' => 'Blazor',
+            // As stacks do coletor (collector/vagas/config_defaults.json, tenant dotnet), sem a linguagem.
+            'stacks' => ['C#', 'ASP.NET', 'Blazor', 'Entity Framework', 'MAUI', 'Xamarin', 'WPF', 'F#', 'VB.NET'],
+            'stack_workplace' => ['C#' => ['Remoto', 'Híbrido', 'Presencial']],
+            'stack_seniority' => ['C#' => ['Júnior', 'Pleno', 'Sênior']],
+            'palette' => self::PALETTE_DOTNET,
         ],
     ];
 

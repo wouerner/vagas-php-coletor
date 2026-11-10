@@ -42,6 +42,12 @@ final class Text
         return mb_strtolower(preg_replace('/\p{Mn}/u', '', $d === false ? $text : $d));
     }
 
+    /** Slug de stack ou tema para endereços (/vagas/<slug>): "C#" -> "c-sharp", não "c". */
+    public static function techSlug(?string $name): string
+    {
+        return self::slugify(str_replace('#', ' sharp', $name ?? ''));
+    }
+
     /** "Desenvolvedor(a) PHP Sênior" -> "desenvolvedor-a-php-senior". */
     public static function slugify(?string $text, int $limit = 70): string
     {
