@@ -26,6 +26,9 @@ final class Sites
     /** @var array{host: string, tenant: string, default: bool}|null site da requisição atual */
     private static ?array $current = null;
 
+    /** @var array<string, string> domínio -> tenant de todos os sites (VAGAS_SITES) */
+    private static array $all = [];
+
     /** @return array<string, string> domínio -> tenant, na ordem de VAGAS_SITES */
     public static function map(?string $spec = null): array
     {
@@ -57,6 +60,7 @@ final class Sites
     public static function select(Request $request, ?string $spec = null): ?string
     {
         $map = self::map($spec);
+        self::$all = $map;
         if (!$map) {
             self::$current = null;
             return null;
@@ -74,7 +78,49 @@ final class Sites
     public static function reset(): void
     {
         self::$current = null;
+        self::$all = [];
         Brand::use(null);
+    }
+
+    /**
+     * Barra de abas no topo de todas as páginas, como as abas do navegador: um link para cada
+     * site da família Vagas (na ordem de VAGAS_SITES), com a aba do site atual em destaque. É a
+     * única parte compartilhada entre os sites. Vazia com menos de dois sites (modo de um site).
+     * Entra depois do Brand::fill: os nomes das outras linguagens não podem virar a do site atual.
+     */
+    public static function tabs(): string
+    {
+        if (self::$current === null || count(self::$all) < 2) {
+            return '';
+        }
+        $links = '';
+        foreach (self::$all as $host => $tenant) {
+            $brand = Brand::BRANDS[$tenant] ?? null;
+            if ($brand === null) {
+                continue;
+            }
+            $current = $host === self::$current['host'] ? ' aria-current="page"' : '';
+            $links .= '<a href="https://' . htmlspecialchars($host) . '/"' . $current . '>'
+                . '<img src="' . htmlspecialchars($brand['icon']) . '" alt="" width="16" height="16">'
+                . '<span class="st-vagas">Vagas </span>' . htmlspecialchars($brand['lang']) . '</a>';
+        }
+        return <<<HTML
+<nav id="site-tabs" aria-label="Sites de vagas por linguagem"><div>{$links}</div></nav>
+<style>
+  #site-tabs { display: block; margin: 0; padding: 0; background: var(--line); }
+  #site-tabs > div { max-width: 920px; margin: 0 auto; padding: 6px 16px 0; display: flex; gap: 2px;
+    overflow-x: auto; scrollbar-width: none; }
+  #site-tabs > div::-webkit-scrollbar { display: none; }
+  #site-tabs a { display: flex; align-items: center; gap: 7px; padding: 7px 14px 8px; white-space: nowrap;
+    border-radius: 10px 10px 0 0; font-size: 13px; line-height: 1; font-weight: 400; color: var(--muted);
+    text-decoration: none; background: color-mix(in srgb, var(--bg) 40%, transparent); }
+  #site-tabs a:hover { color: var(--text); background: color-mix(in srgb, var(--bg) 70%, transparent); }
+  #site-tabs a[aria-current] { color: var(--text); background: var(--bg); font-weight: 600; }
+  #site-tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  #site-tabs img { width: 16px; height: 16px; flex: none; }
+  @media (max-width: 480px) { #site-tabs a { padding: 7px 11px 8px; } #site-tabs .st-vagas { display: none; } }
+</style>
+HTML;
     }
 
     /** Endereço público do site atual ("https://vagasruby.wouerner.dev"), ou null sem VAGAS_SITES. */

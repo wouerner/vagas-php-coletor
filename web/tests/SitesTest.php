@@ -76,3 +76,33 @@ it('aceita contêiner do Tag Manager (GTM-) e carrega o gtm.js no lugar do gtag.
     expect($html)->toContain('googletagmanager.com/gtag/js?id=G-LUA12345')
         ->toContain('gtag("config", "G-LUA12345")')->not->toContain('gtm.js');
 });
+
+it('mostra as abas de todos os sites no topo, com a do site atual marcada', function () {
+    $req = hostRequest('vagasruby.wouerner.dev');
+    Sites::select($req, SITES);
+    $html = Seo::plain($req, 'contato.html');
+    preg_match('#<nav id="site-tabs".*?</nav>#s', $html, $m);
+    expect($m)->not->toBeEmpty();
+    $nav = $m[0];
+    // Uma aba por site, na ordem de VAGAS_SITES; os nomes das outras linguagens não viram "Ruby".
+    expect(substr_count($nav, '<a '))->toBe(3)
+        ->and($nav)->toMatch('#href="https://vagasphp\.wouerner\.dev/">.*PHP</a>.*vagasruby.*vagaslua#s')
+        ->toContain('<a href="https://vagasruby.wouerner.dev/" aria-current="page">')
+        ->toContain('Vagas </span>Lua</a>')
+        ->and(substr_count($nav, 'aria-current'))->toBe(1);
+    // Logo depois do <body>, em todas as páginas renderizadas.
+    expect($html)->toMatch('#<body[^>]*>\s*<nav id="site-tabs"#');
+    $page = Seo::render($req, 'regras.html', 'Regras', 'Regras do site', '/regras');
+    expect($page)->toContain('<nav id="site-tabs"');
+});
+
+it('não mostra as abas com um site só nem no print do dashboard', function () {
+    $req = hostRequest('vagasphp.wouerner.dev');
+    Sites::select($req, '');
+    expect(Seo::plain($req, 'contato.html'))->not->toContain('site-tabs');
+    Sites::select($req, 'vagasphp.wouerner.dev=php');
+    expect(Seo::plain($req, 'contato.html'))->not->toContain('site-tabs');
+    Sites::select($req, SITES);
+    $print = new Request('GET', '/dashboard', ['print' => '1'], ['host' => 'vagasphp.wouerner.dev'], 'http', 'vagasphp.wouerner.dev');
+    expect(Seo::plain($print, 'dashboard.html'))->not->toContain('site-tabs');
+});

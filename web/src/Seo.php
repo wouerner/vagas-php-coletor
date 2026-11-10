@@ -127,7 +127,15 @@ final class Seo
     /** Template sem conteúdo do servidor, só com a tag do GA (fora de ?print=1). */
     public static function plain(Request $request, string $name): string
     {
-        return self::withAnalytics($request, self::template($name));
+        return self::withAnalytics($request, self::withTabs($request, self::template($name)));
+    }
+
+    /** Abas dos outros sites (Sites::tabs) logo depois do <body>, fora de ?print=1. */
+    private static function withTabs(Request $request, string $html): string
+    {
+        $tabs = $request->has('print') ? '' : Sites::tabs();
+        return $tabs === '' ? $html
+            : (string) preg_replace_callback('#<body[^>]*>#', fn ($m) => $m[0] . "\n" . $tabs, $html, 1);
     }
 
     /** Template com as marcas {{brand:...}} do tenant já trocadas (Brand::fill). */
@@ -179,7 +187,7 @@ final class Seo
         if (!$request->has('print')) {
             $html = self::replaceOnce('</head>', "<script defer src=\"/webmcp.js\"></script>\n</head>", $html);
         }
-        return self::withAnalytics($request, $html);
+        return self::withAnalytics($request, self::withTabs($request, $html));
     }
 
     /**
