@@ -9,9 +9,9 @@
 #   - o site não publica porta: o domínio vai no serviço "web", porta 8000;
 #   - MCP desligado por padrão (VAGAS_MCP_ENABLED=false); ligado, ele e o noVNC (sem
 #     senha!) ficam só no 127.0.0.1 do servidor: use túnel SSH.
-# Este compose é um deploy só: os coletores (vagas-php, collector-ruby, collector-lua) e um
-# serviço web que serve todos os sites. O domínio escolhe o site (VAGAS_SITES, web/src/Sites.php):
-# no Coolify, o serviço web tem os domínios de todos os sites. Um segundo deploy deste compose
+# Este compose é um deploy só: os coletores (vagas-php, collector-ruby, collector-lua,
+# collector-java) e um serviço web que serve todos os sites. O domínio escolhe o site
+# (VAGAS_SITES, web/src/Sites.php): no Coolify, o serviço web tem os domínios de todos os sites. Um segundo deploy deste compose
 # subiria outro coletor PHP.
 services:
   vagas-php:
@@ -133,6 +133,28 @@ services:
     volumes:
       - lua-data:/app/data
 
+  # Coletor do tenant java (multi-tenant: mesma base, VAGAS_TENANT=java). Só coleta: sem
+  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+  # variáveis listadas aqui: os termos de busca do Java vêm da base (collector_config),
+  # nunca dos VAGAS_*_TERMS do PHP.
+  collector-java:
+    build: ./collector
+    command: ["serve"]
+    restart: unless-stopped
+    user: pwuser
+    environment:
+      TZ: America/Sao_Paulo
+      VAGAS_TENANT: java
+      VAGAS_MCP_ENABLED: "false"
+      VAGAS_POSTS_ENABLED: "false"
+      VAGAS_LINKEDIN_DAILY_POST: "false"
+      VAGAS_INDEXING_ENABLED: "false"
+      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+      DATABASE_URL: ${DATABASE_URL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+    volumes:
+      - java-data:/app/data
+
   web:
     build: ./web
     restart: unless-stopped
@@ -143,8 +165,10 @@ services:
       # GA e token do WebMCP de cada site além do padrão (os sem sufixo valem só para ele).
       VAGAS_GA_ID_RUBY: ${VAGAS_GA_ID_RUBY:-}
       VAGAS_GA_ID_LUA: ${VAGAS_GA_ID_LUA:-}
+      VAGAS_GA_ID_JAVA: ${VAGAS_GA_ID_JAVA:-}
       VAGAS_ORIGIN_TRIAL_RUBY: ${VAGAS_ORIGIN_TRIAL_RUBY:-}
       VAGAS_ORIGIN_TRIAL_LUA: ${VAGAS_ORIGIN_TRIAL_LUA:-}
+      VAGAS_ORIGIN_TRIAL_JAVA: ${VAGAS_ORIGIN_TRIAL_JAVA:-}
       VAGAS_GA_ID: ${VAGAS_GA_ID:-}  # Google Analytics (G-XXXXXXXXXX); vazio: sem GA
       VAGAS_SITE_URL: ${VAGAS_SITE_URL:-}  # endereço público (canonical, sitemap); vazio: do proxy
       VAGAS_ORIGIN_TRIAL: ${VAGAS_ORIGIN_TRIAL:-}  # token do origin trial do WebMCP (Chrome); vazio: sem
@@ -162,5 +186,6 @@ services:
 volumes:
   ruby-data:
   lua-data:
+  java-data:
   vagas-data:
   linkedin-session:

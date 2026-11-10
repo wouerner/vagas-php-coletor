@@ -45,6 +45,6 @@ it('usa a paleta marrom-alaranjada e a marca no tenant java', function () {
             ->not->toContain('Vagas PHP');
     }
     expect(Seo::template('index.html'))->toContain('<h1>Vagas <span>Java</span></h1>')
-        ->toContain('<option>Spring Boot</option>')->toContain('Java, Spring Boot, Quarkus, Micronaut')
+        ->toContain('<option>Spring Boot</option>')->toContain('Java, Spring Boot e Quarkus')
         ->not->toContain('Laravel')->not->toContain('Symfony')->not->toContain('WordPress');
 });
