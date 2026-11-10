@@ -88,7 +88,8 @@ it('mostra as abas de todos os sites no topo, com a do site atual marcada', func
     expect(substr_count($nav, '<a '))->toBe(3)
         ->and($nav)->toMatch('#href="https://vagasphp\.wouerner\.dev/">.*PHP</a>.*vagasruby.*vagaslua#s')
         ->toContain('<a href="https://vagasruby.wouerner.dev/" aria-current="page">')
-        ->toContain('Vagas </span>Lua</a>')
+        ->toContain('height="16">Lua</a>')
+        ->not->toContain('Vagas')
         ->and(substr_count($nav, 'aria-current'))->toBe(1);
     // Logo depois do <body>, em todas as páginas renderizadas.
     expect($html)->toMatch('#<body[^>]*>\s*<nav id="site-tabs"#');

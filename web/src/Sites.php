@@ -84,7 +84,8 @@ final class Sites
 
     /**
      * Barra de abas no topo de todas as páginas, como as abas do navegador: um link para cada
-     * site da família Vagas (na ordem de VAGAS_SITES), com a aba do site atual em destaque. É a
+     * site da família Vagas (na ordem de VAGAS_SITES), com a aba do site atual em destaque. A aba
+     * traz só o ícone e o nome da linguagem: todos os sites são de vagas. É a
      * única parte compartilhada entre os sites. Vazia com menos de dois sites (modo de um site).
      * Entra depois do Brand::fill: os nomes das outras linguagens não podem virar a do site atual.
      */
@@ -102,7 +103,7 @@ final class Sites
             $current = $host === self::$current['host'] ? ' aria-current="page"' : '';
             $links .= '<a href="https://' . htmlspecialchars($host) . '/"' . $current . '>'
                 . '<img src="' . htmlspecialchars($brand['icon']) . '" alt="" width="16" height="16">'
-                . '<span class="st-vagas">Vagas </span>' . htmlspecialchars($brand['lang']) . '</a>';
+                . htmlspecialchars($brand['lang']) . '</a>';
         }
         return <<<HTML
 <nav id="site-tabs" aria-label="Sites de vagas por linguagem"><div>{$links}</div></nav>
@@ -118,7 +119,7 @@ final class Sites
   #site-tabs a[aria-current] { color: var(--text); background: var(--bg); font-weight: 600; }
   #site-tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   #site-tabs img { width: 16px; height: 16px; flex: none; }
-  @media (max-width: 480px) { #site-tabs a { padding: 7px 11px 8px; } #site-tabs .st-vagas { display: none; } }
+  @media (max-width: 480px) { #site-tabs a { padding: 7px 11px 8px; } }
 </style>
 HTML;
     }
