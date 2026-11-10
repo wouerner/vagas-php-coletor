@@ -171,5 +171,38 @@
       "names": ["^wouerner\\b"],
       "urls": ["linkedin\\.com/in/wouerner/?$"]
     }
+  },
+  "nodejs": {
+    "language": {
+      "name": "Node.js",
+      "slug": "nodejs",
+      "examples": "Node.js, Express, NestJS, Fastify, AdonisJS ou Koa"
+    },
+    "core": "\\b(node[\\s.-]?js|(dev|desenvolvedor|desenvolvedora|developer|programador|programadora|engenheir[oa]|engineer|back[\\s-]?end|full[\\s-]?stack)\\W{1,3}node|node\\W{1,3}(developer|engineer|dev|back[\\s-]?end|full[\\s-]?stack)|nest[\\s.-]?js|express[\\s.-]?js|fastify|adonis([\\s.-]?js)?|koa[\\s.-]?js)\\b",
+    "stack": [
+      ["Node.js", "\\bnode([\\s.-]?js)?\\b"],
+      ["Express", "\\bexpress[\\s.-]?js\\b|(?<!american\\s)\\bexpress\\b"],
+      ["NestJS", "\\bnest[\\s.-]?js\\b"],
+      ["Fastify", "\\bfastify\\b"],
+      ["AdonisJS", "\\badonis([\\s.-]?js)?\\b"],
+      ["Koa", "\\bkoa([\\s.-]?js)?\\b"],
+      ["TypeScript", "\\btype\\s?script\\b"]
+    ],
+    "search": {
+      "linkedin": ["node.js", "nodejs", "nestjs", "express.js", "fastify", "adonisjs"],
+      "posts": ["vaga node.js", "vaga nodejs", "desenvolvedor node.js", "pessoa desenvolvedora node.js", "oportunidade node.js", "vaga nestjs"],
+      "gupy": ["node.js", "nodejs", "node", "nestjs", "express.js", "fastify", "adonisjs"],
+      "solides": ["node.js", "nodejs", "node", "nestjs", "express.js", "fastify", "adonisjs"],
+      "catho": ["nodejs", "node js", "nestjs"],
+      "remotar": ["node.js", "nodejs", "node", "nestjs", "express.js", "fastify", "adonisjs"],
+      "programathor": ["jobs-node-js", "jobs-nest-js", "jobs-express", "jobs-adonis-js", "jobs-koa"],
+      "nerdin": ["node.js", "nodejs", "node", "nestjs", "express.js", "fastify", "adonisjs"],
+      "upvagas": ["node.js", "nodejs", "node", "nestjs", "express.js", "fastify", "adonisjs"],
+      "github": ["backend-br/vagas"]
+    },
+    "self_author": {
+      "names": ["^wouerner\\b"],
+      "urls": ["linkedin\\.com/in/wouerner/?$"]
+    }
   }
 }

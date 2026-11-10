@@ -108,13 +108,14 @@ prioridade sobre a base.
 
 ### Várias linguagens (multi-tenant)
 
-A base é multi-tenant: cada linguagem é um tenant (`php`, `ruby`, `lua`, `java`, `python`), com as próprias vagas,
+A base é multi-tenant: cada linguagem é um tenant (`php`, `ruby`, `lua`, `java`, `python`, `nodejs`), com as próprias vagas,
 coletas e configuração na mesma base. Cada coletor grava um tenant só (`VAGAS_TENANT`,
 padrão `php`), e cada site mostra só o seu (`VAGAS_TENANT` do site). O serviço
 `collector-ruby` do compose coleta vagas de Ruby (Ruby on Rails, Sinatra, Hanami) nas
 fontes públicas; o `collector-lua`, de Lua (LuaJIT, OpenResty, Roblox/Luau, LÖVE,
 Defold); o `collector-java`, de Java (Spring Boot, Quarkus, Micronaut, Jakarta EE,
-Hibernate); e o `collector-python`, de Python (Django, Flask, FastAPI):
+Hibernate); o `collector-python`, de Python (Django, Flask, FastAPI); e o
+`collector-nodejs`, de Node.js (Express, NestJS, Fastify, AdonisJS, Koa):
 
 ```bash
 docker compose up -d collector-ruby                    # coleta agendada do Ruby
@@ -126,14 +127,14 @@ docker compose run --rm collector-ruby config search   # termos de busca do Ruby
 As variáveis de termos de busca do `.env` (`VAGAS_GUPY_TERMS`...) valem só para o tenant
 `php`: os outros usam só a configuração da base.
 
-Os sites (Vagas PHP, Vagas Ruby, Vagas Lua, Vagas Java, Vagas Python) são o mesmo código do `web/` e, em produção,
+Os sites (Vagas PHP, Vagas Ruby, Vagas Lua, Vagas Java, Vagas Python, Vagas Node.js) são o mesmo código do `web/` e, em produção,
 **um container só**: o domínio da requisição escolhe o tenant (`VAGAS_SITES`, em
 `web/src/Sites.php`), e nome, ícone, cores, textos e filtro de stack vêm de
 `web/src/Brand.php`. No Coolify, o serviço `web` do compose principal tem os domínios de
 todos os sites:
 
 ```
-VAGAS_SITES=vagasphp.wouerner.dev=php,vagasruby.wouerner.dev=ruby,vagaslua.wouerner.dev=lua,vagasjava.wouerner.dev=java,vagaspython.wouerner.dev=python
+VAGAS_SITES=vagasphp.wouerner.dev=php,vagasruby.wouerner.dev=ruby,vagaslua.wouerner.dev=lua,vagasjava.wouerner.dev=java,vagaspython.wouerner.dev=python,vagasnodejs.wouerner.dev=nodejs
 ```
 
 O primeiro é o padrão (Host desconhecido, como o healthcheck). `VAGAS_GA_ID` e
@@ -164,7 +165,7 @@ Na ordem prevista. Cada uma é um tenant novo, só de coleta, como o Ruby:
 | Java | `java` | Java, Spring, Spring Boot, Quarkus | feito (site e coleta); o filtro descarta "java" seguido de "script" |
 | C# | `csharp` | C#, .NET, ASP.NET, Blazor | `\b` não casa em volta de `#` e `.`: `c#` e `.net` precisam de regex à parte |
 | Python | `python` | Python, Django, Flask, FastAPI | feito (site e coleta); vagas de dados e ML citam Python sem ser de desenvolvimento: as buscas não usam termos de dados (pandas, PySpark) e, fora do título, a linguagem só conta em cargo de desenvolvimento |
-| Node.js | `node` | Node.js, NestJS, Express | "JavaScript" sozinho também é vaga de front-end |
+| Node.js | `nodejs` | Node.js, Express, NestJS, Fastify, AdonisJS | feito (site e coleta); "JavaScript" e React sozinhos não entram, e "node" só conta ao lado de um cargo de desenvolvimento (nó de Kubernetes fica de fora) |
 | Go | `go` | Go, Golang, Gin | "go" é palavra comum em inglês: buscar por "golang" |
 | Rust | `rust` | Rust, Tokio, Actix, Axum | poucas vagas no Brasil: conferir se as fontes rendem |
 

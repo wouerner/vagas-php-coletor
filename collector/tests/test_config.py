@@ -139,6 +139,46 @@ def test_python_tenant_defaults():
     assert not classify.is_relevant_job("Desenvolvedor Python Django")
 
 
+def test_nodejs_tenant_defaults():
+    try:
+        config.load({}, "nodejs")
+        assert config.tenant == "nodejs"
+        assert classify.is_relevant_job("Desenvolvedor Node.js Sênior")
+        assert classify.is_relevant_job("Pessoa Desenvolvedora NodeJS Pleno")
+        # Título vindo do endereço da vaga (Programathor, Nerdin...): "node-js" vira "node js".
+        assert classify.is_relevant_job("desenvolvedor node js pleno")
+        assert classify.is_relevant_job("Backend Developer (NestJS)")
+        assert classify.is_relevant_job("Desenvolvedor Backend Node Pleno")
+        assert classify.is_relevant_job("Full Stack Developer (Node + React)")
+        assert classify.is_relevant_job("Backend Engineer", "APIs em Fastify e Express.js, com TypeScript.")
+        # Front-end e JavaScript em geral não são Node.js.
+        assert not classify.is_relevant_job("Desenvolvedor Front-end React")
+        assert not classify.is_relevant_job("Desenvolvedor JavaScript Pleno")
+        assert not classify.is_relevant_job("Desenvolvedor React Native", "React, TypeScript e Next.js.")
+        assert not classify.is_relevant_job("Frontend Engineer", "React e TypeScript. Backend em Node.js.")
+        # "node" sozinho é ambíguo: nó de Kubernetes, de rede, de blockchain.
+        assert not classify.is_relevant_job("Kubernetes Node Administrator")
+        assert not classify.is_relevant_job(
+            "DevOps Engineer", "Cada worker node do cluster Kubernetes roda o node exporter. Node pools na AWS.")
+        assert not classify.is_relevant_job("Desenvolvedor PHP Laravel")
+        assert not classify.is_relevant_job("Desenvolvedor Java Spring Boot")
+        assert (classify.details("Dev Node.js", "NestJS, Express, Fastify e TypeScript")["stack"]
+                == "Node.js,Express,NestJS,Fastify,TypeScript")
+        assert classify.details("Dev Backend Node", "AdonisJS e Koa")["stack"] == "Node.js,AdonisJS,Koa"
+        assert classify.details("Dev React", "Cartão American Express")["stack"] is None
+        assert config.search("programathor", "VAGAS_PROGRAMATHOR_PAGES") == [
+            "jobs-node-js", "jobs-nest-js", "jobs-express", "jobs-adonis-js", "jobs-koa"]
+        assert config.search("gupy", "VAGAS_GUPY_TERMS") == [
+            "node.js", "nodejs", "node", "nestjs", "express.js", "fastify", "adonisjs"]
+        rules = {r["id"]: r for r in classify.RULES}
+        assert rules["lang_title"]["title"].startswith("Node.js")
+    finally:
+        config.load({}, "php")
+    assert config.tenant == "php"
+    assert classify.is_relevant_job("Desenvolvedor PHP Laravel")
+    assert not classify.is_relevant_job("Desenvolvedor Node.js")
+
+
 def test_unknown_tenant_never_inherits_another():
     with pytest.raises(ValueError, match="sem configuração"):
         config.load({"language": RUBY["language"]}, "elixir")

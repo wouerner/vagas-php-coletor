@@ -60,3 +60,18 @@ it('usa a paleta azul e amarela e a marca no tenant python', function () {
         ->toContain('<option>Django</option>')->toContain('Python, Django e FastAPI')
         ->not->toContain('Laravel')->not->toContain('Symfony')->not->toContain('WordPress');
 });
+
+it('usa a paleta verde e a marca no tenant nodejs', function () {
+    Brand::use('nodejs');
+    foreach (['index.html', 'tema.html', 'dashboard.html', 'empresas.html', 'vaga.html'] as $t) {
+        $html = Seo::template($t);
+        expect($html)->toContain('#29722d')->not->toContain('#5b5fa0')->not->toContain('#a3a7e6')
+            ->not->toContain('Vagas PHP');
+    }
+    expect(Seo::template('index.html'))->toContain('<h1>Vagas <span>Node.js</span></h1>')
+        ->toContain('<option>NestJS</option>')->toContain('Node.js, Express e NestJS')
+        ->not->toContain('Laravel')->not->toContain('Symfony')->not->toContain('WordPress');
+    // O ponto de "Node.js" fica fora dos endereços: /mercado-nodejs e /vagas/nodejs-senior.
+    expect(Seo::template('index.html'))->toContain('/mercado-nodejs')->not->toContain('/mercado-php');
+    expect(Brand::get('lang_lower'))->toBe('nodejs');
+});

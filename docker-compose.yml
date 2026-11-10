@@ -1,5 +1,6 @@
 # Monorepo: coletor em Python (collector/, serviço vagas-php; collector-ruby,
-# collector-lua, collector-java e collector-python para os tenants ruby, lua, java e python)
+# collector-lua, collector-java, collector-python e collector-nodejs para os tenants ruby, lua,
+# java, python e nodejs)
 # e site em PHP (web/,
 # serviço web). Conversam só pelo MySQL, uma base multi-tenant (docs/contrato-base.md).
 # Portas publicadas (todas mudam por variável; veja o README):
@@ -144,6 +145,28 @@ services:
       DATABASE_URL: "mysql://vagas:${MYSQL_PASSWORD:-vagas}@mysql:3306/vagas"
     volumes:
       - ./data/python:/app/data      # config do agendador deste tenant
+
+  # Coletor do tenant nodejs: igual ao collector-ruby, com VAGAS_TENANT=nodejs. Os termos de
+  # busca do Node.js vêm da base (collector_config).
+  collector-nodejs:
+    build: ./collector
+    image: vagas-php-collector
+    command: ["serve"]
+    restart: unless-stopped
+    depends_on:
+      mysql: {condition: service_healthy}
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      TZ: America/Sao_Paulo
+      VAGAS_TENANT: nodejs
+      VAGAS_MCP_ENABLED: "false"
+      VAGAS_POSTS_ENABLED: "false"
+      VAGAS_LINKEDIN_DAILY_POST: "false"
+      VAGAS_INDEXING_ENABLED: "false"
+      VAGAS_MAX_AGE_HOURS: "${VAGAS_MAX_AGE_HOURS:-72}"
+      DATABASE_URL: "mysql://vagas:${MYSQL_PASSWORD:-vagas}@mysql:3306/vagas"
+    volumes:
+      - ./data/nodejs:/app/data      # config do agendador deste tenant
 
   # Site (PHP 8.5 + Apache): lê o MySQL do coletor (só o tenant php); só grava os cliques.
   web:

@@ -8,7 +8,7 @@ namespace VagasPhp;
  * Identidade pública do site por tenant (VAGAS_TENANT, padrão "php"; o mesmo de Repo):
  * nome, linguagem, frameworks citados nos textos, ícone, canais (Telegram/Instagram),
  * caminho da página de mercado e as stacks do filtro da home. O mesmo código serve o
- * Vagas PHP, o Vagas Ruby, o Vagas Lua, o Vagas Java e o Vagas Python; só muda o deploy (VAGAS_TENANT)
+ * Vagas PHP, o Vagas Ruby, o Vagas Lua, o Vagas Java, o Vagas Python e o Vagas Node.js; só muda o deploy (VAGAS_TENANT)
  * e o domínio.
  *
  * Os templates marcam os textos de marca com {{brand:chave}} (fill() troca); o PHP usa
@@ -44,6 +44,12 @@ final class Brand
         . "<rect x='4' y='4' width='68' height='68' rx='16' fill='%233776AB'/>"
         . "<text x='38' y='49' font-size='34' font-family='Arial' font-weight='bold' text-anchor='middle' "
         . "fill='white'>py</text></svg>";
+
+    // Node.js: hexágono verde com o nome (forma genérica; não é o logotipo, marca registrada).
+    private const ICON_NODEJS = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+        . "<polygon points='50,3 91,26 91,74 50,97 9,74 9,26' fill='%2329722D'/>"
+        . "<text x='50' y='59' font-size='26' font-family='Arial' font-weight='bold' text-anchor='middle' "
+        . "fill='white'>node</text></svg>";
 
     /**
      * Cores do Ruby: troca, nos templates, cada cor da paleta do PHP (roxo, com neutros
@@ -91,6 +97,20 @@ final class Brand
         // escuro
         '#a3a7e6' => '#ffd43b', '#2a2b45' => '#3d3514', '#13131b' => '#12161a', '#1c1c27' => '#1a2026',
         '#2d2d3c' => '#2b333b', '#262634' => '#242b32', '#e8e8f0' => '#e7ecf0', '#a0a2b4' => '#9faab4',
+    ];
+
+    /**
+     * Cores do Node.js: o mesmo esquema do Ruby, com verde no lugar do roxo do PHP. O verde
+     * da marca (#339933) é claro demais para texto em fundo branco: no tema claro entra um
+     * tom mais escuro dele, e no escuro, um mais claro.
+     */
+    private const PALETTE_NODEJS = [
+        // claro
+        '#5b5fa0' => '#29722d', '#ebecf7' => '#e6f4e6', '#f6f6fa' => '#f5f8f5', '#f0f0f5' => '#eef3ee',
+        '#e3e3ec' => '#dfe7df', '#1d1d2b' => '#1b251c', '#5d6070' => '#586459',
+        // escuro
+        '#a3a7e6' => '#8ccf8a', '#2a2b45' => '#1f3d22', '#13131b' => '#121712', '#1c1c27' => '#1a211a',
+        '#2d2d3c' => '#2c362c', '#262634' => '#252e25', '#e8e8f0' => '#e7eee7', '#a0a2b4' => '#a0aea1',
     ];
 
     private const GITHUB = 'https://github.com/wouerner/vagas-php-coletor';
@@ -211,6 +231,29 @@ final class Brand
             'stack_workplace' => ['Django' => ['Remoto', 'Híbrido', 'Presencial']],
             'stack_seniority' => ['Django' => ['Júnior', 'Pleno', 'Sênior']],
             'palette' => self::PALETTE_PYTHON,
+        ],
+        'nodejs' => [
+            'lang' => 'Node.js',
+            // Sem o ponto: entra em endereços (/vagas/nodejs-senior).
+            'lang_lower' => 'nodejs',
+            'name' => 'Vagas Node.js',
+            'frameworks' => 'Express e NestJS',
+            'frameworks_list' => 'Express, NestJS, Fastify',
+            'frameworks_etc' => 'Express, NestJS, Fastify, AdonisJS...',
+            'icon' => self::ICON_NODEJS,
+            'telegram' => null,
+            'instagram' => null,
+            'github' => self::GITHUB,
+            'mercado_path' => '/mercado-nodejs',
+            'og_image' => null,
+            'og_alt' => null,
+            'stack_example' => 'nestjs',
+            'stacks_keyword' => 'Fastify',
+            // As stacks do coletor (collector/vagas/config_defaults.json, tenant nodejs), sem a linguagem.
+            'stacks' => ['Express', 'NestJS', 'Fastify', 'AdonisJS', 'Koa', 'TypeScript'],
+            'stack_workplace' => ['NestJS' => ['Remoto', 'Híbrido', 'Presencial']],
+            'stack_seniority' => ['NestJS' => ['Júnior', 'Pleno', 'Sênior']],
+            'palette' => self::PALETTE_NODEJS,
         ],
     ];
 
