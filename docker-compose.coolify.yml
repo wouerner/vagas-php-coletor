@@ -169,7 +169,7 @@ services:
       VAGAS_ORIGIN_TRIAL_RUBY: ${VAGAS_ORIGIN_TRIAL_RUBY:-}
       VAGAS_ORIGIN_TRIAL_LUA: ${VAGAS_ORIGIN_TRIAL_LUA:-}
       VAGAS_ORIGIN_TRIAL_JAVA: ${VAGAS_ORIGIN_TRIAL_JAVA:-}
-      VAGAS_GA_ID: ${VAGAS_GA_ID:-}  # Google Analytics (G-XXXXXXXXXX); vazio: sem GA
+      VAGAS_GA_ID: ${VAGAS_GA_ID:-}  # Google Analytics (G-...) ou Tag Manager (GTM-...); vazio: sem GA
       VAGAS_SITE_URL: ${VAGAS_SITE_URL:-}  # endereço público (canonical, sitemap); vazio: do proxy
       VAGAS_ORIGIN_TRIAL: ${VAGAS_ORIGIN_TRIAL:-}  # token do origin trial do WebMCP (Chrome); vazio: sem
       VAGAS_RECRUITERS_MIN: ${VAGAS_RECRUITERS_MIN:-2}   # /recrutadores: mínimo de vagas em 90 dias

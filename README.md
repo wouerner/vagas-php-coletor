@@ -342,7 +342,9 @@ Chrome com o token do *origin trial* da sua origem em `VAGAS_ORIGIN_TRIAL`.
 
 **Google Analytics**: com `VAGAS_GA_ID=G-XXXXXXXXXX` as páginas recebem a tag do GA
 (`web/templates/analytics.html`) com aviso de cookies (LGPD, *Consent Mode*): sem aceite,
-o GA não grava cookies. Sem a variável (padrão local), nada é carregado. O print do
+o GA não grava cookies. Também aceita um contêiner do Tag Manager (`GTM-XXXXXXX`): o site
+carrega o `gtm.js` em vez do `gtag.js`, e a tag do GA4 fica configurada no GTM, que herda
+o mesmo consentimento. Sem a variável (padrão local), nada é carregado. O print do
 dashboard para o post diário abre `?print=1`, que fica sem a tag.
 
 ## Dashboard

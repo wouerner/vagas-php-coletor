@@ -18,6 +18,7 @@ afterEach(function () {
     Sites::reset();
     putenv('VAGAS_GA_ID');
     putenv('VAGAS_GA_ID_RUBY');
+    putenv('VAGAS_GA_ID_LUA');
 });
 
 it('lê a lista de domínios e tenants', function () {
@@ -58,4 +59,20 @@ it('cada site usa a variável com o sufixo dele; a geral só vale no site padrã
     expect(Seo::gaId())->toBe('');
     Sites::select(hostRequest('vagasphp.wouerner.dev'), SITES);
     expect(Seo::gaId())->toBe('G-GERAL1234');
+});
+
+it('aceita contêiner do Tag Manager (GTM-) e carrega o gtm.js no lugar do gtag.js', function () {
+    putenv('VAGAS_GA_ID_LUA=GTM-ABC1234');
+    $req = hostRequest('vagaslua.wouerner.dev');
+    Sites::select($req, SITES);
+    expect(Seo::gaId())->toBe('GTM-ABC1234');
+    $html = Seo::plain($req, 'contato.html');
+    expect($html)->toContain('googletagmanager.com/gtm.js?id=GTM-ABC1234')
+        ->toContain('"gtm.start"')->toContain('gtag("consent", "default"')
+        ->not->toContain('gtag/js')->not->toContain('gtag("config"');
+
+    putenv('VAGAS_GA_ID_LUA=G-LUA12345');
+    $html = Seo::plain($req, 'contato.html');
+    expect($html)->toContain('googletagmanager.com/gtag/js?id=G-LUA12345')
+        ->toContain('gtag("config", "G-LUA12345")')->not->toContain('gtm.js');
 });

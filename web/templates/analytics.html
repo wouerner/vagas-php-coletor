@@ -1,5 +1,6 @@
 <!-- Google Analytics com Consent Mode (LGPD): inserido pelo site (web/src/Seo.php) antes de </head> quando
-     VAGAS_GA_ID está definido. Sem aceite, o GA não grava cookies (só sinais anônimos);
+     VAGAS_GA_ID está definido: G-... carrega o gtag.js; GTM-... carrega o contêiner do Tag
+     Manager (que precisa ter a tag do GA4) e herda o mesmo consentimento. Sem aceite, o GA não grava cookies (só sinais anônimos);
      a escolha fica no localStorage ("ga-consent": granted | denied). -->
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -12,7 +13,7 @@
       analytics_storage: choice === "granted" ? "granted" : "denied",
     });
     gtag("js", new Date());
-    gtag("config", "{GA_ID}");
+    {GA_INIT}
     if (choice) return;
     addEventListener("DOMContentLoaded", () => {
       const bar = document.createElement("div");
@@ -35,7 +36,7 @@
     });
   })();
 </script>
-<script async src="https://www.googletagmanager.com/gtag/js?id={GA_ID}"></script>
+<script async src="{GA_SRC}"></script>
 <style>
   #ga-consent { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 1000;
     max-width: 640px; margin: 0 auto; display: flex; gap: 12px 16px; align-items: center;

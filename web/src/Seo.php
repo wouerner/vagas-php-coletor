@@ -45,11 +45,11 @@ final class Seo
         return Sites::env($name);
     }
 
-    /** Google Analytics (G-XXXXXXXXXX); vazio ou inválido: sem GA. */
+    /** Google Analytics (G-XXXXXXXXXX) ou Tag Manager (GTM-XXXXXXX); vazio ou inválido: sem GA. */
     public static function gaId(): string
     {
         $id = self::env('VAGAS_GA_ID');
-        return preg_match('/^G-[A-Z0-9]{4,20}$/', $id) ? $id : '';
+        return preg_match('/^(G|GTM)-[A-Z0-9]{4,20}$/', $id) ? $id : '';
     }
 
     /** Endereço público do site, sem barra no fim. */
@@ -140,7 +140,13 @@ final class Seo
     {
         $ga = self::gaId();
         if ($ga !== '' && !$request->has('print')) {
-            $tag = str_replace('{GA_ID}', $ga, (string) file_get_contents(self::templates() . '/analytics.html'));
+            $gtm = str_starts_with($ga, 'GTM-');
+            $tag = strtr((string) file_get_contents(self::templates() . '/analytics.html'), [
+                '{GA_INIT}' => $gtm
+                    ? 'dataLayer.push({"gtm.start": Date.now(), event: "gtm.js"});'
+                    : 'gtag("config", "' . $ga . '");',
+                '{GA_SRC}' => 'https://www.googletagmanager.com/' . ($gtm ? 'gtm.js' : 'gtag/js') . '?id=' . $ga,
+            ]);
             $html = self::replaceOnce('</head>', $tag . '</head>', $html);
         }
         return $html;
