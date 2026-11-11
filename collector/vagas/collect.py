@@ -125,7 +125,7 @@ def collect_solides(store: Store, since: datetime) -> dict:
 def _maybe_relevant_title(title: str) -> bool:
     """Título que is_relevant_job pode aceitar (cargo de desenvolvimento ou a linguagem no título):
     só esses valem baixar a página da vaga."""
-    return classify.job_verdict(title) != "not_dev" and bool(
+    return classify.job_verdict(title) not in ("not_dev", "excluded") and bool(
         classify.DEV_ROLE.search(title) or classify.CORE.search(title))
 
 

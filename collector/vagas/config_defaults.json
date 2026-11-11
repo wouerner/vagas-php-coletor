@@ -240,5 +240,115 @@
       "names": ["^wouerner\\b"],
       "urls": ["linkedin\\.com/in/wouerner/?$"]
     }
+  },
+  "go": {
+    "language": {
+      "name": "Go",
+      "slug": "go",
+      "examples": "Go (Golang), Gin, Echo, Fiber ou gRPC"
+    },
+    "core": "\\bgo[\\s-]?lang\\b|\\b(dev|desenvolvedor|desenvolvedora|developer|programador|programadora|engenheir[oa]|engineer|software|back[\\s-]?end|full[\\s-]?stack)(\\(a\\)|/a)?(\\s(j[uú]nior|jr|pleno|pl|s[eê]nior|sr|especialista))?[\\s(/|,:+]{1,3}go\\b(?![\\s-]?(to|live|horse)\\b)|(?<!to\\s)(?<!let.s\\s)(?<!pok[eé]mon\\s)\\bgo[\\s)/|,:+-]{1,3}(developer|engineer|dev|programmer|software|back[\\s-]?end|full[\\s-]?stack)\\b|(?-i:\\b(em|in)\\s+Go\\b)(?![\\s-]?(to|live|horse)\\b)|\\b(linguagem|language)\\s+go\\b(?![\\s-]?(to|live|horse)\\b)|\\bgo[\\s-]?routines?\\b|\\bgin[\\s-]?gonic\\b|\\b(gin|echo|fiber)\\W{1,3}framework\\b|\\bgo[\\s-]?fiber\\b|\\blabstack\\b|\\bgorm\\b",
+    "stack": [
+      ["Go", "\\bgo[\\s-]?lang\\b|\\b(dev|desenvolvedor|desenvolvedora|developer|programador|programadora|engenheir[oa]|engineer|software|back[\\s-]?end|full[\\s-]?stack)(\\(a\\)|/a)?(\\s(j[uú]nior|jr|pleno|pl|s[eê]nior|sr|especialista))?[\\s(/|,:+]{1,3}go\\b(?![\\s-]?(to|live|horse)\\b)|(?<!to\\s)(?<!let.s\\s)(?<!pok[eé]mon\\s)\\bgo[\\s)/|,:+-]{1,3}(developer|engineer|dev|programmer|software|back[\\s-]?end|full[\\s-]?stack)\\b|(?-i:\\b(em|in)\\s+Go\\b)(?![\\s-]?(to|live|horse)\\b)|\\b(linguagem|language)\\s+go\\b(?![\\s-]?(to|live|horse)\\b)|\\bgo[\\s-]?routines?\\b"],
+      ["Gin", "\\bgin[\\s-]?gonic\\b|\\bgin\\W{1,3}framework\\b|\\bgo(lang)?\\W{1,3}((com|with|e|and)\\s)?gin\\b|\\bgin\\W{1,3}((e|ou|and|or)\\s)?(echo|fiber|gorm|chi)\\b|\\b(echo|fiber|gorm|chi)\\W{1,3}((e|ou|and|or)\\s)?gin\\b"],
+      ["Echo", "\\blabstack\\b|\\becho\\W{1,3}framework\\b|\\bgo(lang)?\\W{1,3}((com|with|e|and)\\s)?echo\\b|\\becho\\W{1,3}((e|ou|and|or)\\s)?(gin|fiber|gorm|chi)\\b|\\b(gin|fiber|gorm|chi)\\W{1,3}((e|ou|and|or)\\s)?echo\\b"],
+      ["Fiber", "\\bgo[\\s-]?fiber\\b|\\bfiber\\W{1,3}framework\\b|\\bgo(lang)?\\W{1,3}((com|with|e|and)\\s)?fiber\\b|\\bfiber\\W{1,3}((e|ou|and|or)\\s)?(gin|echo|gorm|chi)\\b|\\b(gin|echo|gorm|chi)\\W{1,3}((e|ou|and|or)\\s)?fiber\\b"],
+      ["GORM", "\\bgorm\\b"],
+      ["gRPC", "\\bgrpc\\b"],
+      ["Kubernetes", "\\b(kubernetes|k8s)\\b"]
+    ],
+    "search": {
+      "linkedin": ["golang", "desenvolvedor go", "go developer"],
+      "posts": ["vaga golang", "desenvolvedor golang", "pessoa desenvolvedora golang", "oportunidade golang", "desenvolvedor go", "go developer"],
+      "gupy": ["golang", "desenvolvedor go", "backend go"],
+      "solides": ["golang", "desenvolvedor go", "backend go"],
+      "catho": ["golang", "desenvolvedor golang"],
+      "remotar": ["golang", "desenvolvedor go", "backend go"],
+      "programathor": ["jobs-go", "jobs-gin"],
+      "nerdin": ["golang", "desenvolvedor go", "backend go"],
+      "upvagas": ["golang", "desenvolvedor go", "backend go"],
+      "github": ["golang-brasil/vagas", "backend-br/vagas"]
+    },
+    "self_author": {
+      "names": ["^wouerner\\b"],
+      "urls": ["linkedin\\.com/in/wouerner/?$"]
+    }
+  },
+  "mobile": {
+    "language": {
+      "name": "Mobile",
+      "slug": "mobile",
+      "examples": "Android, iOS, Kotlin, Swift, Flutter ou React Native"
+    },
+    "core": "\\b(react[\\s-]?native|flutter|swift[\\s-]?ui|jetpack[\\s-]?compose|compose[\\s-]?multiplatform|kmp|kmm|xamarin|net[\\s-]?maui|objective[\\s-]?c|uikit|ionic)\\b|(?<!backend )(?<!back-end )(?<!back end )\\bkotlin\\b(?!\\W{1,3}(back[\\s-]?end|spring|ktor)\\b)|\\b(devs?|desenvolvedor|desenvolvedora|developer|programador|programadora|engenheir[oa]|engineer|software|full[\\s-]?stack|front[\\s-]?end|back[\\s-]?end|tech\\s?lead|arquitet[oa]|architect)(?:\\W+[\\w+#.]+){0,2}?\\W+(android|ios|(?<!t-)mobile(?![\\s-]?first)|(apps?|aplicativos?|aplica[çc][õo]es)\\W+m[óo]veis)\\b|\\b(android|ios|(?<!t-)mobile(?![\\s-]?first))(?:\\W+[\\w+#.]+)??\\W+(developer|engineer|dev|software|tech\\s?lead|architect|desenvolvedor|desenvolvedora|engenheir[oa])\\b|\\b(desenvolvimento|development)(?:\\W+[\\w+#.]+){0,2}?\\W+(android|ios|mobile)\\b|\\b(android|ios|mobile)\\W{1,3}development\\b|\\b(android|ios)\\W{1,3}(nativ[oa]|native|sdk)\\b|\\bandroid\\W{1,3}studio\\b|\\b(devs?|desenvolvedor|desenvolvedora|developer|programador|programadora|engenheir[oa]|engineer)\\W{1,3}((s[êe]nior|pleno|j[úu]nior|sr|pl|jr)\\W{1,3})?swift\\b|\\bswift\\W{1,3}(developer|engineer|dev)\\b|(?:^|,)(android|ios|mobile)(?=,|$)",
+    "stack": [
+      ["Android", "\\bandroid\\b"],
+      ["iOS", "\\bios\\b"],
+      ["Kotlin", "\\bkotlin\\b"],
+      ["Swift", "\\bswift\\b"],
+      ["Flutter", "\\bflutter\\b"],
+      ["React Native", "\\breact[\\s-]?native\\b"],
+      ["SwiftUI", "\\bswift[\\s-]?ui\\b"],
+      ["Jetpack Compose", "\\bjetpack[\\s-]?compose\\b"],
+      ["Kotlin Multiplatform", "\\b(kotlin[\\s-]?multiplatform|compose[\\s-]?multiplatform|kmp|kmm)\\b"],
+      ["Dart", "\\bdart\\b"],
+      ["Objective-C", "\\bobjective[\\s-]?c\\b"],
+      ["Ionic", "\\bionic\\b"],
+      ["Xamarin", "\\bxamarin\\b"],
+      ["MAUI", "\\bnet[\\s-]?maui\\b"]
+    ],
+    "search": {
+      "linkedin": ["desenvolvedor android", "desenvolvedor ios", "desenvolvedor mobile", "kotlin", "swiftui", "flutter", "react native"],
+      "posts": ["vaga android", "vaga ios", "vaga mobile", "desenvolvedor mobile", "pessoa desenvolvedora mobile", "vaga flutter", "vaga react native"],
+      "gupy": ["android", "ios", "mobile", "kotlin", "swift", "flutter", "react native"],
+      "solides": ["android", "ios", "mobile", "kotlin", "swift", "flutter", "react native"],
+      "catho": ["android", "ios", "desenvolvedor mobile", "kotlin", "flutter", "react native"],
+      "remotar": ["android", "ios", "mobile", "kotlin", "swift", "flutter", "react native"],
+      "programathor": ["jobs-android", "jobs-ios", "jobs-kotlin", "jobs-swift", "jobs-flutter", "jobs-react-native", "jobs-dart", "jobs-objective-c", "jobs-ionic", "jobs-xamarin"],
+      "nerdin": ["android", "ios", "mobile", "kotlin", "swift", "flutter", "react native"],
+      "upvagas": ["android", "ios", "mobile", "kotlin", "swift", "flutter", "react native"],
+      "github": ["androiddevbr/vagas", "CocoaHeadsBrasil/vagas", "flutterbr/vagas", "react-brasil/vagas", "frontendbr/vagas"]
+    },
+    "self_author": {
+      "names": ["^wouerner\\b"],
+      "urls": ["linkedin\\.com/in/wouerner/?$"]
+    }
+  },
+  "frontend": {
+    "language": {
+      "name": "Front-end",
+      "slug": "frontend",
+      "examples": "Front-end, React, Vue.js, Angular, Next.js, Nuxt ou Svelte"
+    },
+    "core": "\\bfront[\\s-]?end\\b|\\b(react|vue|angular|next)[\\s.-]?js\\b|\\bvue\\s?[23]\\b|\\bangular\\s?\\d|\\b(?-i:React|REACT)\\b(?![\\s.-]?native)|\\b(?-i:Vue|VUE|Angular|ANGULAR)\\b|\\b(devs?|desenvolvedor(a|es)?(\\(a\\))?|developer|programador(a)?(\\(a\\))?|engenheir[oa](\\(a\\))?|engineer|analista|especialista)\\W{1,3}(front|react(?![\\s.-]?native)|vue|angular)\\b|\\b(front|react|vue|angular)\\W{1,3}(developer|engineer|dev|pleno|s[eê]nior|j[uú]nior|jr|sr)\\b|\\bnuxt([\\s.-]?js)?\\b|\\bsvelte([\\s-]?kit)?\\b|\\b(remix|astro|solid|ember|gatsby|preact|qwik)[\\s.-]?js\\b|\\b(gatsby|preact)\\b",
+    "exclude": "\\bfull[\\s-]?(stack|cycle)\\b|\\bback[\\s-]?end\\b|\\breact[\\s.-]?native\\b|\\b(mobile|flutter|android|ios|kotlin|swift)\\b|\\b(node([\\s.-]?js)?|nest[\\s.-]?js|php|laravel|java|spring|python|django|ruby|rails|golang|dot[\\s-]?net)\\b|(?<!\\w)\\.net\\b|(?<![\\w#+.])c#(?![\\w#])",
+    "stack": [
+      ["React", "\\breact([\\s.-]?js)?\\b(?![\\s.-]?native)"],
+      ["Vue.js", "\\bvue([\\s.-]?js)?\\b"],
+      ["Angular", "\\bangular([\\s.-]?js)?\\b"],
+      ["Next.js", "\\bnext[\\s.-]?js\\b"],
+      ["Nuxt", "\\bnuxt([\\s.-]?js)?\\b"],
+      ["Svelte", "\\bsvelte([\\s-]?kit)?\\b"],
+      ["TypeScript", "\\btype\\s?script\\b"],
+      ["JavaScript", "\\bjava\\s?script\\b"],
+      ["Tailwind", "\\btailwind(\\s?css)?\\b"],
+      ["Redux", "\\bredux\\b"]
+    ],
+    "search": {
+      "linkedin": ["front-end", "frontend", "react", "reactjs", "vue.js", "vuejs", "angular", "next.js"],
+      "posts": ["vaga front-end", "vaga frontend", "vaga react", "vaga vue.js", "vaga angular", "desenvolvedor front-end", "pessoa desenvolvedora front-end", "oportunidade front-end"],
+      "gupy": ["front-end", "frontend", "react", "reactjs", "vue.js", "vuejs", "angular", "next.js"],
+      "solides": ["front-end", "frontend", "react", "reactjs", "vue.js", "vuejs", "angular", "next.js"],
+      "catho": ["front-end", "frontend", "react", "reactjs", "vuejs", "angular", "nextjs"],
+      "remotar": ["front-end", "frontend", "react", "reactjs", "vue.js", "vuejs", "angular", "next.js"],
+      "programathor": ["jobs-front-end", "jobs-react", "jobs-vue-js", "jobs-angular", "jobs-nextjs", "jobs-redux", "jobs-ember-js"],
+      "nerdin": ["front-end", "frontend", "react", "reactjs", "vue.js", "vuejs", "angular", "next.js"],
+      "upvagas": ["front-end", "frontend", "react", "reactjs", "vue.js", "vuejs", "angular", "next.js"],
+      "github": ["frontendbr/vagas", "react-brasil/vagas"]
+    },
+    "self_author": {
+      "names": ["^wouerner\\b"],
+      "urls": ["linkedin\\.com/in/wouerner/?$"]
+    }
   }
 }

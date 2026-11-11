@@ -130,7 +130,7 @@ def main() -> int:
                                        "collector_config)")
     cf.add_argument("words", nargs="*", metavar="[set] NOME [JSON]",
                     help="sem argumentos: tudo; NOME: um item (language, core, stack, search, "
-                         "self_author); set NOME JSON: grava o item")
+                         "self_author e o opcional exclude); set NOME JSON: grava o item")
     tr = sub.add_parser("trust", help="níveis de confiança internos de empresas e recrutadores "
                                       "(site_meta trust_levels; não aparece no site)")
     tsub = tr.add_subparsers(dest="trust_cmd", required=True)

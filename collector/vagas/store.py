@@ -121,7 +121,7 @@ SCHEMA = [
     updated_at  VARCHAR(40) NOT NULL,  -- ISO UTC
     PRIMARY KEY (tenant, name)
 )""",
-    # Configuração dos coletores (JSON): language, core, stack, search, self_author. Ver
+    # Configuração dos coletores (JSON): language, core, stack, search, self_author e, opcional, exclude. Ver
     # config.py; os valores iniciais vêm de config_defaults.json.
     """CREATE TABLE IF NOT EXISTS collector_config (
     tenant      VARCHAR(32) NOT NULL DEFAULT 'php',
@@ -488,13 +488,15 @@ class Store:
         """Reaplica classify.is_relevant_job às vagas de portais já salvas (todas as fontes menos
         "post"), para mudanças na regra valerem também para o que já foi coletado. As
         etiquetas das issues do GitHub não ficam na base: issue aceita por etiqueta
-        continua aceita. Retorna os ids que mudaram."""
+        continua aceita, a menos que o título tenha passado a ser excluído (configuração
+        "exclude"). Retorna os ids que mudaram."""
         rows = self.execute("SELECT id, source, title, description, relevant FROM jobs "
                             "WHERE tenant = ? AND source != 'post'", (self.tenant,)).fetchall()
         changed = []
         for r in rows:
-            ok = classify.is_relevant_job(r["title"], r["description"]) or (
-                r["source"] == "github" and r["relevant"])
+            ok = classify.is_relevant_job(r["title"], r["description"]) or bool(
+                r["source"] == "github" and r["relevant"]
+                and classify.job_verdict(r["title"]) != "excluded")
             if ok != bool(r["relevant"]):
                 changed.append((int(ok), r["id"]))
         with self.tx():

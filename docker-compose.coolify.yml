@@ -10,7 +10,7 @@
 #   - MCP desligado por padrão (VAGAS_MCP_ENABLED=false); ligado, ele e o noVNC (sem
 #     senha!) ficam só no 127.0.0.1 do servidor: use túnel SSH.
 # Este compose é um deploy só: os coletores (vagas-php, collector-ruby, collector-lua,
-# collector-java, collector-python, collector-nodejs, collector-dotnet) e um serviço web que serve todos os sites. O domínio escolhe o site
+# collector-java, collector-python, collector-nodejs, collector-dotnet, collector-go, collector-frontend, collector-mobile) e um serviço web que serve todos os sites. O domínio escolhe o site
 # (VAGAS_SITES, web/src/Sites.php): no Coolify, o serviço web tem os domínios de todos os sites. Um segundo deploy deste compose
 # subiria outro coletor PHP.
 services:
@@ -221,6 +221,72 @@ services:
     volumes:
       - dotnet-data:/app/data
 
+  # Coletor do tenant go (multi-tenant: mesma base, VAGAS_TENANT=go). Só coleta: sem
+  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+  # variáveis listadas aqui: os termos de busca do Go vêm da base (collector_config),
+  # nunca dos VAGAS_*_TERMS do PHP.
+  collector-go:
+    build: ./collector
+    command: ["serve"]
+    restart: unless-stopped
+    user: pwuser
+    environment:
+      TZ: America/Sao_Paulo
+      VAGAS_TENANT: go
+      VAGAS_MCP_ENABLED: "false"
+      VAGAS_POSTS_ENABLED: "false"
+      VAGAS_LINKEDIN_DAILY_POST: "false"
+      VAGAS_INDEXING_ENABLED: "false"
+      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+      DATABASE_URL: ${DATABASE_URL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+    volumes:
+      - go-data:/app/data
+
+  # Coletor do tenant mobile (multi-tenant: mesma base, VAGAS_TENANT=mobile). Só coleta: sem
+  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+  # variáveis listadas aqui: os termos de busca do Mobile vêm da base (collector_config),
+  # nunca dos VAGAS_*_TERMS do PHP.
+  collector-mobile:
+    build: ./collector
+    command: ["serve"]
+    restart: unless-stopped
+    user: pwuser
+    environment:
+      TZ: America/Sao_Paulo
+      VAGAS_TENANT: mobile
+      VAGAS_MCP_ENABLED: "false"
+      VAGAS_POSTS_ENABLED: "false"
+      VAGAS_LINKEDIN_DAILY_POST: "false"
+      VAGAS_INDEXING_ENABLED: "false"
+      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+      DATABASE_URL: ${DATABASE_URL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+    volumes:
+      - mobile-data:/app/data
+
+  # Coletor do tenant frontend (multi-tenant: mesma base, VAGAS_TENANT=frontend). Só coleta: sem
+  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+  # variáveis listadas aqui: os termos de busca do Front-end vêm da base (collector_config),
+  # nunca dos VAGAS_*_TERMS do PHP.
+  collector-frontend:
+    build: ./collector
+    command: ["serve"]
+    restart: unless-stopped
+    user: pwuser
+    environment:
+      TZ: America/Sao_Paulo
+      VAGAS_TENANT: frontend
+      VAGAS_MCP_ENABLED: "false"
+      VAGAS_POSTS_ENABLED: "false"
+      VAGAS_LINKEDIN_DAILY_POST: "false"
+      VAGAS_INDEXING_ENABLED: "false"
+      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+      DATABASE_URL: ${DATABASE_URL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+    volumes:
+      - frontend-data:/app/data
+
   web:
     build: ./web
     restart: unless-stopped
@@ -235,12 +301,18 @@ services:
       VAGAS_GA_ID_PYTHON: ${VAGAS_GA_ID_PYTHON:-}
       VAGAS_GA_ID_NODEJS: ${VAGAS_GA_ID_NODEJS:-}
       VAGAS_GA_ID_DOTNET: ${VAGAS_GA_ID_DOTNET:-}
+      VAGAS_GA_ID_GO: ${VAGAS_GA_ID_GO:-}
+      VAGAS_GA_ID_MOBILE: ${VAGAS_GA_ID_MOBILE:-}
+      VAGAS_GA_ID_FRONTEND: ${VAGAS_GA_ID_FRONTEND:-}
       VAGAS_ORIGIN_TRIAL_RUBY: ${VAGAS_ORIGIN_TRIAL_RUBY:-}
       VAGAS_ORIGIN_TRIAL_LUA: ${VAGAS_ORIGIN_TRIAL_LUA:-}
       VAGAS_ORIGIN_TRIAL_JAVA: ${VAGAS_ORIGIN_TRIAL_JAVA:-}
       VAGAS_ORIGIN_TRIAL_PYTHON: ${VAGAS_ORIGIN_TRIAL_PYTHON:-}
       VAGAS_ORIGIN_TRIAL_NODEJS: ${VAGAS_ORIGIN_TRIAL_NODEJS:-}
       VAGAS_ORIGIN_TRIAL_DOTNET: ${VAGAS_ORIGIN_TRIAL_DOTNET:-}
+      VAGAS_ORIGIN_TRIAL_GO: ${VAGAS_ORIGIN_TRIAL_GO:-}
+      VAGAS_ORIGIN_TRIAL_MOBILE: ${VAGAS_ORIGIN_TRIAL_MOBILE:-}
+      VAGAS_ORIGIN_TRIAL_FRONTEND: ${VAGAS_ORIGIN_TRIAL_FRONTEND:-}
       VAGAS_GA_ID: ${VAGAS_GA_ID:-}  # Google Analytics (G-...) ou Tag Manager (GTM-...); vazio: sem GA
       VAGAS_SITE_URL: ${VAGAS_SITE_URL:-}  # endereço público (canonical, sitemap); vazio: do proxy
       VAGAS_ORIGIN_TRIAL: ${VAGAS_ORIGIN_TRIAL:-}  # token do origin trial do WebMCP (Chrome); vazio: sem
@@ -262,5 +334,8 @@ volumes:
   python-data:
   nodejs-data:
   dotnet-data:
+  go-data:
+  mobile-data:
+  frontend-data:
   vagas-data:
   linkedin-session:

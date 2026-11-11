@@ -14,6 +14,10 @@ from . import config
 CORE: re.Pattern
 STACK: dict[str, str] = {}
 STACK_RE: dict[str, re.Pattern] = {}
+# O que o site deixa de fora pelo título, mesmo citando a linguagem (configuração opcional
+# "exclude": no Front-end, full stack, back-end e mobile). None no tenant sem o item: nada
+# é excluído e as regras "excluded"/"post_excluded" nem são publicadas.
+EXCLUDE: re.Pattern | None = None
 
 # Título de vaga de engenharia/desenvolvimento de software.
 DEV_ROLE = re.compile(
@@ -286,6 +290,8 @@ def job_verdict(title: str | None, description: str | None = None,
     title = title or ""
     if NOT_DEV.search(title) and not DEV_ROLE.search(title):
         return "not_dev"
+    if EXCLUDE and EXCLUDE.search(title):
+        return "excluded"
     if CORE.search(title) or (labels and CORE.search(labels)):
         return "lang_title"
     if DEV_ROLE.search(title) and description and len(CORE.findall(description)) >= 2:
@@ -297,23 +303,40 @@ def is_relevant_job(title: str | None, description: str | None = None,
                     labels: str | None = None) -> bool:
     """Vaga de engenharia de software da linguagem: termo de CORE no título ou nas
     etiquetas, ou título de desenvolvimento com a linguagem em destaque na descrição (2+
-    menções: uma só costuma ser a linguagem numa lista de linguagens aceitas)."""
+    menções: uma só costuma ser a linguagem numa lista de linguagens aceitas). Título que
+    casa EXCLUDE (tenant com "exclude") fica de fora antes disso, mesmo citando a linguagem."""
     return job_verdict(title, description, labels) in JOB_OK
 
 
-def _job_title_line(text: str) -> bool:
-    """Alguma linha com cara de título de vaga: cargo de desenvolvimento + linguagem
-    (CORE) + senioridade ou modalidade ("• Pessoa Desenvolvedora PHP Sênior | 100%
-    remoto"). Num post curto, senioridade, modalidade ou contratação podem vir em outra
-    linha ("Desenvolvedor WordPress Full Stack" / "Modelo PJ/ Hibrido")."""
+def _title_lines(text: str) -> list[str]:
+    """Linhas que podem ser título de vaga, sem olhar cargo nem linguagem: curtas, com
+    senioridade ou modalidade ("• Pessoa Desenvolvedora PHP Sênior | 100% remoto"). Num
+    post curto, senioridade, modalidade ou contratação podem vir em outra linha
+    ("Desenvolvedor WordPress Full Stack" / "Modelo PJ/ Hibrido")."""
     short = len(text) < 400
     terms = lambda t: _first(SENIORITY, t) or _first(WORKPLACE, t) or _first(CONTRACT, t)  # noqa: E731
-    for line in text.splitlines():
-        line = HASHTAG_OR_URL.sub(" ", line)
-        if (len(line) <= 160 and DEV_ROLE.search(line) and CORE.search(line)
-                and (_first(SENIORITY, line) or _first(WORKPLACE, line) or (short and terms(text)))):
-            return True
-    return False
+    lines = (HASHTAG_OR_URL.sub(" ", line) for line in text.splitlines())
+    return [line for line in lines
+            if (len(line) <= 160
+                and (_first(SENIORITY, line) or _first(WORKPLACE, line) or (short and terms(text))))]
+
+
+def _job_title_line(text: str) -> bool:
+    """Alguma linha com cara de título de vaga: cargo de desenvolvimento + linguagem (CORE)
+    + senioridade ou modalidade (_title_lines)."""
+    return any(DEV_ROLE.search(line) and CORE.search(line) for line in _title_lines(text))
+
+
+def is_excluded_post(text: str) -> bool:
+    """Post cujas linhas de título (_title_lines que citam a linguagem ou um termo de
+    EXCLUDE) casam todas EXCLUDE: é o equivalente, no texto livre, do título da vaga de
+    portal. Um post com um título dentro do site e outro fora continua valendo
+    (anuncia as duas vagas), e um post sem linha de título, em texto corrido, não é
+    barrado: "full stack" no meio de uma frase não diz de que vaga o post é."""
+    if not EXCLUDE:
+        return False
+    titles = [line for line in _title_lines(text) if CORE.search(line) or EXCLUDE.search(line)]
+    return bool(titles) and all(EXCLUDE.search(line) for line in titles)
 
 
 def _job_ad_shape(text: str) -> bool:
@@ -376,6 +399,8 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
     mentions = len(CORE.findall(body))
     if not (mentions and (DEV_ROLE.search(body) or mentions >= 2)):
         return "post_no_lang"
+    if is_excluded_post(text):
+        return "post_excluded"
     if is_aggregator(text):
         return "aggregator"
     if is_job_list(text):
@@ -523,12 +548,31 @@ def _rules() -> list[dict]:
     """Regras com o nome e os termos da linguagem configurada."""
     lang = config.get("language")
     name, slug, examples = lang["name"], lang["slug"], lang["examples"]
+    # Regras de exclusão: só no tenant que tem "exclude" (os outros publicam as de sempre).
+    excluded = [
+        {"group": "vagas", "id": "excluded", "effect": "recusa",
+         "title": f"Fora do escopo do {name}",
+         "text": f"Este site é só de vagas de {name}: título com algum dos termos abaixo fica "
+                 f"de fora, mesmo citando {name}. Vale também para o título que traz os dois "
+                 f"(\"{name} ou ...\"): a vaga não é só de {name}.",
+         "patterns": _patterns(EXCLUDE)}] if EXCLUDE else []
+    post_excluded = [
+        {"group": "posts", "id": "post_excluded", "effect": "recusa",
+         "title": f"Vaga fora do escopo do {name}",
+         "text": "O mesmo corte das vagas de portais, aplicado às linhas com cara de título "
+                 f"de vaga (curtas, com senioridade ou modalidade, citando {name} ou um dos "
+                 "termos abaixo): o post fica "
+                 "de fora quando todas elas trazem um dos termos excluídos. Post com um título "
+                 "dentro do escopo e outro fora continua valendo, e texto corrido, sem linha "
+                 "de título, não é barrado por esta regra.",
+         "patterns": _patterns(EXCLUDE)}] if EXCLUDE else []
     return [
         {"group": "vagas", "id": "not_dev", "effect": "recusa",
          "title": "Cargo que não é de engenharia",
          "text": "Título de vendas, suporte, design, ensino, recrutamento etc., sem cargo de "
                  f"desenvolvimento junto, fica de fora mesmo citando {name}.",
          "patterns": _patterns(NOT_DEV)},
+        *excluded,
         {"group": "vagas", "id": "lang_title", "effect": "aceita",
          "title": f"{name} ou tecnologia do ecossistema no título",
          "text": f"{examples} no título da vaga (ou nas etiquetas da issue, no GitHub).",
@@ -556,6 +600,7 @@ def _rules() -> list[dict]:
                  f"de um cargo de desenvolvimento, ou mais de uma vez. Hashtags e links não "
                  f"contam: muitos posts enchem de #{slug} #java #python.",
          "patterns": _patterns(CORE)},
+        *post_excluded,
         {"group": "posts", "id": "aggregator", "effect": "recusa",
          "title": "Divulgação de grupos e canais de vagas, sem curadoria",
          "text": f"Posts que divulgam grupos, canais e comunidades de vagas (Discord, Telegram, "
@@ -655,10 +700,13 @@ def _rules() -> list[dict]:
 
 
 def _configure() -> None:
-    """Recalcula o que vem da configuração: termos da linguagem, stack, dono do site e as
-    regras publicadas (que citam a linguagem e trazem as expressões)."""
-    global CORE, STACK, STACK_RE, SELF_AUTHOR, SELF_AUTHOR_RE, SELF_AUTHOR_URL_RE, RULES
+    """Recalcula o que vem da configuração: termos da linguagem, stack, o que fica de fora
+    (opcional), dono do site e as regras publicadas (que citam a linguagem e trazem as
+    expressões)."""
+    global CORE, EXCLUDE, STACK, STACK_RE, SELF_AUTHOR, SELF_AUTHOR_RE, SELF_AUTHOR_URL_RE, RULES
     CORE = re.compile(config.get("core"), re.I)
+    # Item opcional: ausente (configuração antiga na base) ou vazio, o tenant não exclui nada.
+    EXCLUDE = re.compile(exclude, re.I) if (exclude := config.get("exclude")) else None
     STACK = {name: rx for name, rx in config.get("stack")}
     STACK_RE = {name: re.compile(rx, re.I) for name, rx in STACK.items()}
     SELF_AUTHOR = config.get("self_author")

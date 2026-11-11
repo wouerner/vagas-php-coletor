@@ -8,7 +8,7 @@ namespace VagasPhp;
  * Identidade pública do site por tenant (VAGAS_TENANT, padrão "php"; o mesmo de Repo):
  * nome, linguagem, frameworks citados nos textos, ícone, canais (Telegram/Instagram),
  * caminho da página de mercado e as stacks do filtro da home. O mesmo código serve o
- * Vagas PHP, o Vagas Ruby, o Vagas Lua, o Vagas Java, o Vagas Python, o Vagas Node.js e o Vagas .NET; só muda o deploy (VAGAS_TENANT)
+ * Vagas PHP, o Vagas Ruby, o Vagas Lua, o Vagas Java, o Vagas Python, o Vagas Node.js, o Vagas .NET, o Vagas Go, o Vagas Front-end e o Vagas Mobile; só muda o deploy (VAGAS_TENANT)
  * e o domínio.
  *
  * Os templates marcam os textos de marca com {{brand:chave}} (fill() troca); o PHP usa
@@ -56,6 +56,27 @@ final class Brand
         . "<rect width='100' height='100' rx='18' fill='%23512BD4'/>"
         . "<text x='50' y='61' font-size='30' font-family='Arial' font-weight='bold' text-anchor='middle' "
         . "fill='white'>.NET</text></svg>";
+
+    // Go: círculo azul-petróleo com o nome (forma genérica; não é o logotipo nem o gopher,
+    // marcas registradas).
+    private const ICON_GO = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+        . "<circle cx='50' cy='50' r='48' fill='%23006B84'/>"
+        . "<text x='50' y='66' font-size='46' font-family='Arial' font-weight='bold' text-anchor='middle' "
+        . "fill='white'>Go</text></svg>";
+
+    // Mobile: silhueta de smartphone verde-oliva, com a tela e a barra de gestos (forma genérica;
+    // sem o robô do Android nem a maçã, marcas registradas).
+    private const ICON_MOBILE = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+        . "<rect x='24' y='3' width='52' height='94' rx='12' fill='%235A6B00'/>"
+        . "<rect x='31' y='14' width='38' height='64' rx='4' fill='white'/>"
+        . "<rect x='40' y='85' width='20' height='5' rx='2.5' fill='white'/></svg>";
+
+    // Front-end: quadrado magenta com os sinais de marcação "</>" (forma genérica; nenhum
+    // logotipo de framework).
+    private const ICON_FRONTEND = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+        . "<rect width='100' height='100' rx='18' fill='%23B51F7A'/>"
+        . "<path d='M36 30 16 50l20 20M64 30l20 20-20 20M56 24 44 76' fill='none' stroke='white' "
+        . "stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/></svg>";
 
     /**
      * Cores do Ruby: troca, nos templates, cada cor da paleta do PHP (roxo, com neutros
@@ -130,6 +151,48 @@ final class Brand
         // escuro
         '#a3a7e6' => '#b9a8ff', '#2a2b45' => '#2e2460', '#13131b' => '#13111c', '#1c1c27' => '#1b1929',
         '#2d2d3c' => '#2f2b40', '#262634' => '#272337', '#e8e8f0' => '#eae8f3', '#a0a2b4' => '#a5a1b9',
+    ];
+
+    /**
+     * Cores do Go: o mesmo esquema do Ruby, com azul-petróleo no lugar do roxo do PHP. O
+     * ciano da marca (#00ADD8) é claro demais para texto em fundo branco: no tema claro
+     * entra um tom mais escuro dele, e no escuro, um mais claro.
+     */
+    private const PALETTE_GO = [
+        // claro
+        '#5b5fa0' => '#006b84', '#ebecf7' => '#e2f4f8', '#f6f6fa' => '#f4f8f9', '#f0f0f5' => '#edf3f5',
+        '#e3e3ec' => '#dde7ea', '#1d1d2b' => '#16242a', '#5d6070' => '#55656b',
+        // escuro
+        '#a3a7e6' => '#5fd0ea', '#2a2b45' => '#0f3a47', '#13131b' => '#101619', '#1c1c27' => '#182024',
+        '#2d2d3c' => '#29353a', '#262634' => '#222d31', '#e8e8f0' => '#e6eef0', '#a0a2b4' => '#9eafb5',
+    ];
+
+    /**
+     * Cores do Mobile: o mesmo esquema do Ruby, com verde-oliva no lugar do roxo do PHP (não é
+     * cor de nenhuma das plataformas: o site cobre Android e iOS); no tema escuro entra um
+     * verde-limão claro.
+     */
+    private const PALETTE_MOBILE = [
+        // claro
+        '#5b5fa0' => '#5a6b00', '#ebecf7' => '#f1f5dc', '#f6f6fa' => '#f8f9f3', '#f0f0f5' => '#f2f4ea',
+        '#e3e3ec' => '#e5e8d8', '#1d1d2b' => '#22261a', '#5d6070' => '#62685a',
+        // escuro
+        '#a3a7e6' => '#c5d86d', '#2a2b45' => '#353d14', '#13131b' => '#15170f', '#1c1c27' => '#1f2218',
+        '#2d2d3c' => '#33372a', '#262634' => '#2b2f22', '#e8e8f0' => '#ecefe4', '#a0a2b4' => '#a9ae9c',
+    ];
+
+    /**
+     * Cores do Front-end: o mesmo esquema do Ruby, com magenta no lugar do roxo do PHP (a
+     * faixa de cor que ainda não tinha site, entre o violeta do .NET e o vermelho do Ruby);
+     * no tema escuro entra um rosa mais claro.
+     */
+    private const PALETTE_FRONTEND = [
+        // claro
+        '#5b5fa0' => '#b51f7a', '#ebecf7' => '#fbe7f3', '#f6f6fa' => '#faf6f9', '#f0f0f5' => '#f5eef2',
+        '#e3e3ec' => '#ede0e8', '#1d1d2b' => '#2b1a25', '#5d6070' => '#6b5864',
+        // escuro
+        '#a3a7e6' => '#ff8fd0', '#2a2b45' => '#4a1d3a', '#13131b' => '#1b1318', '#1c1c27' => '#271b23',
+        '#2d2d3c' => '#3c2c36', '#262634' => '#34252e', '#e8e8f0' => '#f0e7ec', '#a0a2b4' => '#b4a0ac',
     ];
 
     private const GITHUB = 'https://github.com/wouerner/vagas-php-coletor';
@@ -296,6 +359,82 @@ final class Brand
             'stack_workplace' => ['C#' => ['Remoto', 'Híbrido', 'Presencial']],
             'stack_seniority' => ['C#' => ['Júnior', 'Pleno', 'Sênior']],
             'palette' => self::PALETTE_DOTNET,
+        ],
+        'go' => [
+            'lang' => 'Go',
+            'lang_lower' => 'go',
+            'name' => 'Vagas Go',
+            'frameworks' => 'Golang e Gin',
+            'frameworks_list' => 'Golang, Gin, Echo',
+            'frameworks_etc' => 'Golang, Gin, Echo, Fiber, gRPC...',
+            'icon' => self::ICON_GO,
+            'telegram' => null,
+            'instagram' => null,
+            'github' => self::GITHUB,
+            'mercado_path' => '/mercado-go',
+            'og_image' => null,
+            'og_alt' => null,
+            'stack_example' => 'gin',
+            'stacks_keyword' => 'gRPC',
+            // As stacks do coletor (collector/vagas/config_defaults.json, tenant go), sem a linguagem.
+            'stacks' => ['Gin', 'Echo', 'Fiber', 'GORM', 'gRPC', 'Kubernetes'],
+            'stack_workplace' => ['Gin' => ['Remoto', 'Híbrido', 'Presencial']],
+            'stack_seniority' => ['Gin' => ['Júnior', 'Pleno', 'Sênior']],
+            'palette' => self::PALETTE_GO,
+        ],
+        'mobile' => [
+            // Plataforma, não linguagem: um site só para Android, iOS e multiplataforma.
+            'lang' => 'Mobile',
+            'lang_lower' => 'mobile',
+            'name' => 'Vagas Mobile',
+            'frameworks' => 'Android e iOS',
+            'frameworks_list' => 'Android, iOS, Flutter',
+            'frameworks_etc' => 'Android, iOS, Flutter, React Native...',
+            'icon' => self::ICON_MOBILE,
+            'telegram' => null,
+            'instagram' => null,
+            'github' => self::GITHUB,
+            'mercado_path' => '/mercado-mobile',
+            'og_image' => null,
+            'og_alt' => null,
+            'stack_example' => 'android',
+            'stacks_keyword' => 'React Native',
+            // As stacks do coletor (collector/vagas/config_defaults.json, tenant mobile); não há
+            // stack com o nome do site ("Mobile").
+            'stacks' => ['Android', 'iOS', 'Kotlin', 'Swift', 'Flutter', 'React Native', 'SwiftUI', 'Jetpack Compose',
+                'Kotlin Multiplatform', 'Dart', 'Objective-C', 'Ionic', 'Xamarin', 'MAUI'],
+            'stack_workplace' => ['Android' => ['Remoto', 'Híbrido', 'Presencial'], 'iOS' => ['Remoto', 'Híbrido', 'Presencial'],
+                'Flutter' => ['Remoto', 'Híbrido', 'Presencial']],
+            'stack_seniority' => ['Android' => ['Júnior', 'Pleno', 'Sênior'], 'iOS' => ['Júnior', 'Pleno', 'Sênior'],
+                'Flutter' => ['Júnior', 'Pleno', 'Sênior']],
+            'palette' => self::PALETTE_MOBILE,
+        ],
+        'frontend' => [
+            // Uma área, não uma linguagem: nenhuma stack tem este nome (todas viram tema).
+            'lang' => 'Front-end',
+            // Sem o hífen: entra em endereços (/vagas/frontend-senior).
+            'lang_lower' => 'frontend',
+            'name' => 'Vagas Front-end',
+            'frameworks' => 'React, Vue e Angular',
+            'frameworks_list' => 'React, Vue.js, Angular',
+            'frameworks_etc' => 'React, Vue.js, Angular, Next.js...',
+            'icon' => self::ICON_FRONTEND,
+            'telegram' => null,
+            'instagram' => null,
+            'github' => self::GITHUB,
+            'mercado_path' => '/mercado-frontend',
+            'og_image' => null,
+            'og_alt' => null,
+            'stack_example' => 'react',
+            'stacks_keyword' => 'Angular',
+            // As stacks do coletor (collector/vagas/config_defaults.json, tenant frontend).
+            'stacks' => ['React', 'Vue.js', 'Angular', 'Next.js', 'Nuxt', 'Svelte', 'TypeScript', 'JavaScript',
+                'Tailwind', 'Redux'],
+            'stack_workplace' => ['React' => ['Remoto', 'Híbrido', 'Presencial'], 'Vue.js' => ['Remoto'],
+                'Angular' => ['Remoto']],
+            'stack_seniority' => ['React' => ['Júnior', 'Pleno', 'Sênior'], 'Vue.js' => ['Júnior', 'Pleno', 'Sênior'],
+                'Angular' => ['Júnior', 'Pleno', 'Sênior']],
+            'palette' => self::PALETTE_FRONTEND,
         ],
     ];
 

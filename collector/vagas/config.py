@@ -1,5 +1,6 @@
 """Configuração dos coletores, por tenant (a linguagem: "php", "ruby"...): nome, termos que
-identificam a linguagem, stack, o que buscar em cada fonte e quem é o dono do site. Fica
+identificam a linguagem, stack, o que buscar em cada fonte, quem é o dono do site e,
+opcional, o que o site deixa de fora pelo título ("exclude"). Fica
 na base (tabela collector_config, um JSON por tenant e item): o mesmo código coleta vagas
 de qualquer linguagem, trocando só a configuração. config_defaults.json tem os valores
 iniciais de cada tenant, gravados na base na primeira subida (só os itens que faltam: o
@@ -18,7 +19,12 @@ from pathlib import Path
 DEFAULTS_PATH = Path(__file__).with_name("config_defaults.json")
 # tenant -> item -> valor
 TENANT_DEFAULTS: dict[str, dict] = json.loads(DEFAULTS_PATH.read_text(encoding="utf-8"))
-ITEMS = ("language", "core", "stack", "search", "self_author")
+# Itens que todo tenant tem, e os opcionais: "exclude" (regex) recusa a vaga pelo título
+# antes das regras da linguagem (o Front-end deixa de fora full stack, back-end e mobile).
+# Tenant sem o item, ou com ele vazio, não exclui nada.
+REQUIRED = ("language", "core", "stack", "search", "self_author")
+OPTIONAL = ("exclude",)
+ITEMS = REQUIRED + OPTIONAL
 # Tenant das linhas de antes do multi-tenant e o único com site hoje (web/ mostra só ele).
 DEFAULT_TENANT = "php"
 
@@ -50,7 +56,7 @@ def load(values: dict, tenant_name: str | None = None) -> None:
     global tenant
     name = tenant_name or tenant
     merged = {**defaults(name), **values}
-    if missing := [item for item in ITEMS if item not in merged]:
+    if missing := [item for item in REQUIRED if item not in merged]:
         raise ValueError(f"tenant {name!r} sem configuração de {', '.join(missing)}: grave com "
                          f"python -m vagas config set NOME '<json>' ou em config_defaults.json")
     tenant = name
@@ -61,7 +67,8 @@ def load(values: dict, tenant_name: str | None = None) -> None:
 
 
 def get(name: str):
-    return current[name]
+    """Item da configuração carregada; None se for um item opcional que o tenant não tem."""
+    return current.get(name) if name in OPTIONAL else current[name]
 
 
 def language() -> str:

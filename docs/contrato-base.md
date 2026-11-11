@@ -22,7 +22,7 @@ existe, responde vazio (`Site::safe()` trata os erros `42S02` e `42S22`).
 
 ## Multi-tenant: uma base, uma linguagem por tenant
 
-`jobs`, `runs`, `site_meta` e `collector_config` têm a coluna `tenant` (`php`, `ruby`, `lua`, `java`, `python`, `nodejs`, `dotnet`...).
+`jobs`, `runs`, `site_meta` e `collector_config` têm a coluna `tenant` (`php`, `ruby`, `lua`, `java`, `python`, `nodejs`, `dotnet`, `go`, `frontend`, `mobile`...).
 Cada processo coletor grava um tenant só (`VAGAS_TENANT`, padrão `php`; na linha de
 comando, `python -m vagas --tenant ruby ...`), e o site lê só o dele (`VAGAS_TENANT` do
 site, padrão `php`). Regras:
@@ -89,6 +89,19 @@ salvas e regrava `site_meta`.
 | `stack` | `[["PHP", "<regex>"], ...]`: tecnologias, na ordem dos filtros e temas do site |
 | `search` | termos de busca por fonte (`linkedin`, `posts`, `gupy`...; `programathor`: listas; `github`: repositórios) |
 | `self_author` | `{"names": [...], "urls": [...]}`: o dono do site, cujos posts não são coletados |
+| `exclude` (opcional) | regex do que o site deixa de fora pelo título, mesmo citando a linguagem; só o `frontend` tem (full stack, back-end, linguagens de back-end e mobile) |
+
+`exclude` é o único item opcional: tenant sem ele (ou com `""`) não exclui nada, não precisa
+do item na base e não publica as regras de exclusão. Com ele, a vaga de portal cujo
+**título** casa a expressão é recusada (regra `excluded`) antes das regras da linguagem,
+inclusive quando o título traz os dois ("Front-end ou Full Stack": a vaga não é só de
+front-end) e quando a issue do GitHub tem etiqueta da linguagem; a descrição não conta. Em
+post do LinkedIn, que não tem título, vale para as linhas com cara de título de vaga
+(curtas, com senioridade ou modalidade, citando a linguagem ou um termo excluído): o post
+é recusado (regra `post_excluded`) quando todas casam a expressão. Post em texto corrido,
+sem linha de título, não é barrado por ela. As duas regras só entram em `site_meta` `rules`
+nos tenants que têm o item, logo depois de `not_dev` e de `post_no_lang`; o site mostra as
+regras que recebe, sem conhecer os ids.
 
 As variáveis `VAGAS_*_TERMS`, `VAGAS_LINKEDIN_KEYWORDS`, `VAGAS_POSTS_KEYWORDS`,
 `VAGAS_PROGRAMATHOR_PAGES` e `VAGAS_GITHUB_REPOS`, se definidas, têm prioridade sobre
