@@ -159,3 +159,23 @@ it('usa a paleta magenta e a marca no tenant frontend', function () {
         expect(array_diff(array_keys(Brand::get($k)), Brand::get('stacks')))->toBe([]);
     }
 });
+
+it('usa a paleta grafite e a marca no tenant rust', function () {
+    Brand::use('rust');
+    foreach (['index.html', 'tema.html', 'dashboard.html', 'empresas.html', 'vaga.html'] as $t) {
+        $html = Seo::template($t);
+        expect($html)->toContain('#46596f')->not->toContain('#5b5fa0')->not->toContain('#a3a7e6')
+            ->not->toContain('Vagas PHP');
+    }
+    expect(Seo::template('index.html'))->toContain('<h1>Vagas <span>Rust</span></h1>')
+        ->toContain('<option>Tokio</option>')->toContain('<option>Axum</option>')->toContain('Rust, Tokio e Axum')
+        ->not->toContain('<option>Rust</option>')
+        ->not->toContain('Laravel')->not->toContain('Symfony')->not->toContain('WordPress');
+    expect(Seo::template('index.html'))->toContain('/mercado-rust')->not->toContain('/mercado-php');
+    expect(Brand::get('lang_lower'))->toBe('rust');
+    expect(Brand::name())->toBe('Vagas Rust');
+    expect(VagasPhp\Text::techSlug('WebAssembly'))->toBe('webassembly');
+    foreach (['stack_workplace', 'stack_seniority'] as $k) {
+        expect(array_diff(array_keys(Brand::get($k)), Brand::get('stacks')))->toBe([]);
+    }
+});

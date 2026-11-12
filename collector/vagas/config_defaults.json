@@ -350,5 +350,39 @@
       "names": ["^wouerner\\b"],
       "urls": ["linkedin\\.com/in/wouerner/?$"]
     }
+  },
+  "rust": {
+    "language": {
+      "name": "Rust",
+      "slug": "rust",
+      "examples": "Rust, Tokio, Axum, Actix ou Tauri"
+    },
+    "core": "\\brust[\\s-]?lang\\b|\\b(dev|desenvolvedor|desenvolvedora|developer|programador|programadora|engenheir[oa]|engineer|software|back[\\s-]?end|full[\\s-]?stack)(\\(a\\)|/a)?(\\s(j[uú]nior|jr|pleno|pl|s[eê]nior|sr|especialista))?(\\s(blockchain|web3|embarcad[oa]s?|embedded|sistemas|systems|back[\\s-]?end|full[\\s-]?stack))?[\\s(/|,:+-]{1,3}([\\w+#.]{1,10}\\s?/\\s?)?rust\\b|\\brust(\\s?/\\s?[\\w+#.]{1,10})?[\\s)/|,:+-]{1,3}(developer|engineer|dev|programmer|software|back[\\s-]?end|full[\\s-]?stack|desenvolvedor|desenvolvedora|engenheir[oa])\\b|\\b(em|in|com|with|linguagem|language)\\s+rust\\b|\\btokio\\b(?![\\s-]*marine)|\\bactix([\\s-]?web)?\\b|\\baxum\\b|\\btauri\\b",
+    "stack": [
+      ["Rust", "\\brust[\\s-]?lang\\b|\\b(dev|desenvolvedor|desenvolvedora|developer|programador|programadora|engenheir[oa]|engineer|software|back[\\s-]?end|full[\\s-]?stack)(\\(a\\)|/a)?(\\s(j[uú]nior|jr|pleno|pl|s[eê]nior|sr|especialista))?(\\s(blockchain|web3|embarcad[oa]s?|embedded|sistemas|systems|back[\\s-]?end|full[\\s-]?stack))?[\\s(/|,:+-]{1,3}([\\w+#.]{1,10}\\s?/\\s?)?rust\\b|\\brust(\\s?/\\s?[\\w+#.]{1,10})?[\\s)/|,:+-]{1,3}(developer|engineer|dev|programmer|software|back[\\s-]?end|full[\\s-]?stack|desenvolvedor|desenvolvedora|engenheir[oa])\\b|\\b(em|in|com|with|linguagem|language)\\s+rust\\b"],
+      ["Tokio", "\\btokio\\b(?![\\s-]*marine)"],
+      ["Actix", "\\bactix([\\s-]?web)?\\b"],
+      ["Axum", "\\baxum\\b"],
+      ["Rocket", "\\brocket[\\s.-]?rs\\b|\\brocket\\W{1,3}framework\\b|\\b(axum|actix([\\s-]?web)?|tokio)\\W{1,3}((e|ou|and|or)\\s)?rocket\\b|\\brocket\\W{1,3}((e|ou|and|or)\\s)?(axum|actix|tokio)\\b"],
+      ["Tauri", "\\btauri\\b"],
+      ["WebAssembly", "\\b(web[\\s-]?assembly|wasm)\\b"],
+      ["Solana", "\\bsolana\\b"]
+    ],
+    "search": {
+      "linkedin": ["rust", "desenvolvedor rust", "rust developer"],
+      "posts": ["vaga rust", "desenvolvedor rust", "pessoa desenvolvedora rust", "oportunidade rust", "rust developer"],
+      "gupy": ["rust", "desenvolvedor rust"],
+      "solides": ["rust", "desenvolvedor rust"],
+      "catho": ["rust", "desenvolvedor rust"],
+      "remotar": ["rust", "desenvolvedor rust"],
+      "programathor": ["jobs-rust"],
+      "nerdin": ["rust", "desenvolvedor rust"],
+      "upvagas": ["rust", "desenvolvedor rust"],
+      "github": ["rustdevbr/vagas", "backend-br/vagas"]
+    },
+    "self_author": {
+      "names": ["^wouerner\\b"],
+      "urls": ["linkedin\\.com/in/wouerner/?$"]
+    }
   }
 }

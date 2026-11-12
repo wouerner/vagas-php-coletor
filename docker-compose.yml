@@ -1,6 +1,6 @@
 # Monorepo: coletor em Python (collector/, serviço vagas-php; collector-ruby,
-# collector-lua, collector-java, collector-python, collector-nodejs, collector-dotnet, collector-go, collector-frontend e collector-mobile para os
-# tenants ruby, lua, java, python, nodejs, dotnet, go, frontend e mobile)
+# collector-lua, collector-java, collector-python, collector-nodejs, collector-dotnet, collector-go, collector-frontend, collector-mobile e collector-rust para os
+# tenants ruby, lua, java, python, nodejs, dotnet, go, frontend, mobile e rust)
 # e site em PHP (web/,
 # serviço web). Conversam só pelo MySQL, uma base multi-tenant (docs/contrato-base.md).
 # Portas publicadas (todas mudam por variável; veja o README):
@@ -257,6 +257,28 @@ services:
       - ./data/frontend:/app/data      # config do agendador deste tenant
 
   # Site (PHP 8.5 + Apache): lê o MySQL do coletor (só o tenant php); só grava os cliques.
+  # Coletor do tenant rust: igual ao collector-ruby, com VAGAS_TENANT=rust. Os termos de
+  # busca do Rust vêm da base (collector_config).
+  collector-rust:
+    build: ./collector
+    image: vagas-php-collector
+    command: ["serve"]
+    restart: unless-stopped
+    depends_on:
+      mysql: {condition: service_healthy}
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      TZ: America/Sao_Paulo
+      VAGAS_TENANT: rust
+      VAGAS_MCP_ENABLED: "false"
+      VAGAS_POSTS_ENABLED: "false"
+      VAGAS_LINKEDIN_DAILY_POST: "false"
+      VAGAS_INDEXING_ENABLED: "false"
+      VAGAS_MAX_AGE_HOURS: "${VAGAS_MAX_AGE_HOURS:-72}"
+      DATABASE_URL: "mysql://vagas:${MYSQL_PASSWORD:-vagas}@mysql:3306/vagas"
+    volumes:
+      - ./data/rust:/app/data      # config do agendador deste tenant
+
   web:
     build: ./web
     image: vagas-php-web

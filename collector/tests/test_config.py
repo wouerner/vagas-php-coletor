@@ -398,6 +398,48 @@ def test_frontend_tenant_defaults():
     assert not classify.is_relevant_job("Desenvolvedor Front-end React")
 
 
+def test_rust_tenant_defaults():
+    try:
+        config.load({}, "rust")
+        assert config.tenant == "rust"
+        assert classify.is_relevant_job("Desenvolvedor Rust")
+        assert classify.is_relevant_job("Rust Developer")
+        assert classify.is_relevant_job("Senior Rust Engineer")
+        assert classify.is_relevant_job("Desenvolvedor(a) Rust Sênior")
+        assert classify.is_relevant_job("Desenvolvedor Sênior Rust")
+        assert classify.is_relevant_job("Engenheiro de Software Rust")
+        assert classify.is_relevant_job("Software Engineer - Rust")
+        assert classify.is_relevant_job("Pessoa Desenvolvedora Back-end | Rust")
+        assert classify.is_relevant_job("Desenvolvedor Blockchain Rust")
+        assert classify.is_relevant_job("Desenvolvedor C++/Rust")
+        assert classify.is_relevant_job("Rust/Go Developer")
+        assert classify.is_relevant_job("Backend Engineer (Rust)")
+        # Título vindo do endereço da vaga (Programathor, Nerdin...): minúsculas, sem pontuação.
+        assert classify.is_relevant_job("desenvolvedor rust pleno")
+        assert classify.is_relevant_job("Backend Engineer", "Serviços em Rust com Tokio e Axum.")
+        assert classify.is_relevant_job("Desktop Developer", "Apps com Tauri. Experience with Rust.")
+        # "rust" é ferrugem em inglês, e Tokio Marine é seguradora.
+        assert not classify.is_relevant_job("Rust Prevention Technician")
+        assert not classify.is_relevant_job("Engenheiro de Corrosão")
+        assert not classify.is_relevant_job("Desenvolvedor Java - Tokio Marine")
+        assert not classify.is_relevant_job(
+            "Software Engineer", "Tokio Marine Seguradora. Stack Java e Kotlin, sem rust no código.")
+        assert not classify.is_relevant_job("Desenvolvedor Go")
+        assert not classify.is_relevant_job("Desenvolvedor C++")
+        assert not classify.is_relevant_job("Desenvolvedor PHP Laravel")
+        assert (classify.details("Dev Rust", "Tokio, Axum, Actix-web e Rocket; WebAssembly e Solana")["stack"]
+                == "Rust,Tokio,Actix,Axum,Rocket,WebAssembly,Solana")
+        assert classify.details("Analista", "Tokio Marine, rocket science")["stack"] is None
+        assert config.search("programathor", "VAGAS_PROGRAMATHOR_PAGES") == ["jobs-rust"]
+        assert config.search("gupy", "VAGAS_GUPY_TERMS") == ["rust", "desenvolvedor rust"]
+        assert config.search("github", "VAGAS_GITHUB_REPOS") == ["rustdevbr/vagas", "backend-br/vagas"]
+        rules = {r["id"]: r for r in classify.RULES}
+        assert rules["lang_title"]["title"].startswith("Rust")
+    finally:
+        config.load({}, "php")
+    assert config.tenant == "php"
+
+
 def test_exclude_refuses_by_title_before_the_language_rules():
     try:
         config.load({}, "frontend")

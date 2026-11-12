@@ -8,7 +8,7 @@ namespace VagasPhp;
  * Identidade pública do site por tenant (VAGAS_TENANT, padrão "php"; o mesmo de Repo):
  * nome, linguagem, frameworks citados nos textos, ícone, canais (Telegram/Instagram),
  * caminho da página de mercado e as stacks do filtro da home. O mesmo código serve o
- * Vagas PHP, o Vagas Ruby, o Vagas Lua, o Vagas Java, o Vagas Python, o Vagas Node.js, o Vagas .NET, o Vagas Go, o Vagas Front-end e o Vagas Mobile; só muda o deploy (VAGAS_TENANT)
+ * Vagas PHP, o Vagas Ruby, o Vagas Lua, o Vagas Java, o Vagas Python, o Vagas Node.js, o Vagas .NET, o Vagas Go, o Vagas Front-end, o Vagas Mobile e o Vagas Rust; só muda o deploy (VAGAS_TENANT)
  * e o domínio.
  *
  * Os templates marcam os textos de marca com {{brand:chave}} (fill() troca); o PHP usa
@@ -77,6 +77,13 @@ final class Brand
         . "<rect width='100' height='100' rx='18' fill='%23B51F7A'/>"
         . "<path d='M36 30 16 50l20 20M64 30l20 20-20 20M56 24 44 76' fill='none' stroke='white' "
         . "stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/></svg>";
+
+    // Rust: quadrado grafite com "Rs" (forma genérica; sem a engrenagem nem o caranguejo
+    // Ferris, que são marcas do projeto).
+    private const ICON_RUST = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+        . "<rect width='100' height='100' rx='18' fill='%2346596F'/>"
+        . "<text x='50' y='66' font-size='44' font-family='Arial' font-weight='bold' text-anchor='middle' "
+        . "fill='white'>Rs</text></svg>";
 
     /**
      * Cores do Ruby: troca, nos templates, cada cor da paleta do PHP (roxo, com neutros
@@ -193,6 +200,20 @@ final class Brand
         // escuro
         '#a3a7e6' => '#ff8fd0', '#2a2b45' => '#4a1d3a', '#13131b' => '#1b1318', '#1c1c27' => '#271b23',
         '#2d2d3c' => '#3c2c36', '#262634' => '#34252e', '#e8e8f0' => '#f0e7ec', '#a0a2b4' => '#b4a0ac',
+    ];
+
+    /**
+     * Cores do Rust: o mesmo esquema do Ruby, com grafite azulado no lugar do roxo do PHP (o
+     * logotipo do Rust é preto; os tons de ferrugem ficariam iguais ao laranja do Java e ao
+     * vermelho do Ruby); no tema escuro entra um azul-acinzentado claro.
+     */
+    private const PALETTE_RUST = [
+        // claro
+        '#5b5fa0' => '#46596f', '#ebecf7' => '#e7ecf2', '#f6f6fa' => '#f5f7f9', '#f0f0f5' => '#eef1f4',
+        '#e3e3ec' => '#e0e5ea', '#1d1d2b' => '#1a2029', '#5d6070' => '#5a6370',
+        // escuro
+        '#a3a7e6' => '#a3bddb', '#2a2b45' => '#1f2a38', '#13131b' => '#12151a', '#1c1c27' => '#1a1f26',
+        '#2d2d3c' => '#2a313b', '#262634' => '#232a33', '#e8e8f0' => '#e6eaf0', '#a0a2b4' => '#9ea8b5',
     ];
 
     private const GITHUB = 'https://github.com/wouerner/vagas-php-coletor';
@@ -435,6 +456,28 @@ final class Brand
             'stack_seniority' => ['React' => ['Júnior', 'Pleno', 'Sênior'], 'Vue.js' => ['Júnior', 'Pleno', 'Sênior'],
                 'Angular' => ['Júnior', 'Pleno', 'Sênior']],
             'palette' => self::PALETTE_FRONTEND,
+        ],
+        'rust' => [
+            'lang' => 'Rust',
+            'lang_lower' => 'rust',
+            'name' => 'Vagas Rust',
+            'frameworks' => 'Tokio e Axum',
+            'frameworks_list' => 'Tokio, Axum, Actix',
+            'frameworks_etc' => 'Tokio, Axum, Actix, Tauri, WebAssembly...',
+            'icon' => self::ICON_RUST,
+            'telegram' => null,
+            'instagram' => null,
+            'github' => self::GITHUB,
+            'mercado_path' => '/mercado-rust',
+            'og_image' => null,
+            'og_alt' => null,
+            'stack_example' => 'tokio',
+            'stacks_keyword' => 'WebAssembly',
+            // As stacks do coletor (collector/vagas/config_defaults.json, tenant rust), sem a linguagem.
+            'stacks' => ['Tokio', 'Actix', 'Axum', 'Rocket', 'Tauri', 'WebAssembly', 'Solana'],
+            'stack_workplace' => ['Tokio' => ['Remoto', 'Híbrido', 'Presencial']],
+            'stack_seniority' => ['Tokio' => ['Júnior', 'Pleno', 'Sênior']],
+            'palette' => self::PALETTE_RUST,
         ],
     ];
 

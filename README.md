@@ -108,7 +108,7 @@ prioridade sobre a base.
 
 ### Várias linguagens (multi-tenant)
 
-A base é multi-tenant: cada linguagem é um tenant (`php`, `ruby`, `lua`, `java`, `python`, `nodejs`, `dotnet`, `go`, `frontend`, `mobile`), com as próprias vagas,
+A base é multi-tenant: cada linguagem é um tenant (`php`, `ruby`, `lua`, `java`, `python`, `nodejs`, `dotnet`, `go`, `frontend`, `mobile`, `rust`), com as próprias vagas,
 coletas e configuração na mesma base. Cada coletor grava um tenant só (`VAGAS_TENANT`,
 padrão `php`), e cada site mostra só o seu (`VAGAS_TENANT` do site). O serviço
 `collector-ruby` do compose coleta vagas de Ruby (Ruby on Rails, Sinatra, Hanami) nas
@@ -118,9 +118,9 @@ Hibernate); o `collector-python`, de Python (Django, Flask, FastAPI); o
 `collector-nodejs`, de Node.js (Express, NestJS, Fastify, AdonisJS, Koa); o
 `collector-dotnet`, de .NET (C#, ASP.NET, Blazor, Entity Framework); o
 `collector-go`, de Go (Golang, Gin, Echo, Fiber, gRPC); o `collector-frontend`, de
-front-end (React, Vue.js, Angular, Next.js, sem vagas full stack); e o
+front-end (React, Vue.js, Angular, Next.js, sem vagas full stack); o
 `collector-mobile`, de desenvolvimento mobile (Android e iOS: Kotlin, Swift, Flutter,
-React Native):
+React Native); e o `collector-rust`, de Rust (Tokio, Axum, Actix, Tauri):
 
 ```bash
 docker compose up -d collector-ruby                    # coleta agendada do Ruby
@@ -132,14 +132,14 @@ docker compose run --rm collector-ruby config search   # termos de busca do Ruby
 As variáveis de termos de busca do `.env` (`VAGAS_GUPY_TERMS`...) valem só para o tenant
 `php`: os outros usam só a configuração da base.
 
-Os sites (Vagas PHP, Vagas Ruby, Vagas Lua, Vagas Java, Vagas Python, Vagas Node.js, Vagas .NET, Vagas Go, Vagas Front-end, Vagas Mobile) são o mesmo código do `web/` e, em produção,
+Os sites (Vagas PHP, Vagas Ruby, Vagas Lua, Vagas Java, Vagas Python, Vagas Node.js, Vagas .NET, Vagas Go, Vagas Front-end, Vagas Mobile, Vagas Rust) são o mesmo código do `web/` e, em produção,
 **um container só**: o domínio da requisição escolhe o tenant (`VAGAS_SITES`, em
 `web/src/Sites.php`), e nome, ícone, cores, textos e filtro de stack vêm de
 `web/src/Brand.php`. No Coolify, o serviço `web` do compose principal tem os domínios de
 todos os sites:
 
 ```
-VAGAS_SITES=vagasphp.wouerner.dev=php,vagasruby.wouerner.dev=ruby,vagaslua.wouerner.dev=lua,vagasjava.wouerner.dev=java,vagaspython.wouerner.dev=python,vagasnodejs.wouerner.dev=nodejs,vagasdotnet.wouerner.dev=dotnet,vagasgo.wouerner.dev=go,vagasfrontend.wouerner.dev=frontend,vagasmobile.wouerner.dev=mobile
+VAGAS_SITES=vagasphp.wouerner.dev=php,vagasruby.wouerner.dev=ruby,vagaslua.wouerner.dev=lua,vagasjava.wouerner.dev=java,vagaspython.wouerner.dev=python,vagasnodejs.wouerner.dev=nodejs,vagasdotnet.wouerner.dev=dotnet,vagasgo.wouerner.dev=go,vagasfrontend.wouerner.dev=frontend,vagasmobile.wouerner.dev=mobile,vagasrust.wouerner.dev=rust
 ```
 
 O primeiro é o padrão (Host desconhecido, como o healthcheck). `VAGAS_GA_ID` e
@@ -174,7 +174,7 @@ Na ordem prevista. Cada uma é um tenant novo, só de coleta, como o Ruby:
 | Front-end | `frontend` | Front-end, React, Vue.js, Angular, Next.js, Nuxt, Svelte | feito (site e coleta); é uma área, não uma linguagem, e só de front-end: título com full stack, back-end, linguagem de back-end ("Java/Angular") ou mobile fica de fora pelo item `exclude` da configuração, mesmo citando React (inclusive "Front-end ou Full Stack"). React Native é do tenant `mobile` e não conta como React. "react", "vue" e "angular" são palavras comuns ("react to", "point de vue", "momento angular"): sozinhas só contam com maiúscula de nome próprio ou coladas a um cargo; "next" só como Next.js. JavaScript e TypeScript sozinhos não entram |
 | Node.js | `nodejs` | Node.js, Express, NestJS, Fastify, AdonisJS | feito (site e coleta); "JavaScript" e React sozinhos não entram, e "node" só conta ao lado de um cargo de desenvolvimento (nó de Kubernetes fica de fora) |
 | Go | `go` | Go, Golang, Gin, Echo, Fiber, GORM, gRPC | feito (site e coleta); "go" é palavra comum em inglês: as buscas usam "golang", e "go" sozinho só conta colado a um cargo de desenvolvimento ("Desenvolvedor Go", "Go Developer") ou em "em Go"; "go-to-market", "go live" e "GO" de Goiás depois de travessão ficam de fora, e Gin, Echo e Fiber só contam qualificados ("gin-gonic", "Echo framework") |
-| Rust | `rust` | Rust, Tokio, Actix, Axum | poucas vagas no Brasil: conferir se as fontes rendem |
+| Rust | `rust` | Rust, Tokio, Actix, Axum, Tauri | feito (site e coleta); "rust" é ferrugem em inglês: sozinho só conta colado a um cargo de desenvolvimento ("Desenvolvedor Rust", "Rust Developer", "Desenvolvedor C++/Rust") ou em "em/com/in/with Rust"; Tokio só conta fora de "Tokio Marine" (seguradora). Poucas vagas no Brasil |
 
 ## Serviço (Docker)
 
