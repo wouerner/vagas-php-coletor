@@ -89,225 +89,228 @@ services:
       - vagas-data:/app/data
       - linkedin-session:/app/.session
 
-  # Coletor do tenant ruby (multi-tenant: mesma base, VAGAS_TENANT=ruby). Só coleta: sem
-  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
-  # variáveis listadas aqui: os termos de busca do Ruby vêm da base (collector_config),
-  # nunca dos VAGAS_*_TERMS do PHP.
-  collector-ruby:
-    build: ./collector
-    command: ["serve"]
-    restart: unless-stopped
-    user: pwuser
-    environment:
-      TZ: America/Sao_Paulo
-      VAGAS_TENANT: ruby
-      VAGAS_MCP_ENABLED: "false"
-      VAGAS_POSTS_ENABLED: "false"
-      VAGAS_LINKEDIN_DAILY_POST: "false"
-      VAGAS_INDEXING_ENABLED: "false"
-      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
-      DATABASE_URL: ${DATABASE_URL:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN-}
-    volumes:
-      - ruby-data:/app/data
+  # Coletores dos outros tenants DESLIGADOS (2026-11-13): o servidor de 2 GB não deu conta
+  # (sites fora do ar por falta de CPU/memória). Para religar, tire o "#" do começo das
+  # linhas abaixo até o serviço web. Os volumes ficam declarados: os dados não se perdem.
+#  # Coletor do tenant ruby (multi-tenant: mesma base, VAGAS_TENANT=ruby). Só coleta: sem
+#  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+#  # variáveis listadas aqui: os termos de busca do Ruby vêm da base (collector_config),
+#  # nunca dos VAGAS_*_TERMS do PHP.
+#  collector-ruby:
+#    build: ./collector
+#    command: ["serve"]
+#    restart: unless-stopped
+#    user: pwuser
+#    environment:
+#      TZ: America/Sao_Paulo
+#      VAGAS_TENANT: ruby
+#      VAGAS_MCP_ENABLED: "false"
+#      VAGAS_POSTS_ENABLED: "false"
+#      VAGAS_LINKEDIN_DAILY_POST: "false"
+#      VAGAS_INDEXING_ENABLED: "false"
+#      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+#      DATABASE_URL: ${DATABASE_URL:-}
+#      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+#    volumes:
+#      - ruby-data:/app/data
 
-  # Coletor do tenant lua (multi-tenant: mesma base, VAGAS_TENANT=lua). Só coleta: sem
-  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
-  # variáveis listadas aqui: os termos de busca do Lua vêm da base (collector_config),
-  # nunca dos VAGAS_*_TERMS do PHP.
-  collector-lua:
-    build: ./collector
-    command: ["serve"]
-    restart: unless-stopped
-    user: pwuser
-    environment:
-      TZ: America/Sao_Paulo
-      VAGAS_TENANT: lua
-      VAGAS_MCP_ENABLED: "false"
-      VAGAS_POSTS_ENABLED: "false"
-      VAGAS_LINKEDIN_DAILY_POST: "false"
-      VAGAS_INDEXING_ENABLED: "false"
-      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
-      DATABASE_URL: ${DATABASE_URL:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN-}
-    volumes:
-      - lua-data:/app/data
+#  # Coletor do tenant lua (multi-tenant: mesma base, VAGAS_TENANT=lua). Só coleta: sem
+#  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+#  # variáveis listadas aqui: os termos de busca do Lua vêm da base (collector_config),
+#  # nunca dos VAGAS_*_TERMS do PHP.
+#  collector-lua:
+#    build: ./collector
+#    command: ["serve"]
+#    restart: unless-stopped
+#    user: pwuser
+#    environment:
+#      TZ: America/Sao_Paulo
+#      VAGAS_TENANT: lua
+#      VAGAS_MCP_ENABLED: "false"
+#      VAGAS_POSTS_ENABLED: "false"
+#      VAGAS_LINKEDIN_DAILY_POST: "false"
+#      VAGAS_INDEXING_ENABLED: "false"
+#      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+#      DATABASE_URL: ${DATABASE_URL:-}
+#      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+#    volumes:
+#      - lua-data:/app/data
 
-  # Coletor do tenant java (multi-tenant: mesma base, VAGAS_TENANT=java). Só coleta: sem
-  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
-  # variáveis listadas aqui: os termos de busca do Java vêm da base (collector_config),
-  # nunca dos VAGAS_*_TERMS do PHP.
-  collector-java:
-    build: ./collector
-    command: ["serve"]
-    restart: unless-stopped
-    user: pwuser
-    environment:
-      TZ: America/Sao_Paulo
-      VAGAS_TENANT: java
-      VAGAS_MCP_ENABLED: "false"
-      VAGAS_POSTS_ENABLED: "false"
-      VAGAS_LINKEDIN_DAILY_POST: "false"
-      VAGAS_INDEXING_ENABLED: "false"
-      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
-      DATABASE_URL: ${DATABASE_URL:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN-}
-    volumes:
-      - java-data:/app/data
+#  # Coletor do tenant java (multi-tenant: mesma base, VAGAS_TENANT=java). Só coleta: sem
+#  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+#  # variáveis listadas aqui: os termos de busca do Java vêm da base (collector_config),
+#  # nunca dos VAGAS_*_TERMS do PHP.
+#  collector-java:
+#    build: ./collector
+#    command: ["serve"]
+#    restart: unless-stopped
+#    user: pwuser
+#    environment:
+#      TZ: America/Sao_Paulo
+#      VAGAS_TENANT: java
+#      VAGAS_MCP_ENABLED: "false"
+#      VAGAS_POSTS_ENABLED: "false"
+#      VAGAS_LINKEDIN_DAILY_POST: "false"
+#      VAGAS_INDEXING_ENABLED: "false"
+#      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+#      DATABASE_URL: ${DATABASE_URL:-}
+#      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+#    volumes:
+#      - java-data:/app/data
 
-  # Coletor do tenant python (multi-tenant: mesma base, VAGAS_TENANT=python). Só coleta: sem
-  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
-  # variáveis listadas aqui: os termos de busca do Python vêm da base (collector_config),
-  # nunca dos VAGAS_*_TERMS do PHP.
-  collector-python:
-    build: ./collector
-    command: ["serve"]
-    restart: unless-stopped
-    user: pwuser
-    environment:
-      TZ: America/Sao_Paulo
-      VAGAS_TENANT: python
-      VAGAS_MCP_ENABLED: "false"
-      VAGAS_POSTS_ENABLED: "false"
-      VAGAS_LINKEDIN_DAILY_POST: "false"
-      VAGAS_INDEXING_ENABLED: "false"
-      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
-      DATABASE_URL: ${DATABASE_URL:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN-}
-    volumes:
-      - python-data:/app/data
+#  # Coletor do tenant python (multi-tenant: mesma base, VAGAS_TENANT=python). Só coleta: sem
+#  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+#  # variáveis listadas aqui: os termos de busca do Python vêm da base (collector_config),
+#  # nunca dos VAGAS_*_TERMS do PHP.
+#  collector-python:
+#    build: ./collector
+#    command: ["serve"]
+#    restart: unless-stopped
+#    user: pwuser
+#    environment:
+#      TZ: America/Sao_Paulo
+#      VAGAS_TENANT: python
+#      VAGAS_MCP_ENABLED: "false"
+#      VAGAS_POSTS_ENABLED: "false"
+#      VAGAS_LINKEDIN_DAILY_POST: "false"
+#      VAGAS_INDEXING_ENABLED: "false"
+#      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+#      DATABASE_URL: ${DATABASE_URL:-}
+#      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+#    volumes:
+#      - python-data:/app/data
 
-  # Coletor do tenant nodejs (multi-tenant: mesma base, VAGAS_TENANT=nodejs). Só coleta: sem
-  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
-  # variáveis listadas aqui: os termos de busca do Node.js vêm da base (collector_config),
-  # nunca dos VAGAS_*_TERMS do PHP.
-  collector-nodejs:
-    build: ./collector
-    command: ["serve"]
-    restart: unless-stopped
-    user: pwuser
-    environment:
-      TZ: America/Sao_Paulo
-      VAGAS_TENANT: nodejs
-      VAGAS_MCP_ENABLED: "false"
-      VAGAS_POSTS_ENABLED: "false"
-      VAGAS_LINKEDIN_DAILY_POST: "false"
-      VAGAS_INDEXING_ENABLED: "false"
-      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
-      DATABASE_URL: ${DATABASE_URL:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN-}
-    volumes:
-      - nodejs-data:/app/data
+#  # Coletor do tenant nodejs (multi-tenant: mesma base, VAGAS_TENANT=nodejs). Só coleta: sem
+#  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+#  # variáveis listadas aqui: os termos de busca do Node.js vêm da base (collector_config),
+#  # nunca dos VAGAS_*_TERMS do PHP.
+#  collector-nodejs:
+#    build: ./collector
+#    command: ["serve"]
+#    restart: unless-stopped
+#    user: pwuser
+#    environment:
+#      TZ: America/Sao_Paulo
+#      VAGAS_TENANT: nodejs
+#      VAGAS_MCP_ENABLED: "false"
+#      VAGAS_POSTS_ENABLED: "false"
+#      VAGAS_LINKEDIN_DAILY_POST: "false"
+#      VAGAS_INDEXING_ENABLED: "false"
+#      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+#      DATABASE_URL: ${DATABASE_URL:-}
+#      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+#    volumes:
+#      - nodejs-data:/app/data
 
-  # Coletor do tenant dotnet (multi-tenant: mesma base, VAGAS_TENANT=dotnet). Só coleta: sem
-  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
-  # variáveis listadas aqui: os termos de busca do .NET vêm da base (collector_config),
-  # nunca dos VAGAS_*_TERMS do PHP.
-  collector-dotnet:
-    build: ./collector
-    command: ["serve"]
-    restart: unless-stopped
-    user: pwuser
-    environment:
-      TZ: America/Sao_Paulo
-      VAGAS_TENANT: dotnet
-      VAGAS_MCP_ENABLED: "false"
-      VAGAS_POSTS_ENABLED: "false"
-      VAGAS_LINKEDIN_DAILY_POST: "false"
-      VAGAS_INDEXING_ENABLED: "false"
-      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
-      DATABASE_URL: ${DATABASE_URL:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN-}
-    volumes:
-      - dotnet-data:/app/data
+#  # Coletor do tenant dotnet (multi-tenant: mesma base, VAGAS_TENANT=dotnet). Só coleta: sem
+#  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+#  # variáveis listadas aqui: os termos de busca do .NET vêm da base (collector_config),
+#  # nunca dos VAGAS_*_TERMS do PHP.
+#  collector-dotnet:
+#    build: ./collector
+#    command: ["serve"]
+#    restart: unless-stopped
+#    user: pwuser
+#    environment:
+#      TZ: America/Sao_Paulo
+#      VAGAS_TENANT: dotnet
+#      VAGAS_MCP_ENABLED: "false"
+#      VAGAS_POSTS_ENABLED: "false"
+#      VAGAS_LINKEDIN_DAILY_POST: "false"
+#      VAGAS_INDEXING_ENABLED: "false"
+#      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+#      DATABASE_URL: ${DATABASE_URL:-}
+#      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+#    volumes:
+#      - dotnet-data:/app/data
 
-  # Coletor do tenant go (multi-tenant: mesma base, VAGAS_TENANT=go). Só coleta: sem
-  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
-  # variáveis listadas aqui: os termos de busca do Go vêm da base (collector_config),
-  # nunca dos VAGAS_*_TERMS do PHP.
-  collector-go:
-    build: ./collector
-    command: ["serve"]
-    restart: unless-stopped
-    user: pwuser
-    environment:
-      TZ: America/Sao_Paulo
-      VAGAS_TENANT: go
-      VAGAS_MCP_ENABLED: "false"
-      VAGAS_POSTS_ENABLED: "false"
-      VAGAS_LINKEDIN_DAILY_POST: "false"
-      VAGAS_INDEXING_ENABLED: "false"
-      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
-      DATABASE_URL: ${DATABASE_URL:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN-}
-    volumes:
-      - go-data:/app/data
+#  # Coletor do tenant go (multi-tenant: mesma base, VAGAS_TENANT=go). Só coleta: sem
+#  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+#  # variáveis listadas aqui: os termos de busca do Go vêm da base (collector_config),
+#  # nunca dos VAGAS_*_TERMS do PHP.
+#  collector-go:
+#    build: ./collector
+#    command: ["serve"]
+#    restart: unless-stopped
+#    user: pwuser
+#    environment:
+#      TZ: America/Sao_Paulo
+#      VAGAS_TENANT: go
+#      VAGAS_MCP_ENABLED: "false"
+#      VAGAS_POSTS_ENABLED: "false"
+#      VAGAS_LINKEDIN_DAILY_POST: "false"
+#      VAGAS_INDEXING_ENABLED: "false"
+#      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+#      DATABASE_URL: ${DATABASE_URL:-}
+#      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+#    volumes:
+#      - go-data:/app/data
 
-  # Coletor do tenant mobile (multi-tenant: mesma base, VAGAS_TENANT=mobile). Só coleta: sem
-  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
-  # variáveis listadas aqui: os termos de busca do Mobile vêm da base (collector_config),
-  # nunca dos VAGAS_*_TERMS do PHP.
-  collector-mobile:
-    build: ./collector
-    command: ["serve"]
-    restart: unless-stopped
-    user: pwuser
-    environment:
-      TZ: America/Sao_Paulo
-      VAGAS_TENANT: mobile
-      VAGAS_MCP_ENABLED: "false"
-      VAGAS_POSTS_ENABLED: "false"
-      VAGAS_LINKEDIN_DAILY_POST: "false"
-      VAGAS_INDEXING_ENABLED: "false"
-      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
-      DATABASE_URL: ${DATABASE_URL:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN-}
-    volumes:
-      - mobile-data:/app/data
+#  # Coletor do tenant mobile (multi-tenant: mesma base, VAGAS_TENANT=mobile). Só coleta: sem
+#  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+#  # variáveis listadas aqui: os termos de busca do Mobile vêm da base (collector_config),
+#  # nunca dos VAGAS_*_TERMS do PHP.
+#  collector-mobile:
+#    build: ./collector
+#    command: ["serve"]
+#    restart: unless-stopped
+#    user: pwuser
+#    environment:
+#      TZ: America/Sao_Paulo
+#      VAGAS_TENANT: mobile
+#      VAGAS_MCP_ENABLED: "false"
+#      VAGAS_POSTS_ENABLED: "false"
+#      VAGAS_LINKEDIN_DAILY_POST: "false"
+#      VAGAS_INDEXING_ENABLED: "false"
+#      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+#      DATABASE_URL: ${DATABASE_URL:-}
+#      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+#    volumes:
+#      - mobile-data:/app/data
 
-  # Coletor do tenant frontend (multi-tenant: mesma base, VAGAS_TENANT=frontend). Só coleta: sem
-  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
-  # variáveis listadas aqui: os termos de busca do Front-end vêm da base (collector_config),
-  # nunca dos VAGAS_*_TERMS do PHP.
-  collector-frontend:
-    build: ./collector
-    command: ["serve"]
-    restart: unless-stopped
-    user: pwuser
-    environment:
-      TZ: America/Sao_Paulo
-      VAGAS_TENANT: frontend
-      VAGAS_MCP_ENABLED: "false"
-      VAGAS_POSTS_ENABLED: "false"
-      VAGAS_LINKEDIN_DAILY_POST: "false"
-      VAGAS_INDEXING_ENABLED: "false"
-      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
-      DATABASE_URL: ${DATABASE_URL:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN-}
-    volumes:
-      - frontend-data:/app/data
+#  # Coletor do tenant frontend (multi-tenant: mesma base, VAGAS_TENANT=frontend). Só coleta: sem
+#  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+#  # variáveis listadas aqui: os termos de busca do Front-end vêm da base (collector_config),
+#  # nunca dos VAGAS_*_TERMS do PHP.
+#  collector-frontend:
+#    build: ./collector
+#    command: ["serve"]
+#    restart: unless-stopped
+#    user: pwuser
+#    environment:
+#      TZ: America/Sao_Paulo
+#      VAGAS_TENANT: frontend
+#      VAGAS_MCP_ENABLED: "false"
+#      VAGAS_POSTS_ENABLED: "false"
+#      VAGAS_LINKEDIN_DAILY_POST: "false"
+#      VAGAS_INDEXING_ENABLED: "false"
+#      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+#      DATABASE_URL: ${DATABASE_URL:-}
+#      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+#    volumes:
+#      - frontend-data:/app/data
 
-  # Coletor do tenant rust (multi-tenant: mesma base, VAGAS_TENANT=rust). Só coleta: sem
-  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
-  # variáveis listadas aqui: os termos de busca do Rust vêm da base (collector_config),
-  # nunca dos VAGAS_*_TERMS do PHP.
-  collector-rust:
-    build: ./collector
-    command: ["serve"]
-    restart: unless-stopped
-    user: pwuser
-    environment:
-      TZ: America/Sao_Paulo
-      VAGAS_TENANT: rust
-      VAGAS_MCP_ENABLED: "false"
-      VAGAS_POSTS_ENABLED: "false"
-      VAGAS_LINKEDIN_DAILY_POST: "false"
-      VAGAS_INDEXING_ENABLED: "false"
-      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
-      DATABASE_URL: ${DATABASE_URL:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN-}
-    volumes:
-      - rust-data:/app/data
+#  # Coletor do tenant rust (multi-tenant: mesma base, VAGAS_TENANT=rust). Só coleta: sem
+#  # site, MCP, publicações do LinkedIn, post diário nem Indexing API. Recebe só as
+#  # variáveis listadas aqui: os termos de busca do Rust vêm da base (collector_config),
+#  # nunca dos VAGAS_*_TERMS do PHP.
+#  collector-rust:
+#    build: ./collector
+#    command: ["serve"]
+#    restart: unless-stopped
+#    user: pwuser
+#    environment:
+#      TZ: America/Sao_Paulo
+#      VAGAS_TENANT: rust
+#      VAGAS_MCP_ENABLED: "false"
+#      VAGAS_POSTS_ENABLED: "false"
+#      VAGAS_LINKEDIN_DAILY_POST: "false"
+#      VAGAS_INDEXING_ENABLED: "false"
+#      VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
+#      DATABASE_URL: ${DATABASE_URL:-}
+#      GITHUB_TOKEN: ${GITHUB_TOKEN-}
+#    volumes:
+#      - rust-data:/app/data
 
   web:
     build: ./web
