@@ -34,4 +34,66 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt -r requirements-dev.txt
-      - run: pytest -q
+      - run: python -m pytest -q   # "python -m" põe collector/ no path (import vagas)
+
+  # Imagens de produção, montadas aqui e não no servidor do Coolify (2 GB de RAM: o build
+  # no servidor disputava memória com os sites). Só na main e só com os testes verdes.
+  # O repositório é público, então as imagens também são: nada de segredo no build (sem
+  # build-args nem secrets; as credenciais chegam ao container só na execução, pelo
+  # Coolify). O checkout limpo não tem .env, data/ nem .session/.
+  images:
+    name: Imagens (GHCR)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [web, collector]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: vagas-php-web
+            context: web
+          - name: vagas-php-collector
+            context: collector
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:main
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  # Deploy no Coolify depois das imagens publicadas. Só roda se os secrets COOLIFY_URL
+  # (ex.: https://coolify.exemplo.com) e COOLIFY_TOKEN existirem no repositório; sem
+  # eles o deploy continua manual (painel ou API).
+  deploy:
+    name: Deploy (Coolify)
+    needs: images
+    runs-on: ubuntu-latest
+    env:
+      COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+      COOLIFY_APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
+    steps:
+      - name: Disparar deploy
+        run: |
+          if [ -z "$COOLIFY_URL" ] || [ -z "$COOLIFY_TOKEN" ] || [ -z "$COOLIFY_APP_UUID" ]; then
+            echo "COOLIFY_URL/COOLIFY_TOKEN/COOLIFY_APP_UUID não configurados: deploy manual."
+            exit 0
+          fi
+          curl -fsS -X POST -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_URL/api/v1/deploy?uuid=$COOLIFY_APP_UUID&force=false"

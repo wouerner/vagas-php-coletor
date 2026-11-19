@@ -15,7 +15,8 @@
 # subiria outro coletor PHP.
 services:
   vagas-php:
-    build: ./collector
+    image: ghcr.io/wouerner/vagas-php-collector:main   # montada no GitHub Actions (ci.yml)
+    pull_policy: always
     command: ["serve"]
     restart: unless-stopped
     user: pwuser
@@ -97,7 +98,8 @@ services:
 #  # variáveis listadas aqui: os termos de busca do Ruby vêm da base (collector_config),
 #  # nunca dos VAGAS_*_TERMS do PHP.
 #  collector-ruby:
-#    build: ./collector
+#    image: ghcr.io/wouerner/vagas-php-collector:main
+#    pull_policy: always
 #    command: ["serve"]
 #    restart: unless-stopped
 #    user: pwuser
@@ -119,7 +121,8 @@ services:
 #  # variáveis listadas aqui: os termos de busca do Lua vêm da base (collector_config),
 #  # nunca dos VAGAS_*_TERMS do PHP.
 #  collector-lua:
-#    build: ./collector
+#    image: ghcr.io/wouerner/vagas-php-collector:main
+#    pull_policy: always
 #    command: ["serve"]
 #    restart: unless-stopped
 #    user: pwuser
@@ -141,7 +144,8 @@ services:
 #  # variáveis listadas aqui: os termos de busca do Java vêm da base (collector_config),
 #  # nunca dos VAGAS_*_TERMS do PHP.
 #  collector-java:
-#    build: ./collector
+#    image: ghcr.io/wouerner/vagas-php-collector:main
+#    pull_policy: always
 #    command: ["serve"]
 #    restart: unless-stopped
 #    user: pwuser
@@ -163,7 +167,8 @@ services:
 #  # variáveis listadas aqui: os termos de busca do Python vêm da base (collector_config),
 #  # nunca dos VAGAS_*_TERMS do PHP.
 #  collector-python:
-#    build: ./collector
+#    image: ghcr.io/wouerner/vagas-php-collector:main
+#    pull_policy: always
 #    command: ["serve"]
 #    restart: unless-stopped
 #    user: pwuser
@@ -185,7 +190,8 @@ services:
 #  # variáveis listadas aqui: os termos de busca do Node.js vêm da base (collector_config),
 #  # nunca dos VAGAS_*_TERMS do PHP.
 #  collector-nodejs:
-#    build: ./collector
+#    image: ghcr.io/wouerner/vagas-php-collector:main
+#    pull_policy: always
 #    command: ["serve"]
 #    restart: unless-stopped
 #    user: pwuser
@@ -207,7 +213,8 @@ services:
 #  # variáveis listadas aqui: os termos de busca do .NET vêm da base (collector_config),
 #  # nunca dos VAGAS_*_TERMS do PHP.
 #  collector-dotnet:
-#    build: ./collector
+#    image: ghcr.io/wouerner/vagas-php-collector:main
+#    pull_policy: always
 #    command: ["serve"]
 #    restart: unless-stopped
 #    user: pwuser
@@ -229,7 +236,8 @@ services:
 #  # variáveis listadas aqui: os termos de busca do Go vêm da base (collector_config),
 #  # nunca dos VAGAS_*_TERMS do PHP.
 #  collector-go:
-#    build: ./collector
+#    image: ghcr.io/wouerner/vagas-php-collector:main
+#    pull_policy: always
 #    command: ["serve"]
 #    restart: unless-stopped
 #    user: pwuser
@@ -251,7 +259,8 @@ services:
 #  # variáveis listadas aqui: os termos de busca do Mobile vêm da base (collector_config),
 #  # nunca dos VAGAS_*_TERMS do PHP.
 #  collector-mobile:
-#    build: ./collector
+#    image: ghcr.io/wouerner/vagas-php-collector:main
+#    pull_policy: always
 #    command: ["serve"]
 #    restart: unless-stopped
 #    user: pwuser
@@ -273,7 +282,8 @@ services:
 #  # variáveis listadas aqui: os termos de busca do Front-end vêm da base (collector_config),
 #  # nunca dos VAGAS_*_TERMS do PHP.
 #  collector-frontend:
-#    build: ./collector
+#    image: ghcr.io/wouerner/vagas-php-collector:main
+#    pull_policy: always
 #    command: ["serve"]
 #    restart: unless-stopped
 #    user: pwuser
@@ -295,7 +305,8 @@ services:
 #  # variáveis listadas aqui: os termos de busca do Rust vêm da base (collector_config),
 #  # nunca dos VAGAS_*_TERMS do PHP.
 #  collector-rust:
-#    build: ./collector
+#    image: ghcr.io/wouerner/vagas-php-collector:main
+#    pull_policy: always
 #    command: ["serve"]
 #    restart: unless-stopped
 #    user: pwuser
@@ -313,7 +324,8 @@ services:
 #      - rust-data:/app/data
 
   web:
-    build: ./web
+    image: ghcr.io/wouerner/vagas-php-web:main   # montada no GitHub Actions (ci.yml)
+    pull_policy: always
     restart: unless-stopped
     environment:
       SERVICE_URL_WEB_8000:          # o Coolify gera/usa o domínio do site

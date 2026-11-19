@@ -1,4 +1,6 @@
 # Site do Vagas PHP: PHP 8.5 + Apache, porta 8000. Lê o MySQL do coletor (DATABASE_URL).
+# Imagem pública (ghcr.io, montada no GitHub Actions): nada de segredo aqui. Sem ARG/ENV
+# com credencial; senhas e tokens chegam só na execução, pelas variáveis do Coolify.
 FROM composer:2 AS vendor
 WORKDIR /app
 COPY composer.json composer.lock* ./

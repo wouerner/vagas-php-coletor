@@ -18,7 +18,8 @@ visitante ──HTTPS──▶ Cloudflare (proxy) ──HTTPS──▶ Traefik (
 |---|---|
 | Domínio | **https://vagasphp.wouerner.dev** |
 | DNS e HTTPS público | Cloudflare, plano Free |
-| Servidor e deploy | Coolify, build pack Docker Compose (`docker-compose.coolify.yml`) |
+| Servidor e deploy | Coolify, build pack Docker Compose (`docker-compose.coolify.yml`), com imagens prontas do GHCR |
+| Build das imagens | GitHub Actions (`.github/workflows/ci.yml`, job `images`) |
 | Proxy reverso | Traefik do Coolify, com certificado Let's Encrypt |
 | Base de dados | MySQL 8 em outro servidor (`DATABASE_URL`) |
 
@@ -63,8 +64,19 @@ Zona `wouerner.dev`, com os nameservers da Cloudflare.
   `https://vagasphp.wouerner.dev/dashboard`. O token do origin trial do WebMCP (expira em
   30/03/2027; renove em https://developer.chrome.com/origintrials) vai em
   `VAGAS_ORIGIN_TRIAL`, no serviço `web`.
-- **O deploy não é automático:** um push na `main` não publica nada. Faça o deploy pelo
-  painel do Coolify (ou pela API). Quando o serviço sobe, ele reaplica os filtros às vagas
+- **Imagens prontas, sem build no servidor:** o job `images` do `ci.yml` monta
+  `ghcr.io/wouerner/vagas-php-web` e `ghcr.io/wouerner/vagas-php-collector` a cada push
+  verde na `main` (tags `:main` e `:<sha do commit>`). O Coolify só baixa (`pull_policy:
+  always`): o servidor tem 2 GB e o build lá derrubava os sites. As imagens são públicas,
+  como o repositório: nada de segredo no Dockerfile nem no build. Na primeira publicação o
+  GHCR cria o pacote como privado; em *Package settings* de cada um, mude para **Public**
+  (uma vez só), senão o Coolify não consegue baixar.
+- **Rollback:** troque `:main` por `:<sha>` de um commit anterior no compose (ou use
+  *Rollback* do Coolify) e faça o deploy.
+- **Deploy:** depois das imagens, o job `deploy` chama a API do Coolify se o repositório
+  tiver os secrets `COOLIFY_URL` e `COOLIFY_TOKEN` e a variável `COOLIFY_APP_UUID` (o app
+  `vagas-php`). Sem eles, o deploy é manual, pelo painel ou pela API, depois do job
+  `images` terminar. Quando o serviço sobe, ele reaplica os filtros às vagas
   e aos posts já salvos e regrava o que o site precisa do filtro (`site_meta`), então uma
   mudança de regra em `collector/vagas/classify.py` vale para a base inteira e para o site.
 

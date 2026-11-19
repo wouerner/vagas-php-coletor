@@ -1,3 +1,5 @@
+# Imagem pública (ghcr.io, montada no GitHub Actions): nada de segredo aqui. Sem ARG/ENV
+# com credencial; senhas e tokens chegam só na execução, pelas variáveis do Coolify.
 FROM mcr.microsoft.com/playwright/python:v1.63.0-noble
 
 RUN apt-get update \

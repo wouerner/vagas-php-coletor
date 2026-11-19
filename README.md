@@ -398,7 +398,9 @@ Use `docker-compose.coolify.yml`:
 
 1. Use este repositório (ou um fork). O `.gitignore` já tira `.env`, `.session/` e `data/`.
 2. No Coolify: *New Resource → Public Repository* (ou *Private Repository*, num fork privado), build pack **Docker Compose**,
-   *Docker Compose Location* `/docker-compose.coolify.yml`.
+   *Docker Compose Location* `/docker-compose.coolify.yml`. O compose usa as imagens que o
+   GitHub Actions publica no GHCR (`ghcr.io/wouerner/vagas-php-*`), sem build no servidor;
+   num fork, troque o dono no `image:` e deixe os pacotes públicos (veja `docs/deploy.md`).
 3. Crie no MySQL 8 do outro servidor a base e um usuário com permissão total nela
    (`CREATE DATABASE vagas CHARACTER SET utf8mb4; CREATE USER 'vagas'@'%' IDENTIFIED BY '...';
    GRANT ALL ON vagas.* TO 'vagas'@'%';`) e libere a porta 3306 para o servidor do Coolify.
