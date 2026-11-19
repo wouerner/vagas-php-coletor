@@ -12,7 +12,7 @@ namespace VagasPhp;
  * A base é multi-tenant (uma linguagem por tenant): o site lê só o seu (VAGAS_TENANT,
  * padrão "php") em jobs, runs e site_meta. Toda consulta nessas tabelas filtra o tenant.
  */
-final class Repo
+class Repo
 {
     /** Fontes, na ordem do coletor (store.SOURCES); site_meta "taxonomy" pode trazer outras. */
     public const SOURCES = ['linkedin', 'gupy', 'post', 'github', 'remotar', 'programathor', 'catho',
@@ -62,6 +62,24 @@ final class Repo
             $this->meta[$name] = $v === null ? null : json_decode((string) $v, true);
         }
         return $this->meta[$name];
+    }
+
+    /** Grava um item de site_meta do tenant e atualiza o cache local. */
+    public function setMeta(string $name, mixed $value): void
+    {
+        $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+        if ($json === false) {
+            throw new \RuntimeException('site_meta inválido');
+        }
+        try {
+            $this->db->query('REPLACE INTO site_meta (tenant, name, value, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
+                [$this->tenant, $name, $json]);
+        } catch (\PDOException $e) {
+            if (!Db::isMissingTable($e)) {
+                throw $e;
+            }
+        }
+        $this->meta[$name] = $value;
     }
 
     /** @return list<string> */

@@ -10,13 +10,15 @@
   :root {
     --bg: #f6f6fa; --surface: #ffffff; --text: #1d1d2b; --muted: #5d6070;
     --line: #e3e3ec; --accent: #5b5fa0; --accent-soft: #ebecf7; --chip: #f0f0f5;
-    --warn: #7a4b00; --warn-soft: #fff4dc;
+    --warn: #7a4b00; --warn-soft: #fff4dc; --ok: #1f7a4d; --ok-soft: #e3f4ea;
+    --vote-true: #1f7a4d; --vote-fake: #d14b4b; --vote-track: #ececf4;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #13131b; --surface: #1c1c27; --text: #e8e8f0; --muted: #a0a2b4;
       --line: #2d2d3c; --accent: #a3a7e6; --accent-soft: #2a2b45; --chip: #262634;
-      --warn: #f3c46b; --warn-soft: #3a2f17;
+      --warn: #f3c46b; --warn-soft: #3a2f17; --ok: #7fd3a6; --ok-soft: #173326;
+      --vote-true: #7fd3a6; --vote-fake: #f08080; --vote-track: #2a2a36;
     }
   }
   * { box-sizing: border-box; }
@@ -51,6 +53,23 @@
   .button { display: inline-block; padding: 10px 18px; border-radius: 10px; background: var(--accent); color: var(--surface);
             font-weight: 600; text-decoration: none; }
   .button:hover { filter: brightness(1.08); }
+  .vote { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+  .vote-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .vote h2 { margin: 0; font-size: 16px; }
+  .vote-meta { margin: 0; color: var(--muted); font-size: 13px; }
+  .vote-bar { margin-top: 10px; display: flex; height: 12px; overflow: hidden; border-radius: 999px; background: var(--vote-track); }
+  .vote-true, .vote-fake { display: block; min-width: 8px; }
+  .vote-true { background: linear-gradient(90deg, var(--vote-true), color-mix(in srgb, var(--vote-true) 70%, #fff)); }
+  .vote-fake { background: linear-gradient(90deg, color-mix(in srgb, var(--vote-fake) 85%, #fff), var(--vote-fake)); }
+  .vote-form { display: flex; gap: 8px; margin-top: 12px; }
+  .vote-form button { flex: 1; border: 0; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 700; }
+  .vote-form button[value="true"] { background: var(--vote-true); color: #fff; }
+  .vote-form button[value="fake"] { background: var(--vote-fake); color: #fff; }
+  .vote-form button:disabled { opacity: .45; cursor: not-allowed; }
+  .vote-note { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+  .vote-limit { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 13px; }
+  .vote-ok { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: var(--ok-soft); color: var(--ok); font-size: 13px; }
+  .vote-form button:hover:not(:disabled) { filter: brightness(1.05); }
   /* Cliques no anúncio original, ao lado do botão, com a explicação no hover e no foco (toque). */
   .clicks { position: relative; display: inline-block; margin-left: 10px; font-size: 13px; color: var(--muted);
             white-space: nowrap; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }

@@ -425,7 +425,7 @@ final class Vaga
         return $h == (int) $h ? (string) (int) $h : (string) $h;
     }
 
-    public static function jobHtml(array $job, bool $isOpen, array $others, array $trustLevels = []): string
+    public static function jobHtml(array $job, bool $isOpen, array $others, array $trustLevels = [], ?array $vote = null): string
     {
         $e = Text::e(...);
         [$name, $path] = self::topic($job);
@@ -468,6 +468,40 @@ final class Vaga
                 . 'rel="nofollow noopener" target="_blank">Candidatar-se no site original '
                 . '(' . $e($source) . ')</a>'
                 . (isset($job['clicks']) ? ' ' . Site::clicksHtml((int) $job['clicks']) : '') . '</p>';
+        }
+        if ($isOpen) {
+            $vote = $vote ?? ['true' => 0, 'fake' => 0, 'total' => 0, 'session_voted' => false,
+                'today_votes' => 0, 'remaining_today' => 10];
+            $total = max(1, (int) ($vote['total'] ?? 0));
+            $true = (int) ($vote['true'] ?? 0);
+            $fake = (int) ($vote['fake'] ?? 0);
+            $pct = (int) round(($true / $total) * 100);
+            $remaining = (int) ($vote['remaining_today'] ?? 10);
+            $session = !empty($vote['session_voted']);
+            $status = $vote['status'] ?? null;
+            $out[] = '<section class="vote" aria-labelledby="vote-title">'
+                . '<div class="vote-head"><h2 id="vote-title">Termômetro da vaga</h2>'
+                . '<p class="vote-meta">' . $true . ' verdadeiras · ' . $fake . ' fake · restam '
+                . $remaining . ' votos hoje</p></div>'
+                . '<div class="vote-bar" role="img" aria-label="' . $pct . '% verdadeiras e '
+                . (100 - $pct) . '% fake">'
+                . '<span class="vote-true" style="width:' . $pct . '%"></span>'
+                . '<span class="vote-fake" style="width:' . (100 - $pct) . '%"></span>'
+                . '</div>'
+                . '<form class="vote-form" method="post" action="/api/votes">'
+                . '<input type="hidden" name="job" value="' . $e((string) ($job['id'] ?? '')) . '">'
+                . '<button name="vote" value="true"' . ($session || $remaining <= 0 ? ' disabled' : '') . '>Verdadeira</button>'
+                . '<button name="vote" value="fake"' . ($session || $remaining <= 0 ? ' disabled' : '') . '>Fake</button>'
+                . '</form>'
+                . '<p class="vote-note">1 voto por sessão · máximo de 10 por dia</p>';
+            if ($status === 'ok') {
+                $out[] = '<p class="vote-ok">Voto registrado. Obrigado.</p>';
+            } elseif ($status === 'session') {
+                $out[] = '<p class="vote-limit">Você já votou nessa sessão.</p>';
+            } elseif ($status === 'limit') {
+                $out[] = '<p class="vote-limit">Limite diário atingido. Volte amanhã.</p>';
+            }
+            $out[] = '</section>';
         }
         if (trim($job['description'] ?? '') !== '') {
             $out[] = '<h2>Descrição</h2><div class="description">'
@@ -544,8 +578,15 @@ final class Vaga
         if ($open && ($posting = self::jobPosting($job, Seo::siteUrl($request)))) {
             array_unshift($jsonld, $posting);
         }
+        $vote = null;
+        if ($open) {
+            $vote = $this->site->voteSummary($job, $request);
+            if (in_array($request->get('vote'), ['ok', 'session', 'limit'], true)) {
+                $vote['status'] = $request->get('vote');
+            }
+        }
         $html = Seo::render($request, 'vaga.html', self::pageTitle($job, $open), self::summary($job), $path,
-            ['crumbs' => self::crumbsHtml($trail), 'vaga' => self::jobHtml($job, $open, $others, $this->site->trustLevels())], $jsonld, !$open);
+            ['crumbs' => self::crumbsHtml($trail), 'vaga' => self::jobHtml($job, $open, $others, $this->site->trustLevels(), $vote)], $jsonld, !$open);
         return Response::html($html);
     }
 }

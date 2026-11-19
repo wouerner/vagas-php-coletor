@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace VagasPhp\Http;
 
-/** Requisição HTTP: método, caminho, query string, cabeçalhos (nomes em minúsculas) e IP de quem conectou. */
+/** Requisição HTTP: método, caminho, query string, cabeçalhos (nomes em minúsculas), cookies e IP. */
 final class Request
 {
     /**
      * @param array<string, string> $query
      * @param array<string, string> $headers
+     * @param array<string, string> $cookies
      */
     public function __construct(
         public readonly string $method,
@@ -22,7 +23,17 @@ final class Request
         public array $params = [],
         /** REMOTE_ADDR: atrás do proxy é o IP dele (o do visitante vem nos cabeçalhos) */
         public readonly string $ip = '',
+        public array $cookies = [],
+        public readonly string $body = '',
     ) {
+        if ($this->cookies === [] && ($cookie = $this->headers['cookie'] ?? '') !== '') {
+            foreach (explode(';', $cookie) as $pair) {
+                [$name, $value] = array_pad(explode('=', trim($pair), 2), 2, '');
+                if ($name !== '') {
+                    $this->cookies[$name] = urldecode($value);
+                }
+            }
+        }
     }
 
     public static function fromGlobals(): self
@@ -37,6 +48,16 @@ final class Request
         $path = rawurldecode(parse_url($uri, PHP_URL_PATH) ?: '/');
         $https = ($_SERVER['HTTPS'] ?? '') !== '' && ($_SERVER['HTTPS'] ?? '') !== 'off';
         $host = $headers['host'] ?? ($_SERVER['SERVER_NAME'] ?? 'localhost');
+        $cookies = [];
+        if (($cookie = $headers['cookie'] ?? '') !== '') {
+            foreach (explode(';', $cookie) as $pair) {
+                [$name, $value] = array_pad(explode('=', trim($pair), 2), 2, '');
+                if ($name !== '') {
+                    $cookies[$name] = urldecode($value);
+                }
+            }
+        }
+        $body = file_get_contents('php://input') ?: '';
         return new self(
             strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET'),
             $path,
@@ -45,6 +66,8 @@ final class Request
             $https ? 'https' : 'http',
             $host,
             ip: (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
+            cookies: $cookies,
+            body: $body,
         );
     }
 
@@ -80,5 +103,19 @@ final class Request
     public function header(string $name): ?string
     {
         return $this->headers[strtolower($name)] ?? null;
+    }
+
+    /** @return array<string, string> */
+    public function form(): array
+    {
+        if (!str_contains(strtolower((string) $this->header('content-type')), 'application/x-www-form-urlencoded')) {
+            return [];
+        }
+        return self::parseQuery($this->body);
+    }
+
+    public function post(string $name): ?string
+    {
+        return $this->form()[$name] ?? null;
     }
 }

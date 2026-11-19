@@ -316,7 +316,8 @@ def encouragement_save(data_dir: Path, day: date) -> None:
 def send(token: str, chat_id: str, text: str) -> dict:
     """sendMessage do Telegram; devolve o JSON da resposta (também nos erros HTTP)."""
     data = urllib.parse.urlencode({"chat_id": chat_id, "text": text, "parse_mode": "HTML",
-                                   "disable_web_page_preview": "true"}).encode()
+                                   "link_preview_options": json.dumps({"is_disabled": True},
+                                                                      ensure_ascii=False)}).encode()
     req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage",
                                  data=data, headers=HEADERS)
     for retry in (True, False):
@@ -352,7 +353,9 @@ def send_photo(token: str, chat_id: str, image_path: Path, caption: str,
         return {"ok": True, "dry_run": True}
     boundary = uuid.uuid4().hex
     parts = []
-    for name, value in (("chat_id", str(chat_id)), ("caption", caption)):
+    preview_options = json.dumps({"is_disabled": True}, ensure_ascii=False)
+    for name, value in (("chat_id", str(chat_id)), ("caption", caption),
+                        ("link_preview_options", preview_options)):
         parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n'
                      .encode() + value.encode() + b"\r\n")
     parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="photo"; '

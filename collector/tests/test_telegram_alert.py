@@ -225,3 +225,5 @@ def test_batch_gets_footer_at_the_end_once_per_day(alert, monkeypatch):
 def test_footer_is_skipped_when_it_does_not_fit():
     assert telegram_alert.with_encouragement("x" * telegram_alert.MESSAGE_MAX,
                                              T0.date()) is None
+
+

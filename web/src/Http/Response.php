@@ -35,6 +35,12 @@ final class Response
         return new self('', $status, ['Location' => $url] + $headers);
     }
 
+    public static function withCookie(self $response, string $cookie): self
+    {
+        $response->headers['Set-Cookie'] = $cookie;
+        return $response;
+    }
+
     public function send(bool $head = false): void
     {
         http_response_code($this->status);

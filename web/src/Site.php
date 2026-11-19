@@ -98,6 +98,7 @@ final class Site
 
     private ?Themes $themes = null;
     private ?array $openJobs = null;
+    private ?VoteStore $votes = null;
 
     public function __construct(public readonly Repo $repo, private readonly string $assets)
     {
@@ -137,6 +138,8 @@ final class Site
         $r->get('/webmcp.js', fn () => $this->asset('webmcp.js', 'application/javascript'));
         $r->get('/out', $this->out(...));
         $r->get('/api/clicks', $this->clicks(...));
+        $r->get('/api/votes', $this->votes(...));
+        $r->post('/api/votes', $this->vote(...));
         $mercado = new Mercado($this);
         $r->get(Mercado::path(), $mercado->page(...));
         $r->get('/llms.txt', $mercado->llmsTxt(...));
@@ -151,7 +154,14 @@ final class Site
     public function handle(Request $request): Response
     {
         $response = $this->router()->dispatch($request);
-        if (str_starts_with($request->path, '/api/')) {
+        if (($request->method === 'GET' && str_starts_with($request->path, '/vaga/'))
+            || ($request->path === '/api/votes' && $request->method === 'POST')) {
+            $sessionKey = $this->voteSessionKey($request);
+            if (($request->cookies['vagas_vote_session'] ?? '') !== $sessionKey) {
+                $response = Response::withCookie($response, self::voteCookie($request, $sessionKey));
+            }
+        }
+        if (str_starts_with($request->path, '/api/') && !($request->path === '/api/votes' && $request->method === 'POST')) {
             $response->headers += ['X-Robots-Tag' => 'noindex'];
         }
         $response->headers += self::SECURITY_HEADERS;
@@ -193,6 +203,48 @@ final class Site
             'companies' => is_array($levels['companies'] ?? null) ? $levels['companies'] : [],
             'recruiters' => is_array($levels['recruiters'] ?? null) ? $levels['recruiters'] : [],
         ];
+    }
+
+    private function voteJobOr404(string $jobId): ?array
+    {
+        if (!preg_match('/^job-(\d+)$/', $jobId, $m)) {
+            return null;
+        }
+        $job = self::safe(fn () => $this->repo->jobBySeq((int) $m[1]), null);
+        return is_array($job) ? $job : null;
+    }
+
+    private static function voteCookie(Request $request, string $sessionKey): string
+    {
+        $secure = $request->scheme === 'https' ? '; Secure' : '';
+        return 'vagas_vote_session=' . $sessionKey . '; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly' . $secure;
+    }
+
+    public function voteStore(): VoteStore
+    {
+        return $this->votes ??= new VoteStore($this->repo);
+    }
+
+    public function voteSessionKey(Request $request): string
+    {
+        return $this->voteStore()->sessionKey($request);
+    }
+
+    public function voteDailyKey(Request $request): string
+    {
+        return $this->voteStore()->dailyKey($request);
+    }
+
+    public function voteSummary(array $job, Request $request): array
+    {
+        return $this->voteStore()->summary((string) ($job['id'] ?? ('job-' . (int) ($job['seq'] ?? 0))),
+            $this->voteSessionKey($request), $this->voteDailyKey($request));
+    }
+
+    public function voteCast(array $job, bool $truth, Request $request): array
+    {
+        return $this->voteStore()->vote((string) ($job['id'] ?? ('job-' . (int) ($job['seq'] ?? 0))), $truth,
+            $this->voteSessionKey($request), $this->voteDailyKey($request));
     }
 
     public static function number(?string $value, float $default, float $low, float $high): float
@@ -851,6 +903,33 @@ final class Site
             'Fale com quem mantém o ' . Brand::name() . ' pelo LinkedIn para anunciar uma vaga em '
             . 'destaque, corrigir ou remover uma vaga, ou sugerir uma fonte nova.', '/contato',
             jsonld: Seo::breadcrumbs($r, [Brand::name(), '/'], ['Contato', '/contato'])));
+    }
+
+    public function votes(Request $request): Response
+    {
+        $jobId = $request->get('job') ?: '';
+        $job = $this->voteJobOr404($jobId);
+        if ($job === null) {
+            return Response::json(['error' => 'job inválido'], 404);
+        }
+        return Response::json($this->voteSummary($job, $request));
+    }
+
+    public function vote(Request $request): Response
+    {
+        $jobId = $request->post('job') ?: $request->get('job') ?: '';
+        $vote = strtolower(trim((string) ($request->post('vote') ?: $request->get('vote') ?: '')));
+        $job = $this->voteJobOr404($jobId);
+        if ($job === null || !in_array($vote, ['true', 'fake'], true)) {
+            return Response::redirect('/' . ltrim((string) ($job['path'] ?? ''), '/'), 302);
+        }
+        $summary = $this->voteCast($job, $vote === 'true', $request);
+        $cookie = self::voteCookie($request, $this->voteSessionKey($request));
+        $path = Seo::jobPath($job) ?: '/';
+        $status = $summary['status'] === 'ok' ? 'vote=ok'
+            : ($summary['status'] === 'session' ? 'vote=session' : 'vote=limit');
+        $resp = Response::redirect($path . '?' . $status, 303);
+        return Response::withCookie($resp, $cookie);
     }
 
     public function stats(Request $r): Response
