@@ -50,6 +50,7 @@ jobs:
       contents: read
       packages: write
     strategy:
+      fail-fast: false   # uma imagem quebrada não cancela a outra
       matrix:
         include:
           - name: vagas-php-web

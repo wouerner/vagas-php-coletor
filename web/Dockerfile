@@ -4,14 +4,17 @@
 FROM composer:2 AS vendor
 WORKDIR /app
 COPY composer.json composer.lock* ./
+# Este estágio só baixa o vendor/: as extensões que importam são as da imagem final
+# (conferidas lá embaixo). A composer:2 é tag móvel e já veio sem mbstring.
 RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader --no-scripts \
-    --ignore-platform-req=ext-intl --ignore-platform-req=ext-pdo_mysql
+    --ignore-platform-reqs
 
 FROM php:8.5-apache
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libicu-dev \
     && docker-php-ext-install intl pdo_mysql \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && php -r 'foreach (["intl", "pdo_mysql", "mbstring"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR, "falta ext-$e\n"); exit(1); } }'
 # Porta 8000 (a mesma do site antigo; o Coolify aponta o domínio para ela). Toda
 # requisição vai para public/index.php; variáveis de ambiente chegam ao PHP (getenv).
 RUN sed -i 's/^Listen 80$/Listen 8000/' /etc/apache2/ports.conf \
