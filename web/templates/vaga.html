@@ -78,6 +78,20 @@
                  border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12px;
                  line-height: 1.45; white-space: normal; box-shadow: 0 4px 14px rgb(0 0 0 / .2); }
   .clicks:hover .tip, .clicks:focus .tip { display: block; }
+  .vote-mini { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+  .vote-mini-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .vote-mini-title { font-size: 12px; font-weight: 700; color: var(--accent); }
+  .vote-mini-meta { font-size: 12px; color: var(--muted); }
+  .vote-mini-bar { margin-top: 8px; display: flex; height: 8px; overflow: hidden; border-radius: 999px; background: var(--vote-track); }
+  .vote-mini-true, .vote-mini-fake { display: block; min-width: 6px; }
+  .vote-mini-true { background: linear-gradient(90deg, var(--vote-true), color-mix(in srgb, var(--vote-true) 70%, #fff)); }
+  .vote-mini-fake { background: linear-gradient(90deg, color-mix(in srgb, var(--vote-fake) 85%, #fff), var(--vote-fake)); }
+  .vote-mini-form { display: flex; gap: 6px; margin-top: 8px; }
+  .vote-mini-form button { flex: 1; border: 0; border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 12px; font-weight: 700; }
+  .vote-mini-form button[value="true"] { background: var(--vote-true); color: #fff; }
+  .vote-mini-form button[value="fake"] { background: var(--vote-fake); color: #fff; }
+  .vote-mini-form button:disabled { opacity: .45; cursor: not-allowed; }
+  .vote-mini-form button:hover:not(:disabled) { filter: brightness(1.05); }
   .description { overflow-wrap: anywhere; }
   .description p { margin: 0 0 10px; }
   .description h3 { font-size: 15px; margin: 16px 0 6px; }

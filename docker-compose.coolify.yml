@@ -360,8 +360,11 @@ services:
       TZ: America/Sao_Paulo
       VAGAS_MAX_AGE_HOURS: ${VAGAS_MAX_AGE_HOURS:-72}
       DATABASE_URL: ${DATABASE_URL:-}
+    # Só o Apache, sem a base: com o MySQL lento, um healthcheck em /api/stats estourava
+    # o timeout, o container virava unhealthy e o proxy tirava TODOS os sites do ar (503).
+    # Lento é melhor que fora do ar; problema de base aparece em /api/stats e no log.
     healthcheck:
-      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8000/api/stats') === false ? 1 : 0);"]
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8000/og.png') === false ? 1 : 0);"]
       interval: 30s
       timeout: 5s
       retries: 3

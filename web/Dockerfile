@@ -39,5 +39,6 @@ COPY public/ public/
 COPY templates/ templates/
 COPY assets/ assets/
 EXPOSE 8000
+# Healthcheck sem a base (ver docker-compose.coolify.yml).
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD php -r 'exit(@file_get_contents("http://127.0.0.1:8000/api/stats") === false ? 1 : 0);'
+    CMD php -r 'exit(@file_get_contents("http://127.0.0.1:8000/og.png") === false ? 1 : 0);'

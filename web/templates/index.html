@@ -11,6 +11,7 @@
     --bg: #f6f6fa; --surface: #ffffff; --text: #1d1d2b; --muted: #5d6070; --line: #e3e3ec;
     --accent: #5b5fa0; --accent-soft: #ebecf7; --ok: #1f7a4d; --ok-soft: #e3f4ea;
     --warn: #8a5a00; --warn-soft: #fbf0d9; --chip: #f0f0f5;
+    --vote-true: #1f7a4d; --vote-fake: #d14b4b; --vote-track: #ececf4;
     /* idade da vaga: nova -> antiga */
     --age-new: #17703d; --age-new-soft: #e1f5e9;
     --age-recent: #29609f; --age-recent-soft: #e3eefa;
@@ -144,6 +145,20 @@
                  border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12px;
                  line-height: 1.45; white-space: normal; box-shadow: 0 4px 14px rgb(0 0 0 / .2); }
   .clicks:hover .tip, .clicks:focus .tip { display: block; }
+  .vote-mini { flex: 1 0 100%; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+  .vote-mini-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .vote-mini-title { font-size: 12px; font-weight: 700; color: var(--accent); }
+  .vote-mini-meta { font-size: 12px; color: var(--muted); }
+  .vote-mini-bar { margin-top: 8px; display: flex; height: 8px; overflow: hidden; border-radius: 999px; background: var(--vote-track); }
+  .vote-mini-true, .vote-mini-fake { display: block; min-width: 6px; }
+  .vote-mini-true { background: linear-gradient(90deg, var(--vote-true), color-mix(in srgb, var(--vote-true) 70%, #fff)); }
+  .vote-mini-fake { background: linear-gradient(90deg, color-mix(in srgb, var(--vote-fake) 85%, #fff), var(--vote-fake)); }
+  .vote-mini-form { display: flex; gap: 6px; margin-top: 8px; }
+  .vote-mini-form button { flex: 1; border: 0; border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 12px; font-weight: 700; }
+  .vote-mini-form button[value="true"] { background: var(--vote-true); color: #fff; }
+  .vote-mini-form button[value="fake"] { background: var(--vote-fake); color: #fff; }
+  .vote-mini-form button:disabled { opacity: .45; cursor: not-allowed; }
+  .vote-mini-form button:hover:not(:disabled) { filter: brightness(1.05); }
   /* Rajada da mesma empresa (Bursts no servidor): um card que abre para mostrar as vagas. */
   .burst-list > summary { color: var(--accent); font-weight: 600; }
   .burst-jobs { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
@@ -357,6 +372,30 @@ function clicksBadge(n) {
     el("span", { className: "tip", role: "tooltip" }, CLICKS_TIP));
 }
 
+function voteWidget(job) {
+  const v = job.vote || { true: 0, fake: 0, total: 0, remaining_today: 10, session_voted: false };
+  const total = Math.max(1, Number(v.total || 0));
+  const yes = Number(v.true || 0);
+  const no = Number(v.fake || 0);
+  const pct = Math.max(0, Math.min(100, Math.round(100 * yes / total)));
+  const remaining = Math.max(0, Number(v.remaining_today ?? 10));
+  const session = !!v.session_voted;
+  const box = el("div", { className: "vote-mini", "aria-label": `${pct}% verdadeiras e ${100 - pct}% fake` });
+  box.append(
+    el("div", { className: "vote-mini-head" },
+      el("span", { className: "vote-mini-title" }, "Termômetro"),
+      el("span", { className: "vote-mini-meta" }, `${yes} · ${no} · ${remaining} hoje`)),
+    el("div", { className: "vote-mini-bar" },
+      el("span", { className: "vote-mini-true", style: `width:${pct}%` }),
+      el("span", { className: "vote-mini-fake", style: `width:${100 - pct}%` })),
+    el("form", { className: "vote-mini-form", method: "post", action: "/api/votes" },
+      el("input", { type: "hidden", name: "job", value: job.id || "" }),
+      el("input", { type: "hidden", name: "page", value: location.pathname + location.search }),
+      el("button", { name: "vote", value: "true", disabled: session || remaining <= 0 }, "Verdadeira"),
+      el("button", { name: "vote", value: "fake", disabled: session || remaining <= 0 }, "Fake")));
+  return box;
+}
+
 function card(job) {
   const url = safeUrl(job.url);
   const title = job.title || "(sem título)";
@@ -365,6 +404,7 @@ function card(job) {
   const a = age(job.posted_at || job.first_seen);
   const tags = el("div", { className: "tags" },
     el("span", { className: "tag src" }, SOURCE_NAMES[job.source] || job.source));
+  if (job.vote) tags.append(voteWidget(job));
   if (job.closed_at) tags.append(el("span", { className: "tag closed" }, "encerrada"));
   if (job.workplace) tags.append(el("span", { className: "tag" + (job.workplace === "Remoto" ? " remote" : "") }, job.workplace));
   for (const t of [job.seniority, job.contract, job.salary, ...(job.stack || "").split(",")])

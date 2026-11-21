@@ -124,6 +124,23 @@ it('seta cookie de sessão na primeira visita', function () {
         ->and($response->headers['Set-Cookie'])->toContain('vagas_vote_session=');
 });
 
+it('mostra o termômetro na home', function () {
+    $repo = new VoteRepo(['job-1' => voteJob(1)]);
+    $repo->setMeta('vagas_vote_state', ['votes' => [[
+        'job_id' => 'job-1',
+        'choice' => 1,
+        'session_key' => str_repeat('a', 32),
+        'daily_key' => 'feedbeefcafebabe',
+        'at' => '2026-11-18T12:00:00+00:00',
+    ]]]);
+    $site = new Site($repo, __DIR__);
+    $response = $site->handle(new Request('GET', '/', [], ['host' => 'vagasphp.wouerner.dev'], 'https', 'vagasphp.wouerner.dev'));
+
+    expect($response->body)->toContain('Termômetro')
+        ->toContain('Verdadeira')
+        ->toContain('Fake');
+});
+
 it('aceita um voto por sessão e limita em 10 por dia', function () {
     Dates::$now = new DateTimeImmutable('2026-11-18T12:00:00+00:00');
     $jobs = [];

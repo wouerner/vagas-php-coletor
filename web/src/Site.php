@@ -307,10 +307,48 @@ final class Site
             . self::clicksTip() . '</span></span>';
     }
 
+    /** Termômetro compacto para cards e lista da home. */
+    public static function voteHtml(array $job, array $vote, string $page = '/'): string
+    {
+        $e = Text::e(...);
+        $total = max(1, (int) ($vote['total'] ?? 0));
+        $true = (int) ($vote['true'] ?? 0);
+        $fake = (int) ($vote['fake'] ?? 0);
+        $pct = max(0, min(100, (int) round(($true / $total) * 100)));
+        $remaining = max(0, (int) ($vote['remaining_today'] ?? 10));
+        $disabled = !empty($vote['session_voted']) || $remaining <= 0 ? ' disabled' : '';
+        $page = $page !== '' ? $page : '/';
+        return '<div class="vote-mini" aria-label="' . $pct . '% verdadeiras e ' . (100 - $pct) . '% fake">'
+            . '<div class="vote-mini-head"><span class="vote-mini-title">Termômetro</span>'
+            . '<span class="vote-mini-meta">' . $true . ' · ' . $fake . ' · ' . $remaining . ' hoje</span></div>'
+            . '<div class="vote-mini-bar"><span class="vote-mini-true" style="width:' . $pct . '%"></span>'
+            . '<span class="vote-mini-fake" style="width:' . (100 - $pct) . '%"></span></div>'
+            . '<form class="vote-mini-form" method="post" action="/api/votes">'
+            . '<input type="hidden" name="job" value="' . $e((string) ($job['id'] ?? '')) . '">'
+            . '<input type="hidden" name="page" value="' . $e($page) . '">'
+            . '<button name="vote" value="true"' . $disabled . '>Verdadeira</button>'
+            . '<button name="vote" value="fake"' . $disabled . '>Fake</button>'
+            . '</form></div>';
+    }
+
     /** Acrescenta `path`, a página da vaga no site (null para posts do LinkedIn). */
     public static function withPath(array $rows): array
     {
         return array_map(fn ($r) => $r + ['path' => Seo::jobPath($r)], $rows);
+    }
+
+    /** Página atual sem o marcador de pós-voto. */
+    public static function pageUrl(Request $request): string
+    {
+        $query = $request->query;
+        unset($query['vote']);
+        return $request->path . ($query ? '?' . Text::query($query) : '');
+    }
+
+    /** Acrescenta `vote` com os números públicos do termômetro da vaga. */
+    public function withVotes(array $rows, Request $request): array
+    {
+        return array_map(fn ($r) => $r + ['vote' => $this->voteSummary($r, $request)], $rows);
     }
 
     /** `page`: caminho da página que mostra o card, gravado no clique (/out). */
@@ -345,6 +383,9 @@ final class Site
         }
         if ($url && isset($job['clicks'])) {  // sem anúncio original não há o que clicar
             $tags[] = self::clicksHtml((int) $job['clicks']);
+        }
+        if (!empty($job['vote']) && is_array($job['vote'])) {
+            $tags[] = self::voteHtml($job, $job['vote'], $page ?? '/');
         }
         // Vaga de portal: o título leva à página da vaga no site e o anúncio original fica
         // na linha de baixo. Post do LinkedIn: o título leva ao post.
@@ -464,7 +505,7 @@ final class Site
                                ?array $jsonld = null, bool $noindex = false, int $status = 200): Response
     {
         $content = ['h1' => Text::e($h1), 'crumb' => $crumb, 'intro' => $intro,
-            'list' => Bursts::html($this->repo->withClicks($jobs), $path), 'more' => $more,
+            'list' => Bursts::html($this->withVotes($this->repo->withClicks($jobs), $request), $path), 'more' => $more,
             'related' => $related];
         return Response::html(Seo::render($request, 'tema.html', $title, $description, $path, $content, $jsonld, $noindex), $status);
     }
@@ -575,8 +616,8 @@ final class Site
     {
         $source = in_array($r->get('source'), $this->repo->sources(), true) ? $r->get('source') : null;
         [$rows, $st] = self::safe(fn () => [
-            $this->repo->withClicks(self::withPath($this->repo->queryJobs(...['source' => $source,
-                ...self::jobFilters($r), 'limit' => self::PAGE]))),
+            $this->repo->withClicks(self::withPath($this->withVotes($this->repo->queryJobs(...['source' => $source,
+                ...self::jobFilters($r), 'limit' => self::PAGE]), $r))),
             $this->repo->stats(),
         ], [[], ['open_total' => 0, 'last_runs' => []]]);
         $total = $st['open_total'];
@@ -626,7 +667,7 @@ final class Site
         // agrupar rajadas (Bursts). Sem o parâmetro a resposta é a de sempre.
         $burst = in_array($r->get('burst'), ['1', 'true'], true);
         $jobs = array_map(fn ($row) => Repo::publicJob($row) + ($burst ? ['burst_key' => Bursts::publicKey($row)] : []),
-            $this->repo->withClicks(self::withPath(array_slice($rows, 0, $limit))));
+            $this->repo->withClicks(self::withPath($this->withVotes(array_slice($rows, 0, $limit), $r))));
         return Response::json(['jobs' => $jobs,
             'has_more' => count($rows) > $limit, 'max_age_hours' => Dates::maxAgeHours()]);
     }
@@ -925,6 +966,10 @@ final class Site
         }
         $summary = $this->voteCast($job, $vote === 'true', $request);
         $cookie = self::voteCookie($request, $this->voteSessionKey($request));
+        $returnPage = self::clickPage($request->post('page') ?: $request->get('page'));
+        if ($returnPage !== null) {
+            return Response::withCookie(Response::redirect($returnPage, 303), $cookie);
+        }
         $path = Seo::jobPath($job) ?: '/';
         $status = $summary['status'] === 'ok' ? 'vote=ok'
             : ($summary['status'] === 'session' ? 'vote=session' : 'vote=limit');

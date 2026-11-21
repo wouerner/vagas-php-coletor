@@ -530,11 +530,13 @@ final class Vaga
 
     private function notFound(Request $request): Response
     {
+        $body = '<article class="card job">'
+            . '<h1 class="title">Vaga não encontrada</h1>'
+            . '<p>Esta vaga não existe ou foi retirada do site.</p>'
+            . '<p><a href="/">Ver as vagas abertas</a></p></article>';
         $html = Seo::render($request, 'vaga.html', 'Vaga não encontrada | ' . Seo::siteName(),
             'Esta vaga não existe ou foi retirada do site.', $request->path,
-            ['vaga' => '<article class="card job"><h1 class="title">Vaga não encontrada</h1>'
-                . '<p>Esta vaga não existe ou foi retirada do site.</p>'
-                . '<p><a href="/">Ver as vagas abertas</a></p></article>'], noindex: true);
+            ['vaga' => $body], noindex: true);
         return Response::html($html, 404);
     }
 
