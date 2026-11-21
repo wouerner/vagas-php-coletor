@@ -62,6 +62,11 @@ final class VoteRepo extends Repo
     {
         return ['companies' => [], 'recruiters' => []];
     }
+
+    public function stats(): array
+    {
+        return ['sources' => (object) [], 'last_runs' => [], 'open_total' => count($this->jobs)];
+    }
 }
 
 function voteJob(int $seq): array
