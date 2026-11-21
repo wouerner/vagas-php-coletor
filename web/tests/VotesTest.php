@@ -43,6 +43,16 @@ final class VoteRepo extends Repo
         return array_slice(array_values($this->jobs), $offset, $limit);
     }
 
+    public function jobById(string $jobId): ?array
+    {
+        foreach ($this->jobs as $job) {
+            if (($job['id'] ?? null) === $jobId) {
+                return $job;
+            }
+        }
+        return null;
+    }
+
     public function jobBySeq(int $seq): ?array
     {
         foreach ($this->jobs as $job) {
@@ -178,6 +188,23 @@ it('responde JSON ao voto feito pelo fetch da home', function () {
 
     $bad = $site->handle(voteRequest('/api/votes', ['job' => 'job-1', 'vote' => 'talvez'], $headers));
     expect($bad->status)->toBe(400);
+});
+
+it('aceita o id real da vaga, como os forms mandam', function () {
+    Dates::$now = new DateTimeImmutable('2026-11-18T12:00:00+00:00');
+    $post = ['id' => 'post:urn:li:share:7529564285941997568', 'source' => 'post', 'path' => null] + voteJob(5);
+    $repo = new VoteRepo(['a' => ['id' => 'upvagas:10740'] + voteJob(4), 'b' => $post]);
+    $site = new Site($repo, __DIR__);
+    $headers = ['accept' => 'application/json', 'cf-connecting-ip' => '200.1.2.3'];
+
+    foreach (['upvagas:10740', 'post:urn:li:share:7529564285941997568'] as $i => $id) {
+        $resp = $site->handle(voteRequest('/api/votes', ['job' => $id, 'vote' => 'true'],
+            $headers + ['cookie' => 'vagas_vote_session=' . sprintf('%032x', $i + 100)]));
+        expect($resp->status)->toBe(200)
+            ->and(json_decode($resp->body, true)['status'])->toBe('ok');
+    }
+    expect($repo->meta['vagas_vote_state']['votes'])->toHaveCount(2)
+        ->and($site->handle(voteRequest('/api/votes', ['job' => 'nao:existe', 'vote' => 'true'], $headers))->status)->toBe(404);
 });
 
 it('aceita um voto por sessão e limita em 10 por dia', function () {

@@ -207,10 +207,14 @@ final class Site
 
     private function voteJobOr404(string $jobId): ?array
     {
-        if (!preg_match('/^job-(\d+)$/', $jobId, $m)) {
+        // Os forms mandam o id real da vaga (job.id); "job-<seq>" fica como alternativa.
+        if ($jobId === '' || strlen($jobId) > 300) {
             return null;
         }
-        $job = self::safe(fn () => $this->repo->jobBySeq((int) $m[1]), null);
+        $job = self::safe(fn () => $this->repo->jobById($jobId), null);
+        if (!is_array($job) && preg_match('/^job-(\d+)$/', $jobId, $m)) {
+            $job = self::safe(fn () => $this->repo->jobBySeq((int) $m[1]), null);
+        }
         return is_array($job) ? $job : null;
     }
 

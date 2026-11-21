@@ -390,6 +390,12 @@ class Repo
         return $out;
     }
 
+    /** Vaga pelo id (ex.: "upvagas:10740", "post:urn:li:share:…"), ou null se não existe. */
+    public function jobById(string $jobId): ?array
+    {
+        return $this->db->one('SELECT * FROM jobs WHERE tenant = ? AND id = ?', [$this->tenant, $jobId]);
+    }
+
     /** Vaga de um clique no /out (id, fonte e anúncio original), ou null se não existe. */
     public function clickTarget(string $jobId): ?array
     {

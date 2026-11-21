@@ -31,8 +31,12 @@
         try { localStorage.setItem("ga-consent", v); } catch (err) {}
         gtag("consent", "update", { analytics_storage: v });
         bar.remove();
+        document.body.style.paddingBottom = "";
       });
       document.body.append(bar);
+      // Espaço no fim da página: com o aviso aberto, o conteúdo de baixo (ex.: botões de
+      // voto) ainda dá para rolar para fora de trás dele.
+      document.body.style.paddingBottom = (bar.offsetHeight + 24) + "px";
     });
   })();
 </script>
@@ -50,4 +54,10 @@
     border: 1px solid var(--line, #e3e3ec); background: transparent; color: inherit; }
   #ga-consent button.primary { background: var(--accent, #5b5fa0); border-color: transparent;
     color: var(--surface, #fff); }
+  /* Celular: aviso mais baixo, para cobrir menos da lista. */
+  @media (max-width: 520px) {
+    #ga-consent { left: 8px; right: 8px; bottom: 8px; gap: 8px; padding: 10px 12px; font-size: 13px; }
+    #ga-consent p { flex-basis: 100%; }
+    #ga-consent div { margin-left: auto; }
+  }
 </style>
