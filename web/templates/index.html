@@ -145,22 +145,29 @@
                  border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12px;
                  line-height: 1.45; white-space: normal; box-shadow: 0 4px 14px rgb(0 0 0 / .2); }
   .clicks:hover .tip, .clicks:focus .tip { display: block; }
-  .vote-mini { flex: 1 0 100%; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
-  .vote-mini-head { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; flex-wrap: wrap; }
-  .vote-mini-title { font-size: 11px; font-weight: 700; color: var(--accent); }
-  .vote-mini-meta { font-size: 11px; color: var(--muted); }
+  /* Termômetro: no fim do card, linha própria; acima do link que cobre o card. Botões com
+     altura de toque (~40px) para o celular. */
+  .vote-mini { position: relative; z-index: 1; flex: 1 0 100%; margin-top: 4px; padding: 8px 10px;
+               border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+  .vote-mini-head { display: flex; justify-content: space-between; gap: 4px 8px; align-items: baseline; flex-wrap: wrap; }
+  .vote-mini-title { font-size: 12px; font-weight: 700; color: var(--text); }
+  .vote-mini-meta { font-size: 12px; color: var(--muted); }
   .vote-mini-meter { margin-top: 6px; display: flex; align-items: center; gap: 6px; }
-  .vote-mini-ico { flex: none; width: 1.15em; text-align: center; font-size: 11px; line-height: 1; color: var(--muted); opacity: .8; }
+  .vote-mini-ico { flex: none; font-size: 11px; line-height: 1; }
   .vote-mini-bar { flex: 1; display: flex; height: 6px; overflow: hidden; border-radius: 999px; background: var(--vote-track); }
-  .vote-mini-true, .vote-mini-fake { display: block; min-width: 4px; }
-  .vote-mini-true { background: linear-gradient(90deg, var(--vote-true), color-mix(in srgb, var(--vote-true) 70%, #fff)); }
-  .vote-mini-fake { background: linear-gradient(90deg, color-mix(in srgb, var(--vote-fake) 85%, #fff), var(--vote-fake)); }
-  .vote-mini-form { display: flex; gap: 5px; margin-top: 6px; }
-  .vote-mini-form button { flex: 1; border: 0; border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 11px; font-weight: 700; }
+  .vote-mini-true, .vote-mini-fake { display: block; }
+  .vote-mini-true { background: var(--vote-true); }
+  .vote-mini-fake { background: var(--vote-fake); }
+  .vote-mini-form { display: flex; gap: 8px; margin-top: 8px; }
+  .vote-mini-form button { flex: 1; min-height: 40px; border: 0; border-radius: 9px; padding: 8px 10px; font: inherit;
+                           font-size: 13px; font-weight: 700; cursor: pointer; touch-action: manipulation; }
   .vote-mini-form button[value="true"] { background: var(--vote-true); color: #fff; }
   .vote-mini-form button[value="fake"] { background: var(--vote-fake); color: #fff; }
   .vote-mini-form button:disabled { opacity: .45; cursor: not-allowed; }
   .vote-mini-form button:hover:not(:disabled) { filter: brightness(1.05); }
+  .vote-mini[aria-busy="true"] .vote-mini-form button { opacity: .6; cursor: progress; }
+  .vote-mini-note { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+  .vote-mini-note.ok { color: var(--vote-true); font-weight: 600; }
   /* Rajada da mesma empresa (Bursts no servidor): um card que abre para mostrar as vagas. */
   .burst-list > summary { color: var(--accent); font-weight: 600; }
   .burst-jobs { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
@@ -374,32 +381,86 @@ function clicksBadge(n) {
     el("span", { className: "tip", role: "tooltip" }, CLICKS_TIP));
 }
 
-function voteWidget(job) {
+// Mesmo HTML de Site::voteHtml (cards renderizados no servidor).
+const VOTE_MSG = {
+  ok: ["Voto registrado. Obrigado!", "ok"],
+  session: ["Você já votou nesta vaga.", ""],
+  limit: ["Limite de votos de hoje atingido. Volte amanhã.", ""],
+  error: ["Não deu para registrar o voto. Tente de novo.", ""],
+};
+function voteWidget(job, status = null) {
   const v = job.vote || { true: 0, fake: 0, total: 0, remaining_today: 10, session_voted: false };
-  const total = Math.max(1, Number(v.total || 0));
   const yes = Number(v.true || 0);
   const no = Number(v.fake || 0);
-  const pct = Math.max(0, Math.min(100, Math.round(100 * yes / total)));
+  const total = yes + no;
+  const pct = total ? Math.round(100 * yes / total) : 0;
   const remaining = Math.max(0, Number(v.remaining_today ?? 10));
   const session = !!v.session_voted;
-  const box = el("div", { className: "vote-mini", "aria-label": `${pct}% verdadeiras e ${100 - pct}% fake` });
-  box.append(
-    el("div", { className: "vote-mini-head" },
-      el("span", { className: "vote-mini-title" }, "Termômetro"),
-      el("span", { className: "vote-mini-meta" }, `${yes} · ${no} · ${remaining} hoje`)),
-    el("div", { className: "vote-mini-meter" },
-      el("span", { className: "vote-mini-ico", "aria-hidden": "true" }, "👍"),
+  const box = el("div", { className: "vote-mini" });
+  box.setAttribute("role", "group");
+  box.setAttribute("aria-label", "Esta vaga é real?");
+  const meta = total
+    ? `${yes} ${yes === 1 ? "diz" : "dizem"} verdadeira · ${no} fake`
+    : "sem votos ainda";
+  box.append(el("div", { className: "vote-mini-head" },
+    el("span", { className: "vote-mini-title" }, "Esta vaga é real?"),
+    el("span", { className: "vote-mini-meta" }, meta)));
+  if (total) {  // sem votos, nada de barra: vazia pareceria "100% fake"
+    const meter = el("div", { className: "vote-mini-meter" },
+      el("span", { className: "vote-mini-ico" }, "👍"),
       el("div", { className: "vote-mini-bar" },
         el("span", { className: "vote-mini-true", style: `width:${pct}%` }),
         el("span", { className: "vote-mini-fake", style: `width:${100 - pct}%` })),
-      el("span", { className: "vote-mini-ico", "aria-hidden": "true" }, "👎")),
-    el("form", { className: "vote-mini-form", method: "post", action: "/api/votes" },
-      el("input", { type: "hidden", name: "job", value: job.id || "" }),
-      el("input", { type: "hidden", name: "page", value: location.pathname + location.search }),
-      el("button", { name: "vote", value: "true", disabled: session || remaining <= 0 }, "Verdadeira"),
-      el("button", { name: "vote", value: "fake", disabled: session || remaining <= 0 }, "Fake")));
+      el("span", { className: "vote-mini-ico" }, "👎"));
+    meter.setAttribute("role", "img");
+    meter.setAttribute("aria-label", `${pct}% verdadeira e ${100 - pct}% fake`);
+    box.append(meter);
+  }
+  box.append(el("form", { className: "vote-mini-form", method: "post", action: "/api/votes" },
+    el("input", { type: "hidden", name: "job", value: job.id || "" }),
+    el("input", { type: "hidden", name: "page", value: location.pathname + location.search }),
+    el("button", { name: "vote", value: "true", disabled: session || remaining <= 0 }, "Verdadeira"),
+    el("button", { name: "vote", value: "fake", disabled: session || remaining <= 0 }, "Fake")));
+  const [text, cls] = VOTE_MSG[status] || (session ? VOTE_MSG.session
+    : remaining <= 0 ? VOTE_MSG.limit
+    : remaining <= 3 ? [`Restam ${remaining} ${remaining === 1 ? "voto" : "votos"} hoje.`, ""]
+    : [null, ""]);
+  if (text) {
+    const note = el("p", { className: "vote-mini-note" + (cls ? " " + cls : "") }, text);
+    note.setAttribute("role", "status");
+    box.append(note);
+  }
   return box;
 }
+
+// Voto sem recarregar a página (o usuário não perde o lugar na lista). Sem fetch, o form
+// faz o POST normal e o servidor redireciona de volta.
+document.addEventListener("submit", async e => {
+  const form = e.target.closest && e.target.closest(".vote-mini-form");
+  const btn = e.submitter;
+  if (!form || !btn || !window.fetch) return;
+  e.preventDefault();
+  const box = form.closest(".vote-mini");
+  const buttons = [...form.querySelectorAll("button")];
+  const body = new URLSearchParams(new FormData(form));
+  body.set("vote", btn.value);
+  box.setAttribute("aria-busy", "true");
+  buttons.forEach(b => b.disabled = true);
+  try {
+    const r = await fetch(form.action, { method: "POST", body, credentials: "same-origin",
+      headers: { Accept: "application/json" } });
+    const data = await r.json();
+    if (!r.ok || !data.vote) throw new Error(data.status || r.status);
+    box.replaceWith(voteWidget({ id: form.elements.job.value, vote: data.vote }, data.status));
+  } catch {
+    box.removeAttribute("aria-busy");
+    buttons.forEach(b => b.disabled = false);
+    box.querySelector(".vote-mini-note")?.remove();
+    const note = el("p", { className: "vote-mini-note" }, VOTE_MSG.error[0]);
+    note.setAttribute("role", "status");
+    box.append(note);
+  }
+});
 
 function card(job) {
   const url = safeUrl(job.url);
@@ -409,12 +470,12 @@ function card(job) {
   const a = age(job.posted_at || job.first_seen);
   const tags = el("div", { className: "tags" },
     el("span", { className: "tag src" }, SOURCE_NAMES[job.source] || job.source));
-  if (job.vote) tags.append(voteWidget(job));
   if (job.closed_at) tags.append(el("span", { className: "tag closed" }, "encerrada"));
   if (job.workplace) tags.append(el("span", { className: "tag" + (job.workplace === "Remoto" ? " remote" : "") }, job.workplace));
   for (const t of [job.seniority, job.contract, job.salary, ...(job.stack || "").split(",")])
     if (t) tags.append(el("span", { className: "tag" }, t));
   if (url && job.clicks != null) tags.append(clicksBadge(job.clicks));  // sem anúncio, nada a clicar
+  if (job.vote) tags.append(voteWidget(job));  // por último: linha própria, sem partir as tags
 
   // Vaga de portal: o título leva à página da vaga no site (job.path) e o anúncio original
   // fica na linha de baixo. Post do LinkedIn: o título leva ao post.

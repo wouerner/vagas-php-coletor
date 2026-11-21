@@ -310,25 +310,39 @@ final class Site
     /** Termômetro compacto para cards e lista da home. */
     public static function voteHtml(array $job, array $vote, string $page = '/'): string
     {
+        // Mesmo HTML de voteWidget() em templates/index.html.
         $e = Text::e(...);
-        $total = max(1, (int) ($vote['total'] ?? 0));
         $true = (int) ($vote['true'] ?? 0);
         $fake = (int) ($vote['fake'] ?? 0);
-        $pct = max(0, min(100, (int) round(($true / $total) * 100)));
+        $total = $true + $fake;
+        $pct = $total ? (int) round(($true / $total) * 100) : 0;
         $remaining = max(0, (int) ($vote['remaining_today'] ?? 10));
-        $disabled = !empty($vote['session_voted']) || $remaining <= 0 ? ' disabled' : '';
+        $session = !empty($vote['session_voted']);
+        $disabled = $session || $remaining <= 0 ? ' disabled' : '';
         $page = $page !== '' ? $page : '/';
-        return '<div class="vote-mini" aria-label="' . $pct . '% verdadeiras e ' . (100 - $pct) . '% fake">'
-            . '<div class="vote-mini-head"><span class="vote-mini-title">Termômetro</span>'
-            . '<span class="vote-mini-meta">' . $true . ' · ' . $fake . ' · ' . $remaining . ' hoje</span></div>'
-            . '<div class="vote-mini-bar"><span class="vote-mini-true" style="width:' . $pct . '%"></span>'
+        $meta = $total ? $true . ' ' . ($true === 1 ? 'diz' : 'dizem') . ' verdadeira · ' . $fake . ' fake'
+            : 'sem votos ainda';
+        // Sem votos, nada de barra: vazia pareceria "100% fake".
+        $meter = $total ? '<div class="vote-mini-meter" role="img" aria-label="' . $pct . '% verdadeira e '
+            . (100 - $pct) . '% fake"><span class="vote-mini-ico">👍</span><div class="vote-mini-bar">'
+            . '<span class="vote-mini-true" style="width:' . $pct . '%"></span>'
             . '<span class="vote-mini-fake" style="width:' . (100 - $pct) . '%"></span></div>'
+            . '<span class="vote-mini-ico">👎</span></div>' : '';
+        $note = $session ? 'Você já votou nesta vaga.'
+            : ($remaining <= 0 ? 'Limite de votos de hoje atingido. Volte amanhã.'
+            : ($remaining <= 3 ? 'Restam ' . Text::plural($remaining, 'voto', 'votos') . ' hoje.' : null));
+        return '<div class="vote-mini" role="group" aria-label="Esta vaga é real?">'
+            . '<div class="vote-mini-head"><span class="vote-mini-title">Esta vaga é real?</span>'
+            . '<span class="vote-mini-meta">' . $meta . '</span></div>'
+            . $meter
             . '<form class="vote-mini-form" method="post" action="/api/votes">'
             . '<input type="hidden" name="job" value="' . $e((string) ($job['id'] ?? '')) . '">'
             . '<input type="hidden" name="page" value="' . $e($page) . '">'
             . '<button name="vote" value="true"' . $disabled . '>Verdadeira</button>'
             . '<button name="vote" value="fake"' . $disabled . '>Fake</button>'
-            . '</form></div>';
+            . '</form>'
+            . ($note ? '<p class="vote-mini-note" role="status">' . $note . '</p>' : '')
+            . '</div>';
     }
 
     /** Acrescenta `path`, a página da vaga no site (null para posts do LinkedIn). */
@@ -961,11 +975,19 @@ final class Site
         $jobId = $request->post('job') ?: $request->get('job') ?: '';
         $vote = strtolower(trim((string) ($request->post('vote') ?: $request->get('vote') ?: '')));
         $job = $this->voteJobOr404($jobId);
+        // Voto pelo fetch da home (Accept: application/json): devolve o resumo, sem redirecionar.
+        $json = str_contains((string) $request->header('accept'), 'application/json');
         if ($job === null || !in_array($vote, ['true', 'fake'], true)) {
-            return Response::redirect('/' . ltrim((string) ($job['path'] ?? ''), '/'), 302);
+            return $json ? Response::json(['status' => 'invalid'], $job === null ? 404 : 400)
+                : Response::redirect('/' . ltrim((string) ($job['path'] ?? ''), '/'), 302);
         }
         $summary = $this->voteCast($job, $vote === 'true', $request);
         $cookie = self::voteCookie($request, $this->voteSessionKey($request));
+        if ($json) {
+            $status = $summary['status'];
+            unset($summary['status']);
+            return Response::withCookie(Response::json(['status' => $status, 'vote' => $summary]), $cookie);
+        }
         $returnPage = self::clickPage($request->post('page') ?: $request->get('page'));
         if ($returnPage !== null) {
             return Response::withCookie(Response::redirect($returnPage, 303), $cookie);

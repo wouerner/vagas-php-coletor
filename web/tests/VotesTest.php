@@ -141,9 +141,43 @@ it('mostra o termômetro na home', function () {
     $site = new Site($repo, __DIR__);
     $response = $site->handle(new Request('GET', '/', [], ['host' => 'vagasphp.wouerner.dev'], 'https', 'vagasphp.wouerner.dev'));
 
-    expect($response->body)->toContain('Termômetro')
+    expect($response->body)->toContain('Esta vaga é real?')
         ->toContain('Verdadeira')
         ->toContain('Fake');
+});
+
+it('card sem votos não mostra barra (pareceria 100% fake)', function () {
+    $empty = ['true' => 0, 'fake' => 0, 'total' => 0, 'session_voted' => false, 'today_votes' => 0, 'remaining_today' => 10];
+    $html = Site::voteHtml(voteJob(1), $empty);
+    expect($html)->toContain('sem votos ainda')->not->toContain('vote-mini-fake');
+
+    $voted = Site::voteHtml(voteJob(1), ['true' => 3, 'fake' => 1, 'total' => 4, 'session_voted' => true, 'remaining_today' => 9]);
+    expect($voted)->toContain('3 dizem verdadeira · 1 fake')
+        ->toContain('width:75%')
+        ->toContain('Você já votou nesta vaga.')
+        ->toContain(' disabled');
+});
+
+it('responde JSON ao voto feito pelo fetch da home', function () {
+    Dates::$now = new DateTimeImmutable('2026-11-18T12:00:00+00:00');
+    $repo = new VoteRepo(['job-1' => voteJob(1)]);
+    $site = new Site($repo, __DIR__);
+    $headers = ['accept' => 'application/json', 'cf-connecting-ip' => '200.1.2.3',
+        'cookie' => 'vagas_vote_session=' . str_repeat('c', 32)];
+
+    $ok = $site->handle(voteRequest('/api/votes', ['job' => 'job-1', 'vote' => 'true', 'page' => '/'], $headers));
+    $data = json_decode($ok->body, true);
+    expect($ok->status)->toBe(200)
+        ->and($data['status'])->toBe('ok')
+        ->and($data['vote']['true'])->toBe(1)
+        ->and($data['vote']['session_voted'])->toBeTrue()
+        ->and($data['vote'])->not->toHaveKey('status');
+
+    $again = json_decode($site->handle(voteRequest('/api/votes', ['job' => 'job-1', 'vote' => 'fake'], $headers))->body, true);
+    expect($again['status'])->toBe('session')->and($again['vote']['fake'])->toBe(0);
+
+    $bad = $site->handle(voteRequest('/api/votes', ['job' => 'job-1', 'vote' => 'talvez'], $headers));
+    expect($bad->status)->toBe(400);
 });
 
 it('aceita um voto por sessão e limita em 10 por dia', function () {

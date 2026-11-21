@@ -485,8 +485,9 @@ final class Vaga
                 . $remaining . ' votos hoje</p></div>'
                 . '<div class="vote-bar" role="img" aria-label="' . $pct . '% verdadeiras e '
                 . (100 - $pct) . '% fake">'
-                . '<span class="vote-true" style="width:' . $pct . '%"></span>'
-                . '<span class="vote-fake" style="width:' . (100 - $pct) . '%"></span>'
+                // Sem votos a barra fica vazia (só o trilho), e não "100% fake".
+                . ((int) ($vote['total'] ?? 0) ? '<span class="vote-true" style="width:' . $pct . '%"></span>'
+                    . '<span class="vote-fake" style="width:' . (100 - $pct) . '%"></span>' : '')
                 . '</div>'
                 . '<form class="vote-form" method="post" action="/api/votes">'
                 . '<input type="hidden" name="job" value="' . $e((string) ($job['id'] ?? '')) . '">'
