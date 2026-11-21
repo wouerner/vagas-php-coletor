@@ -237,3 +237,16 @@ it('aceita um voto por sessão e limita em 10 por dia', function () {
     expect($limit->headers['Location'])->toContain('vote=limit');
     expect($repo->meta['vagas_vote_state']['votes'])->toHaveCount(10);
 });
+
+it('lê o Content-Type do POST, que o PHP põe sem o prefixo HTTP_', function () {
+    $saved = $_SERVER;
+    $_SERVER = ['REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/api/votes', 'HTTP_HOST' => 'vagasphp.wouerner.dev',
+        'CONTENT_TYPE' => 'application/x-www-form-urlencoded;charset=UTF-8', 'CONTENT_LENGTH' => '20'];
+    try {
+        $request = Request::fromGlobals();
+    } finally {
+        $_SERVER = $saved;
+    }
+    expect($request->header('content-type'))->toBe('application/x-www-form-urlencoded;charset=UTF-8')
+        ->and($request->header('content-length'))->toBe('20');
+});

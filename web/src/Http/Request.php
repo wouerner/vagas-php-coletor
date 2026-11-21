@@ -44,6 +44,12 @@ final class Request
                 $headers[strtolower(str_replace('_', '-', substr($key, 5)))] = (string) $value;
             }
         }
+        // O PHP põe Content-Type/Length sem o prefixo HTTP_; sem eles o form() de um POST fica vazio.
+        foreach (['CONTENT_TYPE' => 'content-type', 'CONTENT_LENGTH' => 'content-length'] as $key => $name) {
+            if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') {
+                $headers[$name] ??= (string) $_SERVER[$key];
+            }
+        }
         $uri = $_SERVER['REQUEST_URI'] ?? '/';
         $path = rawurldecode(parse_url($uri, PHP_URL_PATH) ?: '/');
         $https = ($_SERVER['HTTPS'] ?? '') !== '' && ($_SERVER['HTTPS'] ?? '') !== 'off';
