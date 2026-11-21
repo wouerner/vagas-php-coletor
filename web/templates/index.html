@@ -149,7 +149,9 @@
   .vote-mini-head { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; flex-wrap: wrap; }
   .vote-mini-title { font-size: 11px; font-weight: 700; color: var(--accent); }
   .vote-mini-meta { font-size: 11px; color: var(--muted); }
-  .vote-mini-bar { margin-top: 6px; display: flex; height: 6px; overflow: hidden; border-radius: 999px; background: var(--vote-track); }
+  .vote-mini-meter { margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+  .vote-mini-ico { flex: none; width: 1.15em; text-align: center; font-size: 11px; line-height: 1; color: var(--muted); opacity: .8; }
+  .vote-mini-bar { flex: 1; display: flex; height: 6px; overflow: hidden; border-radius: 999px; background: var(--vote-track); }
   .vote-mini-true, .vote-mini-fake { display: block; min-width: 4px; }
   .vote-mini-true { background: linear-gradient(90deg, var(--vote-true), color-mix(in srgb, var(--vote-true) 70%, #fff)); }
   .vote-mini-fake { background: linear-gradient(90deg, color-mix(in srgb, var(--vote-fake) 85%, #fff), var(--vote-fake)); }
@@ -385,9 +387,12 @@ function voteWidget(job) {
     el("div", { className: "vote-mini-head" },
       el("span", { className: "vote-mini-title" }, "Termômetro"),
       el("span", { className: "vote-mini-meta" }, `${yes} · ${no} · ${remaining} hoje`)),
-    el("div", { className: "vote-mini-bar" },
-      el("span", { className: "vote-mini-true", style: `width:${pct}%` }),
-      el("span", { className: "vote-mini-fake", style: `width:${100 - pct}%` })),
+    el("div", { className: "vote-mini-meter" },
+      el("span", { className: "vote-mini-ico", "aria-hidden": "true" }, "👍"),
+      el("div", { className: "vote-mini-bar" },
+        el("span", { className: "vote-mini-true", style: `width:${pct}%` }),
+        el("span", { className: "vote-mini-fake", style: `width:${100 - pct}%` })),
+      el("span", { className: "vote-mini-ico", "aria-hidden": "true" }, "👎")),
     el("form", { className: "vote-mini-form", method: "post", action: "/api/votes" },
       el("input", { type: "hidden", name: "job", value: job.id || "" }),
       el("input", { type: "hidden", name: "page", value: location.pathname + location.search }),
