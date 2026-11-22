@@ -28,6 +28,11 @@ DEV_ROLE = re.compile(
 NOT_DEV = re.compile(
     r"\b(vendas|sales|comercial|marketing|recrutador|recruiter|tech recruiter|"
     r"suporte|support|designer|professor|instrutor|teacher|redator|copywriter)\b", re.I)
+# NOT_DEV para a primeira linha de um post: sem os termos de recrutamento, que abrem muitos
+# anúncios bons ("Sou tech recruiter e tenho uma vaga...").
+POST_NOT_DEV = re.compile(
+    r"\b(vendas|sales|comercial|marketing|suporte|support|designer|professor|instrutor|"
+    r"teacher|redator|copywriter)\b", re.I)
 
 # Post de LinkedIn anunciando vaga (e não alguém procurando emprego). Sinais fortes bastam;
 # os fracos aparecem também em posts sobre outros assuntos ("uma oportunidade de aprender",
@@ -152,7 +157,8 @@ AGGREGATOR = [
     r"\bdiscord\b", r"\btelegram\b", r"\bgrupos? de vagas\b", r"\bnossos grupos\b",
     r"\bnossas comunidades\b", r"\b(grupo|canal|comunidade) (do|no) whats\s?app\b",
     r"\bvagas t\.?i\.? -", r"\b(entre|participe) (no|do|nos|dos) (nosso )?(grupo|canal)",
-    r"\bcanal de vagas\b",
+    r"\bcanal de vagas\b", r"\bdivulga[cç](ão|ões) de vagas\b", r"\bconhecer todos os grupos\b",
+    r"\bconfira (algumas|todas as|nossas) comunidades\b", r"\bfreelances? t\.?i\b",
 ]
 AGGREGATOR_RES = [re.compile(rx, re.I) for rx in AGGREGATOR]
 AGGREGATOR_MIN = 3
@@ -170,6 +176,14 @@ JOB_LIST_APPLY_RE = re.compile(
 JOB_LIST_HEADER = [r"\b(\d+) (novas )?vagas\b", r"\b(essas|estas|as) (\d+) vagas\b"]
 JOB_LIST_HEADER_RES = [re.compile(rx, re.I) for rx in JOB_LIST_HEADER]
 JOB_LIST_MIN = 3
+# Resumo do dia de quem junta vagas ("Hoje foram publicadas 9 vagas de início de
+# carreira"): fala de várias vagas sem anunciar nenhuma; barra mesmo sem links.
+JOB_DIGEST = [
+    r"\bforam publicadas \d+ (novas )?vagas\b",
+    r"\b\d+ (novas )?vagas (foram )?publicadas (hoje|nesta semana|esta semana|no dia)\b",
+    r"\b(resumo|giro|balan[cç]o) (das|de) vagas (do dia|da semana|de hoje)\b",
+]
+JOB_DIGEST_RE = re.compile("|".join(f"({rx})" for rx in JOB_DIGEST), re.I)
 URL_RE = re.compile(r"https?://", re.I)
 # Autor de post que é agregador de vagas, pelo NOME de quem publicou: páginas e
 # consultorias que republicam anúncios genéricos de outras empresas, sem curadoria (e
@@ -200,7 +214,21 @@ JOB_SEEKER = re.compile(
     r"recoloca)|recoloca[cç][aã]o|(aberto|aberta|dispon[ií]vel) (a|para) (novas )?oportunidades|"
     r"looking for (a )?(new )?(job|role|position|opportunit)|actively looking|"
     r"seeking (a )?(new )?(job|role|position|opportunit)|open to (new )?(roles|opportunities)|"
-    r"b[uú]squeda activa|buscando (nuevas )?oportunidades)", re.I)
+    r"b[uú]squeda activa|buscando (nuevas )?oportunidades|"
+    # "...e procurando minha primeira oportunidade" (sem o "estou" colado).
+    r"procurando (a |minha |meu |uma |um )?(primeir[ao]|pr[oó]xim[ao]|nov[ao]) "
+    r"(oportunidade|emprego|vaga|est[aá]gio|chance)|minha primeira oportunidade|"
+    # Indicação de candidato para recrutadores ("Ei, tech recruiters! O Fulano é dev...").
+    r"\b(ei|oi|ol[aá]|al[oô]|aten[cç][aã]o),? (tech )?(recruiters?|recrutador[ae]s?)\b|"
+    r"fa[cç]am esse match)", re.I)
+# Outras linguagens que dividem uma lista com a do site ("Java, PHP, C#", "PHP e/ou C#"):
+# com uma menção só, a linguagem é uma das aceitas, não a da vaga. JavaScript/TypeScript
+# ficam de fora: "PHP e JavaScript" é a vaga full stack da linguagem.
+OTHER_LANG = (r"(java(?!script)|c#|c\+\+|python|ruby|golang|node(\.?js)?|\.net|kotlin|scala|"
+              r"elixir|rust|swift|php|delphi)")
+LIST_SEP = r"\s*(,|/|\be/ou\b|\bou\b|\be\b|\bor\b|\band\b)\s*"
+LANG_BEFORE_RE = re.compile(rf"{OTHER_LANG}{LIST_SEP}$", re.I)
+LANG_AFTER_RE = re.compile(rf"{LIST_SEP}{OTHER_LANG}(?!\w)", re.I)
 
 WORKPLACE = [
     ("Remoto", re.compile(r"\b(remot[oa]|remote|home\s?office|anywhere|100% remoto)\b", re.I)),
@@ -362,9 +390,9 @@ def is_aggregator(text: str) -> bool:
 
 
 def is_job_list(text: str) -> bool:
-    """Lista de vagas (JOB_LIST_*): várias chamadas de candidatura com link, ou cabeçalho
-    "N vagas" com vários links."""
-    if len(JOB_LIST_APPLY_RE.findall(text)) >= JOB_LIST_MIN:
+    """Lista de vagas (JOB_LIST_*): várias chamadas de candidatura com link, cabeçalho
+    "N vagas" com vários links, ou resumo do dia (JOB_DIGEST)."""
+    if JOB_DIGEST_RE.search(text) or len(JOB_LIST_APPLY_RE.findall(text)) >= JOB_LIST_MIN:
         return True
     header = any(int(re.search(r"\d+", m.group(0)).group(0)) >= JOB_LIST_MIN
                  for rx in JOB_LIST_HEADER_RES for m in rx.finditer(text))
@@ -386,6 +414,22 @@ def is_self_author(author: str | None, author_url: str | None = None) -> bool:
     """Quem publicou é o dono do site (SELF_AUTHOR), pelo nome ou pelo perfil."""
     return bool((author and SELF_AUTHOR_RE.search(_plain_name(author)))
                 or (author_url and SELF_AUTHOR_URL_RE.search(author_url.split("?")[0])))
+
+
+def lang_in_list(body: str) -> bool:
+    """A linguagem aparece uma vez só, dentro de uma lista de linguagens aceitas ("Java,
+    PHP, C#", "PHP e/ou C#"): é uma opção, não a vaga."""
+    matches = list(CORE.finditer(body))
+    if len(matches) != 1:
+        return False
+    m = matches[0]
+    return bool(LANG_BEFORE_RE.search(body[max(0, m.start() - 40):m.start()])
+                or LANG_AFTER_RE.match(body[m.end():m.end() + 40]))
+
+
+def _headline(text: str) -> str:
+    """Primeira linha com texto: num post, faz as vezes do título."""
+    return next((line for line in text.splitlines() if line.strip()), "")
 
 
 def post_verdict(text: str | None, author: str | None = None) -> str:
@@ -412,6 +456,11 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
     # "Estou em busca de pessoas..." é recrutador, não alguém procurando emprego.
     if JOB_SEEKER.search(text) and not RECRUITING.search(text):
         return "job_seeker"
+    # Como no título da vaga de portal: "Vaga para Analista de Marketing" com WordPress
+    # nos requisitos não é vaga de desenvolvimento.
+    headline = HASHTAG_OR_URL.sub(" ", _headline(text))
+    if POST_NOT_DEV.search(headline) and not DEV_ROLE.search(headline):
+        return "post_not_dev"
     # Quem mostra o próprio projeto pode citar "divulgação de vagas" sem contratar ninguém.
     if is_showcase(text) and not RECRUITING.search(text):
         return "showcase"
@@ -419,6 +468,10 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
     # é anúncio.
     if is_opinion(text):
         return "opinion"
+    # Linguagem só como opção numa lista ("Java, PHP, C#"): depois das regras acima, que
+    # dizem melhor por que o post não é anúncio.
+    if lang_in_list(body):
+        return "post_lang_in_list"
     if HIRING.search(text):
         return "hiring_strong"
     if not HIRING_WEAK.search(text):
@@ -615,10 +668,11 @@ def _rules() -> list[dict]:
                  f"(\"🚨 5 VAGAS HOME OFFICE\", \"Confira essas 7 vagas...\"): {JOB_LIST_MIN} ou "
                  f"mais chamadas de candidatura (\"Candidate-se:\", \"Inscrição:\", \"Apply:\"...) "
                  f"seguidas de link, ou um cabeçalho \"N vagas\" ({JOB_LIST_MIN} ou mais) com "
-                 f"{JOB_LIST_MIN} ou mais links. Vale mesmo quando o texto tem sinal de "
+                 f"{JOB_LIST_MIN} ou mais links. Resumo do dia (\"Hoje foram publicadas 9 "
+                 f"vagas...\") barra mesmo sem links. Vale mesmo quando o texto tem sinal de "
                  f"contratação: queremos o anúncio de quem contrata, não listas montadas por "
                  f"terceiros, sem curadoria. Um anúncio com um link só não barra.",
-         "patterns": _patterns([JOB_LIST_APPLY_RE.pattern], JOB_LIST_HEADER)},
+         "patterns": _patterns([JOB_LIST_APPLY_RE.pattern], JOB_LIST_HEADER, JOB_DIGEST)},
         {"group": "posts", "id": "aggregator_author", "effect": "recusa",
          "title": "Publicado por agregador de vagas",
          "text": "Páginas, comunidades e consultorias que republicam anúncios genéricos de outras "
@@ -629,11 +683,21 @@ def _rules() -> list[dict]:
          "patterns": _patterns(AGGREGATOR_AUTHOR)},
         {"group": "posts", "id": "job_seeker", "effect": "recusa",
          "title": "Pessoa procurando emprego",
-         "text": "Posts de quem procura vaga (#opentowork, \"estou em busca de oportunidade\"...) "
+         "text": "Posts de quem procura vaga (#opentowork, \"estou em busca de oportunidade\", "
+                 "\"procurando minha primeira oportunidade\"...) e indicações de candidato para "
+                 "recrutadores (\"Ei, tech recruiters!\", \"façam esse match\") "
                  "não são anúncios. Texto de "
                  "recrutador (\"estou em busca de pessoas\", \"candidate-se\"...) não conta como "
                  "procura de emprego.",
          "patterns": _patterns(JOB_SEEKER)},
+        {"group": "posts", "id": "post_not_dev", "effect": "recusa",
+         "title": "Primeira linha com cargo que não é de engenharia",
+         "text": "A primeira linha do post faz as vezes do título da vaga: marketing, vendas, "
+                 "suporte, design, ensino etc., sem cargo de desenvolvimento junto, fica de fora "
+                 f"mesmo citando {name} (\"Vaga para Analista de Marketing Digital\" com "
+                 "WordPress nos requisitos). Recrutamento não conta aqui: muitos anúncios abrem "
+                 "com \"Sou tech recruiter...\".",
+         "patterns": _patterns(POST_NOT_DEV)},
         {"group": "posts", "id": "showcase", "effect": "recusa",
          "title": "Vitrine de projeto pessoal",
          "text": "Posts de quem mostra o próprio projeto, sistema, app ou portfólio (\"estou "
@@ -652,6 +716,14 @@ def _rules() -> list[dict]:
                  "candidatar (link, e-mail, \"candidate-se\", \"envie seu currículo\", \"me chama "
                  "no privado\"...), vale como anúncio.",
          "patterns": _patterns(OPINION)},
+        {"group": "posts", "id": "post_lang_in_list", "effect": "recusa",
+         "title": f"{name} só como uma opção numa lista de linguagens",
+         "text": f"Com uma menção só, {name} colado a outra linguagem numa lista (\"Java, "
+                 f"{name}, C#\", \"{name} e/ou C#\") é uma das linguagens aceitas, não a vaga: "
+                 f"como nas vagas de portais, uma menção numa lista não conta. JavaScript e "
+                 f"TypeScript não contam como outra linguagem (\"{name} e JavaScript\" é vaga "
+                 f"full stack).",
+         "patterns": [OTHER_LANG]},
         {"group": "posts", "id": "hiring_strong", "effect": "aceita",
          "title": "Sinal forte de contratação",
          "text": "\"Vaga para\", \"contratando\", \"estamos buscando\", \"candidate-se\", "
