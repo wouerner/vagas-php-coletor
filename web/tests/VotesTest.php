@@ -159,12 +159,12 @@ it('mostra o termômetro na home', function () {
 it('card sem votos não mostra barra (pareceria 100% fake)', function () {
     $empty = ['true' => 0, 'fake' => 0, 'total' => 0, 'session_voted' => false, 'today_votes' => 0, 'remaining_today' => 10];
     $html = Site::voteHtml(voteJob(1), $empty);
-    expect($html)->toContain('sem votos ainda')->not->toContain('vote-mini-fake');
+    expect($html)->toContain('Vaga real?')->toContain('vote-mini-space')->not->toContain('vote-mini-fake');
 
     $voted = Site::voteHtml(voteJob(1), ['true' => 3, 'fake' => 1, 'total' => 4, 'session_voted' => true, 'remaining_today' => 9]);
-    expect($voted)->toContain('3 dizem verdadeira · 1 fake')
+    expect($voted)->toContain('aria-label="Verdadeira (3)"')->toContain('aria-label="Fake (1)"')
         ->toContain('width:75%')
-        ->toContain('Você já votou nesta vaga.')
+        ->toContain('Você já votou')
         ->toContain(' disabled');
 });
 

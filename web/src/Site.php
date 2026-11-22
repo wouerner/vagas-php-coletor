@@ -324,29 +324,24 @@ final class Site
         $session = !empty($vote['session_voted']);
         $disabled = $session || $remaining <= 0 ? ' disabled' : '';
         $page = $page !== '' ? $page : '/';
-        $meta = $total ? $true . ' ' . ($true === 1 ? 'diz' : 'dizem') . ' verdadeira · ' . $fake . ' fake'
-            : 'sem votos ainda';
+        $label = $session ? 'Você já votou' : ($remaining <= 0 ? 'Limite de hoje' : 'Vaga real?');
         // Sem votos, nada de barra: vazia pareceria "100% fake".
-        $meter = $total ? '<div class="vote-mini-meter" role="img" aria-label="' . $pct . '% verdadeira e '
-            . (100 - $pct) . '% fake"><span class="vote-mini-ico">👍</span><div class="vote-mini-bar">'
+        $bar = $total ? '<div class="vote-mini-bar" role="img" aria-label="' . $pct . '% acham verdadeira">'
             . '<span class="vote-mini-true" style="width:' . $pct . '%"></span>'
             . '<span class="vote-mini-fake" style="width:' . (100 - $pct) . '%"></span></div>'
-            . '<span class="vote-mini-ico">👎</span></div>' : '';
-        $note = $session ? 'Você já votou nesta vaga.'
-            : ($remaining <= 0 ? 'Limite de votos de hoje atingido. Volte amanhã.'
-            : ($remaining <= 3 ? 'Restam ' . Text::plural($remaining, 'voto', 'votos') . ' hoje.' : null));
+            : '<span class="vote-mini-space"></span>';
+        $button = fn (string $value, string $emoji, string $name, int $n) => '<button class="vote-mini-btn" name="vote" value="'
+            . $value . '" title="' . $name . '" aria-label="' . $name . ' (' . $n . ')"' . $disabled . '><span>' . $emoji
+            . '</span><span class="n">' . $n . '</span></button>';
         return '<div class="vote-mini" role="group" aria-label="Esta vaga é real?">'
-            . '<div class="vote-mini-head"><span class="vote-mini-title">Esta vaga é real?</span>'
-            . '<span class="vote-mini-meta">' . $meta . '</span></div>'
-            . $meter
+            . '<span class="vote-mini-title" role="status">' . $label . '</span>'
+            . $bar
             . '<form class="vote-mini-form" method="post" action="/api/votes">'
             . '<input type="hidden" name="job" value="' . $e((string) ($job['id'] ?? '')) . '">'
             . '<input type="hidden" name="page" value="' . $e($page) . '">'
-            . '<button name="vote" value="true"' . $disabled . '>Verdadeira</button>'
-            . '<button name="vote" value="fake"' . $disabled . '>Fake</button>'
-            . '</form>'
-            . ($note ? '<p class="vote-mini-note" role="status">' . $note . '</p>' : '')
-            . '</div>';
+            . $button('true', '👍', 'Verdadeira', $true)
+            . $button('fake', '👎', 'Fake', $fake)
+            . '</form></div>';
     }
 
     /** Acrescenta `path`, a página da vaga no site (null para posts do LinkedIn). */

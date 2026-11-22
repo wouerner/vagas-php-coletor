@@ -78,24 +78,22 @@
                  border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12px;
                  line-height: 1.45; white-space: normal; box-shadow: 0 4px 14px rgb(0 0 0 / .2); }
   .clicks:hover .tip, .clicks:focus .tip { display: block; }
-  .vote-mini { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
-  .vote-mini-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-  .vote-mini-title { font-size: 12px; font-weight: 700; color: var(--text); }
-  .vote-mini-meta { font-size: 12px; color: var(--muted); }
-  .vote-mini-meter { margin-top: 8px; display: flex; align-items: center; gap: 6px; }
-  .vote-mini-ico { flex: none; font-size: 11px; line-height: 1; }
-  .vote-mini-bar { flex: 1; display: flex; height: 8px; overflow: hidden; border-radius: 999px; background: var(--vote-track); }
-  .vote-mini-true, .vote-mini-fake { display: block; }
-  .vote-mini-note { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
-  .vote-mini-true { background: linear-gradient(90deg, var(--vote-true), color-mix(in srgb, var(--vote-true) 70%, #fff)); }
-  .vote-mini-fake { background: linear-gradient(90deg, color-mix(in srgb, var(--vote-fake) 85%, #fff), var(--vote-fake)); }
-  .vote-mini-form { display: flex; gap: 6px; margin-top: 8px; }
-  .vote-mini-form button { flex: 1; min-height: 40px; border: 0; border-radius: 10px; padding: 8px 10px; font: inherit;
-                           font-size: 13px; font-weight: 700; cursor: pointer; touch-action: manipulation; }
-  .vote-mini-form button[value="true"] { background: var(--vote-true); color: #fff; }
-  .vote-mini-form button[value="fake"] { background: var(--vote-fake); color: #fff; }
-  .vote-mini-form button:disabled { opacity: .45; cursor: not-allowed; }
-  .vote-mini-form button:hover:not(:disabled) { filter: brightness(1.05); }
+  /* Termômetro compacto (cards de outras vagas): mesmo desenho da home. */
+  .vote-mini { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .vote-mini-title { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .vote-mini-bar { flex: 1; min-width: 24px; display: flex; height: 4px; overflow: hidden; border-radius: 999px; background: var(--vote-track); }
+  .vote-mini-space { flex: 1; }
+  .vote-mini-true { background: var(--vote-true); }
+  .vote-mini-fake { background: var(--vote-fake); }
+  .vote-mini-form { display: flex; gap: 6px; margin: 0; }
+  .vote-mini-btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 52px; height: 36px;
+                   padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+                   font: inherit; font-size: 16px; line-height: 1; color: inherit; cursor: pointer; touch-action: manipulation; }
+  .vote-mini-btn .n { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .vote-mini-btn[value="true"]:hover:not(:disabled) { border-color: var(--vote-true); }
+  .vote-mini-btn[value="fake"]:hover:not(:disabled) { border-color: var(--vote-fake); }
+  .vote-mini-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .vote-mini-btn:disabled { opacity: .45; cursor: not-allowed; }
   .description { overflow-wrap: anywhere; }
   .description p { margin: 0 0 10px; }
   .description h3 { font-size: 15px; margin: 16px 0 6px; }
