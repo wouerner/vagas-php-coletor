@@ -40,7 +40,8 @@ final class VoteRepo extends Repo
                               ?string $seniority = null, ?string $stack = null, ?float $hours = null,
                               bool $includeClosed = false, int $limit = 50, int $offset = 0): array
     {
-        return array_slice(array_values($this->jobs), $offset, $limit);
+        return array_values(array_filter(array_slice(array_values($this->jobs), $offset, $limit),
+            fn (array $job): bool => ($job['url'] ?? null) !== null && $job['url'] !== ''));
     }
 
     public function jobById(string $jobId): ?array
@@ -75,7 +76,8 @@ final class VoteRepo extends Repo
 
     public function stats(): array
     {
-        return ['sources' => (object) [], 'last_runs' => [], 'open_total' => count($this->jobs)];
+        $open = array_values(array_filter($this->jobs, fn (array $job): bool => ($job['url'] ?? null) !== null && $job['url'] !== ''));
+        return ['sources' => (object) [], 'last_runs' => [], 'open_total' => count($open)];
     }
 }
 

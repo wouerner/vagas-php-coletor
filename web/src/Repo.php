@@ -111,7 +111,7 @@ class Repo
                               ?string $seniority = null, ?string $stack = null, ?float $hours = null,
                               bool $includeClosed = false, int $limit = 50, int $offset = 0): array
     {
-        $sql = 'SELECT * FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL';
+        $sql = 'SELECT * FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL AND url IS NOT NULL AND url <> ""';
         $args = [$this->tenant];
         if (!$includeClosed) {
             $sql .= ' AND closed_at IS NULL';
@@ -148,7 +148,7 @@ class Repo
     {
         return (int) $this->db->scalar(
             'SELECT count(*) FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL
-               AND closed_at IS NULL AND COALESCE(posted_at, first_seen) >= ? AND ' . self::DEDUP,
+               AND url IS NOT NULL AND url <> "" AND closed_at IS NULL AND COALESCE(posted_at, first_seen) >= ? AND ' . self::DEDUP,
             [$this->tenant, Dates::cutoff()],
         );
     }
@@ -164,8 +164,8 @@ class Repo
     {
         $bySource = [];
         foreach ($this->db->all(
-            'SELECT source, count(*) total, sum(relevant AND dismissed IS NULL) relevant,
-                    sum(relevant AND dismissed IS NULL AND closed_at IS NULL
+            'SELECT source, count(*) total, sum(relevant AND dismissed IS NULL AND url IS NOT NULL AND url <> "") relevant,
+                    sum(relevant AND dismissed IS NULL AND url IS NOT NULL AND url <> "" AND closed_at IS NULL
                         AND COALESCE(posted_at, first_seen) >= ?) open
              FROM jobs WHERE tenant = ? GROUP BY source',
             [Dates::cutoff(), $this->tenant],
@@ -189,7 +189,7 @@ class Repo
         return $this->db->all(
             'SELECT source, company, workplace, seniority, contract, stack,
                     COALESCE(posted_at, first_seen) AS posted
-             FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL AND ' . self::DEDUP . '
+             FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL AND url IS NOT NULL AND url <> "" AND ' . self::DEDUP . '
                AND COALESCE(posted_at, first_seen) >= ?
              ORDER BY seq',
             [$this->tenant, Dates::daysAgo($days)],
@@ -208,7 +208,7 @@ class Repo
         $rows = $this->db->all(
             'SELECT source, company, workplace, seniority, contract, stack, closed_at,
                     COALESCE(posted_at, first_seen) AS posted
-             FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL AND ' . self::DEDUP . '
+             FROM jobs WHERE tenant = ? AND relevant = 1 AND dismissed IS NULL AND url IS NOT NULL AND url <> "" AND ' . self::DEDUP . '
                AND COALESCE(posted_at, first_seen) >= ?
              ORDER BY seq',
             [$this->tenant, Dates::utcIso($firstDay)],
@@ -489,7 +489,7 @@ class Repo
     {
         return $this->db->all(
             "SELECT seq, source, title, COALESCE(posted_at, first_seen) AS posted FROM jobs
-             WHERE tenant = ? AND source != 'post' AND relevant = 1 AND dismissed IS NULL
+             WHERE tenant = ? AND source != 'post' AND relevant = 1 AND dismissed IS NULL AND url IS NOT NULL AND url <> ''
                AND closed_at IS NULL AND COALESCE(posted_at, first_seen) >= ? AND " . self::DEDUP . '
              ORDER BY posted DESC, seq DESC',
             [$this->tenant, Dates::cutoff()],
