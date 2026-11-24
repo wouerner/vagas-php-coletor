@@ -208,6 +208,43 @@ SELF_AUTHOR: dict
 SELF_AUTHOR_RE: re.Pattern
 SELF_AUTHOR_URL_RE: re.Pattern
 HASHTAG_OR_URL = re.compile(r"(#\w+|hashtag\s*#?\w+|https?://\S+)", re.I)
+# Vagas em espanhol: o site é para quem fala português (Brasil e Portugal). Inglês continua
+# valendo (vaga remota para fora). Contam palavras que só existem num dos dois idiomas:
+# "y"/"e", "el"/"o", "con"/"com"... (as que existem nos dois, como "para", "de", "buscamos",
+# não decidem nada; "en" e "un" ficam de fora por serem também do francês); ¿, ¡ e ñ contam
+# para o espanhol, ã, õ e ç para o português. "Experiencia" sem acento é espanhol.
+SPANISH_WORDS = re.compile(
+    r"\b(el|los|las|del|al|y|con|una|es|muy|pero|tambi[eé]n|a[nñ]os?|nuestr[oa]s?|"
+    r"nosotros|trabajo|trabajar|desarroll\w*|experiencia|conocimientos?|ofrecemos|sueldo|"
+    r"puesto|equipo|herramientas|empleo|posici[oó]n|requerimientos|ingenier[oa]s?|vos|"
+    r"usted|buscando|deseable|excluyentes?|valoramos|postula\w*)\b", re.I)
+SPANISH_CHARS = re.compile(r"[¿¡ñÑ]")
+PORTUGUESE_WORDS = re.compile(
+    r"\b(e|em|ao|do|da|dos|das|um|uma|n[aã]o|voc[eê]s?|com|nosso|nossa|nossos|nossas|"
+    r"tamb[eé]m|trabalho|desenvolv\w*|experiência|conhecimentos?|equipe|s[aã]o|[eé]|"
+    r"isso|essa|esse|est[aá]|mais|pessoa|vagas?|engenheir[oa]s?|atua[cç][aã]o|sobre)\b", re.I)
+PORTUGUESE_CHARS = re.compile(r"[ãõçÃÕÇ]")
+# No título, uma palavra destas já basta (vaga de portal sem descrição em espanhol).
+SPANISH_TITLE = re.compile(r"\b(desarroll\w+|ingenier[oa]s?|programador/a)\b|[¿¡ñ]", re.I)
+
+
+def _spanish_score(text: str) -> tuple[int, int]:
+    """(palavras/letras de espanhol, de português) no texto, sem hashtags e links."""
+    text = HASHTAG_OR_URL.sub(" ", text or "")
+    return (len(SPANISH_WORDS.findall(text)) + len(SPANISH_CHARS.findall(text)),
+            len(PORTUGUESE_WORDS.findall(text)) + len(PORTUGUESE_CHARS.findall(text)))
+
+
+def is_spanish(title: str | None, *texts: str | None) -> bool:
+    """Vaga escrita em espanhol: no texto todo, 4+ marcas de espanhol e mais que o dobro das
+    de português (uma vaga brasileira que pede "espanhol avançado" não conta), ou um título
+    em espanhol ("Desarrollador PHP") num texto com mais marcas de espanhol que de português."""
+    es, pt = _spanish_score(" ".join(t for t in (title, *texts) if t))
+    if es >= 4 and es > 2 * pt:
+        return True
+    return bool(title and SPANISH_TITLE.search(title) and es > pt)
+
+
 JOB_SEEKER = re.compile(
     r"(#opentowork|open to work|estou (em busca|buscando|procurando|dispon[ií]vel)|"
     r"procuro (uma )?(vaga|oportunidade|recoloca)|em busca de (uma )?(nova )?(oportunidade|"
@@ -320,6 +357,8 @@ def job_verdict(title: str | None, description: str | None = None,
         return "not_dev"
     if EXCLUDE and EXCLUDE.search(title):
         return "excluded"
+    if is_spanish(title, description):
+        return "spanish"
     if CORE.search(title) or (labels and CORE.search(labels)):
         return "lang_title"
     if DEV_ROLE.search(title) and description and len(CORE.findall(description)) >= 2:
@@ -445,6 +484,8 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
         return "post_no_lang"
     if is_excluded_post(text):
         return "post_excluded"
+    if is_spanish(_headline(text), text):
+        return "post_spanish"
     if is_aggregator(text):
         return "aggregator"
     if is_job_list(text):
@@ -626,6 +667,15 @@ def _rules() -> list[dict]:
                  f"desenvolvimento junto, fica de fora mesmo citando {name}.",
          "patterns": _patterns(NOT_DEV)},
         *excluded,
+        {"group": "vagas", "id": "spanish", "effect": "recusa",
+         "title": "Vaga em espanhol",
+         "text": "O site é para quem fala português (Brasil e Portugal): vaga escrita em "
+                 "espanhol fica de fora, mesmo citando " + name + ". Contam palavras que só "
+                 "existem num dos dois idiomas (y/e, el/o, con/com, desarrollador/desenvolvedor...): "
+                 "4 ou mais de espanhol e mais que o dobro das de português, ou título em "
+                 "espanhol (\"Desarrollador " + name + "\") num texto mais espanhol que português. Vaga em "
+                 "português que pede espanhol, ou vaga em inglês, continua valendo.",
+         "patterns": _patterns(SPANISH_WORDS, SPANISH_TITLE)},
         {"group": "vagas", "id": "lang_title", "effect": "aceita",
          "title": f"{name} ou tecnologia do ecossistema no título",
          "text": f"{examples} no título da vaga (ou nas etiquetas da issue, no GitHub).",
@@ -654,6 +704,12 @@ def _rules() -> list[dict]:
                  f"contam: muitos posts enchem de #{slug} #java #python.",
          "patterns": _patterns(CORE)},
         *post_excluded,
+        {"group": "posts", "id": "post_spanish", "effect": "recusa",
+         "title": "Post em espanhol",
+         "text": "A mesma regra das vagas de portais, com a primeira linha do post fazendo as "
+                 "vezes do título: anúncio escrito em espanhol fica de fora (o site é para "
+                 "Brasil e Portugal).",
+         "patterns": _patterns(SPANISH_WORDS, SPANISH_TITLE)},
         {"group": "posts", "id": "aggregator", "effect": "recusa",
          "title": "Divulgação de grupos e canais de vagas, sem curadoria",
          "text": f"Posts que divulgam grupos, canais e comunidades de vagas (Discord, Telegram, "

@@ -97,3 +97,53 @@ def test_false_positives_from_production(text, verdict):
 ])
 def test_real_job_posts_still_pass(text):
     assert classify.is_hiring_post(text), classify.post_verdict(text)
+
+
+# Post real em produção (24/11/2026), resumido: vaga PHP em Buenos Aires, em espanhol. O site
+# é para Brasil e Portugal.
+SPANISH_POST = """🚀 ¡DESDE Manage Resources BUSCAMOS DESARROLLADOR/A PHP SEMI SENIOR!
+💻 ¿Te apasiona el desarrollo de software y estás buscando nuevos desafíos tecnológicos?
+🛠️ PRINCIPALES RESPONSABILIDADES
+▪️ Desarrollar y mantener sistemas y aplicaciones.
+🔎 REQUISITOS EXCLUYENTES
+▪️ Al menos 3 años de experiencia en posiciones similares, trabajando en empresas.
+▪️ Conocimientos sólidos de PHP, MySQL, CSS, JavaScript y HTML.
+📍 Modalidad: Híbrida. Ubicación: Belgrano, CABA.
+📩 Envianos tu CV a: rh@example.com.ar"""
+
+
+def test_spanish_post_is_rejected():
+    assert classify.post_verdict(SPANISH_POST) == "post_spanish"
+    assert not classify.is_hiring_post(SPANISH_POST)
+
+
+@pytest.mark.parametrize("title,description", [
+    ("Desarrollador PHP Semi Senior", None),
+    ("Wordpress y PHP Developer", "Buscamos un desarrollador con experiencia en WordPress y "
+     "PHP para nuestro equipo. Trabajo remoto desde cualquier país de LATAM."),
+    ("Backend Developer Jr", "¡Sé parte de Stefanini! Responsabilidades y atribuciones: "
+     "realizar las tareas de desarrollo con PHP y Laravel en el equipo de producto."),
+])
+def test_spanish_jobs_are_rejected(title, description):
+    assert classify.job_verdict(title, description) == "spanish"
+    assert not classify.is_relevant_job(title, description)
+
+
+@pytest.mark.parametrize("text", [
+    # Vaga brasileira que pede espanhol continua valendo.
+    "Estamos contratando Desenvolvedor PHP Pleno, remoto. Requisitos: Laravel, MySQL e "
+    "inglês básico. Espanhol será um diferencial. Candidate-se: https://empresa.gupy.io/jobs/1",
+    # Vaga em inglês continua valendo.
+    "We're hiring a Senior PHP Developer (Laravel) to join our team. Remote from LATAM, "
+    "paid in USD. Apply here: https://example.com/jobs/1",
+])
+def test_portuguese_and_english_posts_still_pass(text):
+    assert classify.is_hiring_post(text), classify.post_verdict(text)
+
+
+def test_portuguese_job_asking_for_spanish_still_passes():
+    assert classify.job_verdict(
+        "Desenvolvedor (a) .NET PLENO | C# + PHP + IA",
+        "Estamos em busca de uma pessoa Desenvolvedora para atuar em um projeto. O que "
+        "buscamos? Conhecimentos em PHP para manutenção. Inglês básico | Espanhol será um "
+        "diferencial.") in classify.JOB_OK

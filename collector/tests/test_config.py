@@ -461,7 +461,7 @@ def test_exclude_refuses_by_title_before_the_language_rules():
         # A exclusão é pelo título: o back-end citado na descrição não barra.
         assert classify.is_relevant_job("Desenvolvedor Front-end", "Integração com o time de back-end e full stack.")
         ids = [r["id"] for r in classify.RULES]
-        assert ids[:3] == ["not_dev", "excluded", "lang_title"]
+        assert ids[:4] == ["not_dev", "excluded", "spanish", "lang_title"]
         assert ids.index("post_excluded") == ids.index("post_no_lang") + 1
         rules = {r["id"]: r for r in classify.RULES}
         assert rules["excluded"]["effect"] == rules["post_excluded"]["effect"] == "recusa"

@@ -489,14 +489,14 @@ class Store:
         "post"), para mudanças na regra valerem também para o que já foi coletado. As
         etiquetas das issues do GitHub não ficam na base: issue aceita por etiqueta
         continua aceita, a menos que o título tenha passado a ser excluído (configuração
-        "exclude"). Retorna os ids que mudaram."""
+        "exclude") ou a vaga seja em espanhol. Retorna os ids que mudaram."""
         rows = self.execute("SELECT id, source, title, description, relevant FROM jobs "
                             "WHERE tenant = ? AND source != 'post'", (self.tenant,)).fetchall()
         changed = []
         for r in rows:
             ok = classify.is_relevant_job(r["title"], r["description"]) or bool(
                 r["source"] == "github" and r["relevant"]
-                and classify.job_verdict(r["title"]) != "excluded")
+                and classify.job_verdict(r["title"], r["description"]) not in ("excluded", "spanish"))
             if ok != bool(r["relevant"]):
                 changed.append((int(ok), r["id"]))
         with self.tx():
