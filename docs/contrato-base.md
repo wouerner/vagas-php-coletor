@@ -32,7 +32,7 @@ site, padrão `php`). Regras:
 - `jobs` tem a chave `(tenant, id)`: a mesma vaga pode estar em dois tenants (uma vaga
   full stack pode ser PHP e Ruby), cada uma com a sua relevância. `seq` continua único
   entre os tenants (o endereço `/vaga/<seq>-<slug>` não colide).
-- `DEDUP` agrupa também por `tenant`, para a linha de um tenant não esconder a de outro.
+- `DEDUP` compara só linhas do mesmo `tenant`, para a linha de um tenant não esconder a de outro.
 - `site_meta` e `collector_config` têm a chave `(tenant, name)`.
 - Linhas de antes do multi-tenant ficaram no tenant `php` (a coluna nasce com o padrão
   `'php'`).
@@ -115,7 +115,12 @@ As duas consultas que definem "vaga aberta" ficam iguais nos dois lados (`DEDUP`
 
 - `relevant = 1 AND dismissed IS NULL AND closed_at IS NULL`;
 - `COALESCE(posted_at, first_seen)` dentro de `VAGAS_MAX_AGE_HOURS` (padrão 72 h);
-- só a linha mais recente (`max(seq)`) de cada fonte + título + empresa.
+- só a linha mais recente (maior `seq`) de cada fonte + título + empresa, dentro do tenant:
+  `jobs.dedup_key` é essa chave, uma coluna gerada pelo MySQL (MD5 da fonte e do
+  `WEIGHT_STRING` do título e da empresa, ou do autor: sem diferenciar maiúsculas nem
+  acentos) com o índice `jobs_dedup (tenant, dedup_key, seq)`. O `DEDUP` é um `NOT EXISTS`
+  de linha mais nova com a mesma chave e chama a tabela de `jobs`, sem apelido. O coletor
+  cria a coluna ao subir (`_add_columns`); o site depende dela. `dedup_key` não sai na API.
 
 ## Endereço da página de vaga
 

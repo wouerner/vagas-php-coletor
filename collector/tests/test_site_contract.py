@@ -2,14 +2,23 @@
 anuncia ao Google, e os dados de site_meta. Ver docs/contrato-base.md."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 
 from vagas import classify, indexing
-from vagas.store import SOURCES, Store
+from vagas.store import DEDUP, SOURCES, Store
 
-CASES = json.loads((Path(__file__).resolve().parents[2] / "contracts" / "job_paths.json").read_text())
+ROOT = Path(__file__).resolve().parents[2]
+CASES = json.loads((ROOT / "contracts" / "job_paths.json").read_text())
+
+
+def test_dedup_matches_site():
+    """O site e o coletor contam as mesmas vagas abertas: o mesmo DEDUP nos dois lados."""
+    repo = (ROOT / "web" / "src" / "Repo.php").read_text()
+    site = re.search(r'public const DEDUP = "(.*?)";', repo, re.S).group(1)
+    assert " ".join(site.split()) == " ".join(DEDUP.split())
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: str(c["job"]["seq"]))

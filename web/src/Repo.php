@@ -19,16 +19,17 @@ class Repo
         'solides', 'inhire', 'coodesh', 'nerdin', 'recrutei', 'upvagas'];
 
     /** Colunas internas do contrato que a API não expõe. */
-    private const HIDDEN = ['company_key', 'author_recruiter', 'tenant'];
+    private const HIDDEN = ['company_key', 'author_recruiter', 'tenant', 'dedup_key'];
 
     /**
      * A mesma vaga é anunciada várias vezes (ex.: um ID do LinkedIn por cidade): vale só a
-     * mais recente de cada título + empresa da mesma fonte, dentro do tenant (a consulta
-     * filtra o tenant; agrupar por ele impede que outro tenant esconda a vaga). Igual ao
-     * DEDUP do coletor.
+     * mais recente de cada título + empresa da mesma fonte, dentro do tenant. jobs.dedup_key
+     * é essa chave (coluna gerada pelo coletor, com índice (tenant, dedup_key, seq)): a
+     * linha fica se não existe outra mais nova com a mesma chave. Igual ao DEDUP do
+     * coletor; a consulta chama a tabela de "jobs", sem apelido.
      */
-    public const DEDUP = "seq IN (SELECT max(seq) FROM jobs GROUP BY tenant, source,
-             lower(COALESCE(title, '')), lower(COALESCE(company, author, '')))";
+    public const DEDUP = "NOT EXISTS (SELECT 1 FROM jobs newer WHERE newer.tenant = jobs.tenant
+             AND newer.dedup_key = jobs.dedup_key AND newer.seq > jobs.seq)";
 
     /** @var array<string, mixed> */
     private array $meta = [];
@@ -473,13 +474,12 @@ class Repo
         return $this->db->one('SELECT * FROM jobs WHERE tenant = ? AND seq = ?', [$this->tenant, $seq]);
     }
 
-    /** seq mais recente da mesma vaga (fonte + título + empresa), como no DEDUP. */
+    /** seq mais recente da mesma vaga (fonte + título + empresa: dedup_key), como no DEDUP. */
     public function newestSeq(array $job): ?int
     {
         $v = $this->db->scalar(
-            "SELECT max(seq) FROM jobs WHERE tenant = ? AND source = ? AND lower(COALESCE(title, '')) = lower(?)
-               AND lower(COALESCE(company, author, '')) = lower(?)",
-            [$this->tenant, $job['source'], $job['title'] ?? '', $job['company'] ?: ($job['author'] ?: '')],
+            'SELECT max(seq) FROM jobs WHERE tenant = ? AND dedup_key = (SELECT dedup_key FROM jobs WHERE tenant = ? AND seq = ?)',
+            [$this->tenant, $this->tenant, $job['seq']],
         );
         return $v === null ? null : (int) $v;
     }

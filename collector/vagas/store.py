@@ -45,8 +45,21 @@ SOURCES = ("linkedin", "gupy", "post", "github", "remotar", "programathor", "cat
 # Datas ficam como texto ISO UTC ("2026-10-15T12:00:00+00:00"), comparadas como string.
 # Chaves em utf8mb4_bin: ids e URLs diferem por maiúscula/acento; o resto usa a collation
 # padrão (sem diferenciar maiúsculas nem acentos nas buscas com LIKE).
+# A mesma vaga é anunciada várias vezes (ex.: um ID do LinkedIn por cidade): vale só a
+# mais recente de cada título + empresa da mesma fonte, dentro do tenant. jobs.dedup_key é
+# essa chave, calculada pelo MySQL (coluna gerada) e indexada com (tenant, dedup_key, seq):
+# DEDUP passa a ser uma busca no índice ("existe uma mais nova com a mesma chave?") em vez
+# de agrupar a tabela inteira, de todos os tenants, a cada consulta (3,5 s com ~100 mil
+# linhas; 20 ms com o índice). WEIGHT_STRING compara título e empresa como a collation da
+# tabela (sem diferenciar maiúsculas nem acentos), como fazia o GROUP BY de antes. A
+# consulta que usa DEDUP chama a tabela de "jobs", sem apelido.
+DEDUP_KEY_DDL = ("CHAR(32) CHARACTER SET ascii COLLATE ascii_bin AS (MD5(CONCAT_WS(CHAR(31), source, "
+                 "HEX(WEIGHT_STRING(COALESCE(title, ''))), "
+                 "HEX(WEIGHT_STRING(COALESCE(company, author, '')))))) STORED")
+DEDUP = """NOT EXISTS (SELECT 1 FROM jobs newer WHERE newer.tenant = jobs.tenant
+             AND newer.dedup_key = jobs.dedup_key AND newer.seq > jobs.seq)"""
 SCHEMA = [
-    """CREATE TABLE IF NOT EXISTS jobs (
+    f"""CREATE TABLE IF NOT EXISTS jobs (
     tenant      VARCHAR(32) NOT NULL DEFAULT 'php',            -- linguagem: "php", "ruby"...
     id          VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,     -- "linkedin:<id>", "gupy:<id>", "post:<urn ou hash>", "github:<repo>#<n>", "inhire:<uuid>", "<fonte>:<id>" nas demais
     seq         BIGINT NOT NULL AUTO_INCREMENT UNIQUE,         -- ordem de inserção (DEDUP); única entre os tenants
@@ -72,9 +85,11 @@ SCHEMA = [
     last_seen   VARCHAR(40) NOT NULL,
     closed_at   VARCHAR(40),           -- issue fechada no GitHub
     dismissed   TEXT,                  -- descartada à mão ("não é vaga"): data e motivo
+    dedup_key   {DEDUP_KEY_DDL},  -- mesma vaga anunciada de novo (DEDUP)
     PRIMARY KEY (tenant, id),
     INDEX jobs_list (relevant, posted_at),
-    INDEX jobs_source (source)
+    INDEX jobs_source (source),
+    INDEX jobs_dedup (tenant, dedup_key, seq)
 )""",
     """CREATE TABLE IF NOT EXISTS runs (
     tenant      VARCHAR(32) NOT NULL DEFAULT 'php',
@@ -136,12 +151,6 @@ SCHEMA = [
 TENANT_TABLES = {"jobs": "(tenant, id)", "runs": None, "site_meta": "(tenant, name)",
                  "collector_config": "(tenant, name)"}
 
-# A mesma vaga é anunciada várias vezes (ex.: um ID do LinkedIn por cidade): vale só a
-# mais recente de cada título + empresa da mesma fonte, dentro do tenant (a consulta que
-# usa DEDUP filtra o tenant; agrupar por ele impede que a linha de outro tenant esconda
-# a deste).
-DEDUP = """seq IN (SELECT max(seq) FROM jobs GROUP BY tenant, source,
-             lower(COALESCE(title, '')), lower(COALESCE(company, author, '')))"""
 
 FIELDS = ("source", "relevant", "title", "company", "location", "workplace", "seniority",
           "contract", "stack", "salary", "url", "author", "author_url", "author_headline",
@@ -289,9 +298,18 @@ class Store:
                                    ("jobs", "author_recruiter", "TINYINT AFTER author_headline"),
                                    # A chave única entra junto com a coluna.
                                    ("clicks", "visitor", "CHAR(16) AFTER source, "
-                                    "ADD UNIQUE KEY clicks_visitor (job_id, visitor)")):
+                                    "ADD UNIQUE KEY clicks_visitor (job_id, visitor)"),
+                                   # Coluna gerada: o MySQL calcula para as linhas que já
+                                   # existem (reconstrói a tabela, alguns segundos).
+                                   ("jobs", "dedup_key", f"{DEDUP_KEY_DDL} AFTER dismissed, "
+                                    "ADD INDEX jobs_dedup (tenant, dedup_key, seq)")):
             if (table, column) not in have:
-                self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+                try:
+                    self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+                except pymysql.err.OperationalError as e:
+                    # Dois coletores subindo juntos: o outro já criou a coluna.
+                    if e.args[0] != 1060:  # Duplicate column name
+                        raise
 
     def _add_tenant(self) -> None:
         """Bases de antes do multi-tenant: acrescenta a coluna tenant (o que já existe fica
@@ -552,7 +570,8 @@ class Store:
         sql += f" AND {DEDUP}"
         sql += " ORDER BY COALESCE(posted_at, first_seen) DESC, first_seen DESC, seq DESC LIMIT ? OFFSET ?"
         args += [limit, offset]
-        return [dict(r) for r in self.execute(sql, args)]
+        return [{k: v for k, v in dict(r).items() if k != "dedup_key"}
+                for r in self.execute(sql, args)]
 
     def stats(self) -> dict:
         by_source = {r["source"]: dict(r) for r in self.execute(
