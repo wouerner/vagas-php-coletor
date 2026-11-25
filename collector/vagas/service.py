@@ -10,6 +10,7 @@ Uso: python -m vagas.service   (MCP em http://HOST:PORT/mcp)
 """
 
 import asyncio
+import ctypes
 import json
 import logging
 import os
@@ -167,6 +168,17 @@ class Config:
         CONFIG_PATH.write_text(json.dumps({k: asdict(v) for k, v in self.sources.items()}, indent=2))
 
 
+def _release_memory() -> None:
+    """Devolve ao sistema a memória livre do processo (malloc_trim do glibc). Cada coleta
+    aloca centenas de MB que o glibc guardava para sempre: com isto, o coletor parado fica
+    em ~80 MB em vez de ~400 MB (MALLOC_ARENA_MAX=2, no Dockerfile, faz o resto). Fora do
+    glibc (macOS, musl) não faz nada."""
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except (OSError, AttributeError):
+        pass
+
+
 class Service:
     def __init__(self):
         self.store = Store()
@@ -179,6 +191,7 @@ class Service:
                      ", ".join(changed[:20]) + ("..." if len(changed) > 20 else ""))
         # O site (PHP) não roda o filtro: recebe pronto o que precisa dele.
         self.store.publish_site_data()
+        _release_memory()  # a reclassificação acima lê todas as vagas do tenant
         self.config = Config.load()
         self.headless = _env_bool("LINKEDIN_HEADLESS", True)
         self.browser = ThreadPoolExecutor(max_workers=1, thread_name_prefix="browser")
@@ -231,6 +244,7 @@ class Service:
             self.store.publish_site_data()
         except Exception as e:
             log.warning("Dados do site não atualizados (%s: %s)", e.__class__.__name__, e)
+        _release_memory()
 
     def _indexing_push(self) -> None:
         """Publica na Indexing API as vagas abertas, numa thread, sem esperar: falha aqui
