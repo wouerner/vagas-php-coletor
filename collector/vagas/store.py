@@ -524,7 +524,10 @@ class Store:
 
     def dismiss(self, ref: str, reason: str | None = None, undo: bool = False) -> list[dict]:
         """Marca como "não é vaga" (ou desfaz) pelo id, pela URL ou pelo número do
-        post/vaga contido nela. Fica na base: novas coletas não trazem de volta."""
+        post/vaga contido nela. Fica na base: novas coletas não trazem de volta.
+
+        Se `ref` não bater em nenhuma linha, tenta como texto livre do post para achar um
+        `post:` que tenha caído na base com outro id/URL."""
         ref = ref.strip()
         digits = re.findall(r"\d{12,}", ref)
         sql = "SELECT id, title, url FROM jobs WHERE tenant = ? AND (id = ? OR url = ?"
@@ -534,6 +537,11 @@ class Store:
             args.append(f"%{digits[-1]}%")
         sql += ")"
         rows = [dict(r) for r in self.execute(sql, args)]
+        if not rows and ref:
+            needle = f"%{ref[:120]}%"
+            rows = [dict(r) for r in self.execute(
+                "SELECT id, title, url FROM jobs WHERE tenant = ? AND source = 'post' "
+                "AND (title LIKE ? OR description LIKE ?)", (self.tenant, needle, needle))]
         mark = None if undo else f"{now_iso()} {reason or ''}".strip()
         with self.tx():
             self.executemany("UPDATE jobs SET dismissed = ? WHERE tenant = ? AND id = ?",

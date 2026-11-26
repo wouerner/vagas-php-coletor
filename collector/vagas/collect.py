@@ -379,7 +379,7 @@ def search_hiring_posts(bot: LinkedInBot, date_posted: str) -> list[Post]:
         posted = dates.from_relative(p.time)
         if not (posted and posted > oldest):
             return False
-        verdict = classify.post_verdict(p.text or p.raw_text, p.author)
+        verdict = classify.post_verdict(p.text or p.raw_text, p.author, p.author_url)
         # Recusados que falam da linguagem também são guardados (fora do site): a página
         # /regras conta quantos cada regra barrou, e mudanças no filtro valem para eles
         # (reclassify). Posts de quem procura emprego e do próprio site não.
@@ -419,7 +419,7 @@ def import_post(store: Store, url: str) -> dict:
                   if m.group(1) == "share"), None) \
         or POST_ID.search(canonical) or POST_ID.search(url) or POST_ID.search(page)
     author = post.get("author") or {}
-    verdict = classify.post_verdict(text, author.get("name"))
+    verdict = classify.post_verdict(text, author.get("name"), author.get("url"))
     job = {"id": f"post:urn:li:{ident.group(1)}:{ident.group(2)}" if ident else
            "post:h:" + hashlib.sha1(f"{author.get('name')}|{text[:300]}".encode()).hexdigest()[:20],
            "source": "post", "relevant": verdict in classify.POST_OK, "title": _post_title(text),

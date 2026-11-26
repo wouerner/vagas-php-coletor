@@ -82,6 +82,18 @@ def test_false_positives_from_production(text, verdict):
     assert not classify.is_hiring_post(text)
 
 
+def test_ccbr_page_is_rejected_by_author_url():
+    text = (
+        "CCBR - Conexão Corporativa Brasil: EDIÇÃO ESPECIAL TECH — VAGAS 100% REMOTAS EM TECNOLOGIA "
+        "(DE ESTÁGIO A SÊNIOR — COM FAIXAS DE ATÉ R$ 18.000/MÊS)!\n"
+        "Confira as vagas e seleções disponíveis no portal: https://lnkd.in/ebhnDa8w"
+    )
+    author = "CCBR - Conexão Corporativa Brasil"
+    author_url = "https://br.linkedin.com/company/ccbr-conex%C3%A3o-corporativo-brasil?trk=public_post_feed-actor-image"
+    assert classify.post_verdict(text, author, author_url) == "aggregator_author"
+    assert not classify.is_hiring_post(text, author, author_url)
+
+
 @pytest.mark.parametrize("text", [
     # Full stack com PHP e JavaScript: uma menção, mas JavaScript não conta como outra linguagem.
     "Estamos contratando Desenvolvedor Full Stack Pleno, remoto. Stack: PHP e JavaScript.",

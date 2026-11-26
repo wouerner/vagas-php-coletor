@@ -112,7 +112,13 @@ SHOWCASE = [
     r"\bgostaria de compartilhar (um|o|meu|nosso) projeto\b",
     r"\bprojeto (da|de|do) (faculdade|curso|TCC|semestre)\b",
     r"\bfeira de (ci[eê]ncias|tecnologia)\b",
+    r"\b3 dias fora do ar\b",
+    r"\baqui est[áa] o que aprendi\b",
+    r"\bo que aprendi\b",
+    r"\bplataforma de conting[eê]ncia\b",
+    r"\bportal voltou\b",
 ]
+
 SHOWCASE_RE = re.compile("|".join(f"({rx})" for rx in SHOWCASE), re.I)
 # Formação/instituição (Senai, "curso técnico"...) não é sinal de vitrine: aparece em
 # anúncio real como requisito ("curso técnico em Informática pelo Senai"), e recusar vaga
@@ -201,6 +207,13 @@ AGGREGATOR_AUTHOR = [
     r"^home office$",
 ]
 AGGREGATOR_AUTHOR_RE = re.compile("|".join(f"({rx})" for rx in AGGREGATOR_AUTHOR), re.I)
+# Perfil público que publica compilações de vagas e não deve voltar na captura.
+# A checagem é por URL e por nome, para impedir que o mesmo perfil reapareça com variações.
+AGGREGATOR_AUTHOR_URL = [
+    r"/in/guilherme-ristow-b59bb931b(?:[/?#]|$)",
+    r"/company/ccbr-[^?#]*corporativo-brasil(?:[/?#]|$)",
+]
+AGGREGATOR_AUTHOR_URL_RE = re.compile("|".join(f"({rx})" for rx in AGGREGATOR_AUTHOR_URL), re.I)
 # O dono do site (configuração "self_author": nomes e perfis): o post diário no LinkedIn
 # (linkedin_post.py) cita as vagas e voltaria na busca de publicações. O site não se
 # auto-coleta. Recalculados em _configure().
@@ -444,9 +457,10 @@ def _plain_name(name: str | None) -> str:
     return name.encode("ascii", "ignore").decode()
 
 
-def is_aggregator_author(author: str | None) -> bool:
-    """Quem publicou é agregador de vagas (AGGREGATOR_AUTHOR), pelo nome."""
-    return bool(author and AGGREGATOR_AUTHOR_RE.search(_plain_name(author)))
+def is_aggregator_author(author: str | None, author_url: str | None = None) -> bool:
+    """Quem publicou é agregador de vagas (AGGREGATOR_AUTHOR), pelo nome ou pelo perfil."""
+    return bool((author and AGGREGATOR_AUTHOR_RE.search(_plain_name(author)))
+                or (author_url and AGGREGATOR_AUTHOR_URL_RE.search(author_url.split("?")[0])))
 
 
 def is_self_author(author: str | None, author_url: str | None = None) -> bool:
@@ -471,11 +485,16 @@ def _headline(text: str) -> str:
     return next((line for line in text.splitlines() if line.strip()), "")
 
 
-def post_verdict(text: str | None, author: str | None = None) -> str:
+def post_verdict(text: str | None, author: str | None = None,
+                 author_url: str | None = None) -> str:
     """Por que um post do LinkedIn entra ou não: um id de RULES. Entram os de POST_OK.
     O autor (nome de quem publicou) barra os posts do próprio site e os de agregadores."""
     if is_self_author(author):
         return "self_author"
+    # Perfil de curadoria/republicação: barra cedo, antes da heurística do texto, para não
+    # depender de quantas vezes a vaga cita a linguagem.
+    if is_aggregator_author(author, author_url):
+        return "aggregator_author"
     if not text:
         return "post_no_lang"
     body = HASHTAG_OR_URL.sub(" ", text)
@@ -492,7 +511,7 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
         return "job_list"
     # Agregador barra antes de julgar o texto: o anúncio pode ser bom, mas não é de quem
     # contrata.
-    if is_aggregator_author(author):
+    if is_aggregator_author(author, author_url):
         return "aggregator_author"
     # "Estou em busca de pessoas..." é recrutador, não alguém procurando emprego.
     if JOB_SEEKER.search(text) and not RECRUITING.search(text):
@@ -522,14 +541,15 @@ def post_verdict(text: str | None, author: str | None = None) -> str:
     return "hiring_weak" if _job_ad_shape(text) else "no_hiring"
 
 
-def is_hiring_post(text: str | None, author: str | None = None) -> bool:
+def is_hiring_post(text: str | None, author: str | None = None,
+                   author_url: str | None = None) -> bool:
     """Post do LinkedIn que anuncia vaga da linguagem: cita a linguagem (CORE) no texto
     junto de um cargo de desenvolvimento, ou mais de uma vez (hashtags e links não contam:
     posts genéricos enchem de #php #java...); não é divulgação de grupos (AGGREGATOR) nem lista de vagas
     de terceiros (JOB_LIST_*), nem de agregador
     de vagas (AGGREGATOR_AUTHOR) ou do próprio site (SELF_AUTHOR), nem de alguém
     procurando emprego, nem debate sobre vagas (OPINION); e tem sinal claro de contratação."""
-    return post_verdict(text, author) in POST_OK
+    return post_verdict(text, author, author_url) in POST_OK
 
 
 # Recrutador "em busca de pessoas" para uma vaga: o texto parece de quem procura emprego.
