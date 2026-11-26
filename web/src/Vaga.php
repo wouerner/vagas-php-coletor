@@ -524,7 +524,7 @@ final class Vaga
             $out[] = '</section>';
         }
         $out[] = '<p class="reddit">Conhece a empresa ou já participou do processo? '
-            . '<a href="' . $e(self::redditHref($job, ($baseUrl ?? '') . $here)) . '" rel="nofollow noopener" target="_blank">'
+            . '<a class="reddit" href="' . $e(self::redditHref($job, ($baseUrl ?? '') . $here)) . '" rel="nofollow noopener" target="_blank">'
             . 'Comente a vaga no Reddit (r/' . self::REDDIT . ')</a></p>';
         if (trim($job['description'] ?? '') !== '') {
             $out[] = '<h2>Descrição</h2><div class="description">'
