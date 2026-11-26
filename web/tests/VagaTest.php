@@ -91,3 +91,18 @@ it('mostra confiança discreta quando houver níveis internos', function () {
         ->and($html)->toContain('Confiança interna da empresa')
         ->and($html)->toContain('Confiança interna do recrutador');
 });
+
+it('liga a vaga a um post novo na comunidade do Reddit', function () {
+    $job = ['id' => 'gupy:3', 'seq' => 7, 'source' => 'gupy', 'title' => 'Dev PHP & Laravel', 'description' => 'Texto',
+        'company' => 'Acme', 'company_key' => 'acme', 'posted_at' => '2026-10-30T12:00:00+00:00',
+        'first_seen' => '2026-10-30T12:00:00+00:00'];
+    $href = Vaga::redditHref($job, 'https://example.test/vaga/7-dev-php-laravel');
+    parse_str((string) parse_url($href, PHP_URL_QUERY), $q);
+    expect($href)->toStartWith('https://www.reddit.com/r/VagasArrombadasTech/submit?')
+        ->and($q)->toBe(['type' => 'link', 'title' => '[PHP] Dev PHP & Laravel · Acme',
+            'url' => 'https://example.test/vaga/7-dev-php-laravel'])
+        ->and(Vaga::jobHtml($job, true, [], baseUrl: 'https://example.test'))
+            ->toContain('href="' . htmlspecialchars($href, ENT_QUOTES) . '"');
+    parse_str((string) parse_url(Vaga::redditHref(['title' => str_repeat('a', 400)] + $job, 'u'), PHP_URL_QUERY), $long);
+    expect(mb_strlen($long['title']))->toBe(300);
+});

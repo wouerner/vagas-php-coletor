@@ -425,7 +425,26 @@ final class Vaga
         return $h == (int) $h ? (string) (int) $h : (string) $h;
     }
 
-    public static function jobHtml(array $job, bool $isOpen, array $others, array $trustLevels = [], ?array $vote = null): string
+    /** Comunidade no Reddit (de todos os sites) onde as vagas são comentadas: o site não tem comentários. */
+    public const REDDIT = 'VagasArrombadasTech';
+
+    /**
+     * Link para criar um post sobre a vaga na comunidade do Reddit, já com título e o
+     * endereço da vaga no site preenchidos (o Reddit pede login antes, se preciso).
+     */
+    public static function redditHref(array $job, string $jobUrl): string
+    {
+        $title = '[' . Brand::lang() . '] ' . trim($job['title'] ?: 'Vaga ' . Brand::lang())
+            . (empty($job['company']) ? '' : ' · ' . trim($job['company']));
+        if (mb_strlen($title) > 300) {  // limite do título no Reddit
+            $title = rtrim(mb_substr($title, 0, 299)) . '…';
+        }
+        return 'https://www.reddit.com/r/' . self::REDDIT . '/submit?'
+            . Text::query(['type' => 'link', 'title' => $title, 'url' => $jobUrl]);
+    }
+
+    public static function jobHtml(array $job, bool $isOpen, array $others, array $trustLevels = [], ?array $vote = null,
+                                   ?string $baseUrl = null): string
     {
         $e = Text::e(...);
         [$name, $path] = self::topic($job);
@@ -504,6 +523,9 @@ final class Vaga
             }
             $out[] = '</section>';
         }
+        $out[] = '<p class="reddit">Conhece a empresa ou já participou do processo? '
+            . '<a href="' . $e(self::redditHref($job, ($baseUrl ?? '') . $here)) . '" rel="nofollow noopener" target="_blank">'
+            . 'Comente a vaga no Reddit (r/' . self::REDDIT . ')</a></p>';
         if (trim($job['description'] ?? '') !== '') {
             $out[] = '<h2>Descrição</h2><div class="description">'
                 . self::descriptionHtml($job['description'], $job['source'] === 'github') . '</div>';
@@ -589,7 +611,7 @@ final class Vaga
             }
         }
         $html = Seo::render($request, 'vaga.html', self::pageTitle($job, $open), self::summary($job), $path,
-            ['crumbs' => self::crumbsHtml($trail), 'vaga' => self::jobHtml($job, $open, $others, $this->site->trustLevels(), $vote)], $jsonld, !$open);
+            ['crumbs' => self::crumbsHtml($trail), 'vaga' => self::jobHtml($job, $open, $others, $this->site->trustLevels(), $vote, Seo::siteUrl($request))], $jsonld, !$open);
         return Response::html($html);
     }
 }
