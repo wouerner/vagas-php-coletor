@@ -55,16 +55,18 @@ final class Seo
     /** Endereço público do site, sem barra no fim. */
     public static function siteUrl(Request $request): string
     {
-        if (($site = Sites::url()) !== null) {  // vários sites: o domínio da lista (Sites)
-            return $site;
-        }
-        $fixed = rtrim(self::env('VAGAS_SITE_URL'), '/');
-        if ($fixed !== '') {
+        if (($fixed = self::publicUrl()) !== '') {
             return $fixed;
         }
         $proto = trim(explode(',', $request->header('x-forwarded-proto') ?? $request->scheme)[0]);
         $host = trim(explode(',', $request->header('x-forwarded-host') ?? $request->host)[0]);
         return "$proto://$host";
+    }
+
+    /** Endereço público conhecido sem a requisição (Sites ou VAGAS_SITE_URL), ou '' sem nenhum dos dois. */
+    public static function publicUrl(): string
+    {
+        return Sites::url() ?? rtrim(self::env('VAGAS_SITE_URL'), '/');  // vários sites: o domínio da lista
     }
 
     /** JSON para <script type="application/ld+json">: "</" escapado não fecha o script. */

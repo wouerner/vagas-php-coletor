@@ -416,6 +416,13 @@ final class Site
         if ($path && $url) {
             $meta .= ($meta !== '' ? ' · ' : '') . '<a href="' . $e($out) . '" target="_blank" rel="noopener">ver anúncio original</a>';
         }
+        // Comentários ficam no Reddit: o post aponta para a página da vaga ou, sem ela (post
+        // do LinkedIn), para o anúncio original. redditHref() de templates/index.html monta o mesmo.
+        $target = $path ? Seo::publicUrl() . $path : $url;
+        if ($target) {
+            $meta .= ($meta !== '' ? ' · ' : '') . '<a class="reddit" href="' . $e(Vaga::redditHref($job, $target))
+                . '" target="_blank" rel="nofollow noopener">comentar no Reddit</a>';
+        }
         $age = $a ? "<span class=\"age\" title=\"Vaga {$a['label']}: publicada há {$a['text']}\">{$a['text']}</span>" : '';
         $desc = !empty($job['description'])
             ? '<details><summary>Descrição</summary><div class="desc">' . $e($job['description']) . '</div></details>' : '';

@@ -325,6 +325,12 @@ const el = (tag, attrs = {}, ...children) => {
 };
 const safeUrl = url => /^https?:\/\//i.test(url || "") ? url : null;
 // Link para o anúncio original passando por /out, que conta o clique (vaga.out_href no servidor).
+// Post novo na comunidade do Reddit, como Vaga::redditHref no servidor.
+const redditHref = (job, target) => {
+  let t = `[{{brand:lang}}] ${(job.title || "Vaga {{brand:lang}}").trim()}` + (job.company ? ` · ${job.company.trim()}` : "");
+  if ([...t].length > 300) t = [...t].slice(0, 299).join("").trimEnd() + "…";
+  return "https://www.reddit.com/r/VagasArrombadasTech/submit?" + new URLSearchParams({ type: "link", title: t, url: target });
+};
 const outHref = (url, job) => "/out?" + new URLSearchParams({
   url, job: job.id || "", page: location.pathname || "/", source: job.source || "" });
 
@@ -475,7 +481,10 @@ function card(job) {
       el("h2", {}, link),
       a && el("span", { className: "age", title: `Vaga ${a.label}: publicada há ${a.text}` }, a.text)),
     el("div", { className: "meta" }, who, when,
-      job.path && url && (who || when) ? " · " : null, job.path && url ? original("ver anúncio original") : null),
+      job.path && url && (who || when) ? " · " : null, job.path && url ? original("ver anúncio original") : null,
+      (job.path || url) && (who || when || (job.path && url)) ? " · " : null,
+      job.path || url ? el("a", { className: "reddit", href: redditHref(job, job.path ? location.origin + job.path : url),
+        target: "_blank", rel: "nofollow noopener" }, "comentar no Reddit") : null),
     tags);
   li.dataset.id = job.id;
   if (job.description) {

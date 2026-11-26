@@ -106,3 +106,14 @@ it('liga a vaga a um post novo na comunidade do Reddit', function () {
     parse_str((string) parse_url(Vaga::redditHref(['title' => str_repeat('a', 400)] + $job, 'u'), PHP_URL_QUERY), $long);
     expect(mb_strlen($long['title']))->toBe(300);
 });
+
+it('põe o link do Reddit nos cards, apontando para o post quando não há página da vaga', function () {
+    $post = ['id' => 'post:urn:li:activity:1', 'seq' => 9, 'source' => 'post', 'title' => 'Vaga PHP', 'company' => null,
+        'author' => 'Ana', 'url' => 'https://www.linkedin.com/feed/update/urn:li:activity:1/',
+        'posted_at' => '2026-10-30T12:00:00+00:00', 'first_seen' => '2026-10-30T12:00:00+00:00'];
+    $html = Site::jobCard($post);
+    preg_match('/class="reddit" href="([^"]+)"/', $html, $m);
+    parse_str((string) parse_url(html_entity_decode($m[1]), PHP_URL_QUERY), $q);
+    expect($q['url'])->toBe('https://www.linkedin.com/feed/update/urn:li:activity:1/')
+        ->and(Site::jobCard(['url' => null] + $post))->not->toContain('class="reddit"');
+});
