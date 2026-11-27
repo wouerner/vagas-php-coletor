@@ -211,6 +211,7 @@ AGGREGATOR_AUTHOR_RE = re.compile("|".join(f"({rx})" for rx in AGGREGATOR_AUTHOR
 # A checagem é por URL e por nome, para impedir que o mesmo perfil reapareça com variações.
 AGGREGATOR_AUTHOR_URL = [
     r"/in/guilherme-ristow-b59bb931b(?:[/?#]|$)",
+    r"/in/vaz10k(?:[/?#]|$)",
     r"/company/ccbr-[^?#]*corporativo-brasil(?:[/?#]|$)",
 ]
 AGGREGATOR_AUTHOR_URL_RE = re.compile("|".join(f"({rx})" for rx in AGGREGATOR_AUTHOR_URL), re.I)

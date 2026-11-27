@@ -94,6 +94,17 @@ def test_ccbr_page_is_rejected_by_author_url():
     assert not classify.is_hiring_post(text, author, author_url)
 
 
+def test_vaz10k_page_is_rejected_by_author_url():
+    text = (
+        "VAGA REMOTA: Desenvolvedor Backend SENIOR (HostGator) 💰 Remuneração: R$ 15.263/mês"
+        " *Robert Half 2026 ... Comenta aqui embaixo \"HOSTGATOR\" e eu te mando o link direto"
+    )
+    author = "Gabriel Vaz"
+    author_url = "https://br.linkedin.com/in/vaz10k?trk=public_post_feed-actor-image"
+    assert classify.post_verdict(text, author, author_url) == "aggregator_author"
+    assert not classify.is_hiring_post(text, author, author_url)
+
+
 @pytest.mark.parametrize("text", [
     # Full stack com PHP e JavaScript: uma menção, mas JavaScript não conta como outra linguagem.
     "Estamos contratando Desenvolvedor Full Stack Pleno, remoto. Stack: PHP e JavaScript.",
