@@ -215,6 +215,12 @@ AGGREGATOR_AUTHOR_URL = [
     r"/company/ccbr-[^?#]*corporativo-brasil(?:[/?#]|$)",
 ]
 AGGREGATOR_AUTHOR_URL_RE = re.compile("|".join(f"({rx})" for rx in AGGREGATOR_AUTHOR_URL), re.I)
+# Perfil que queremos bloquear totalmente, mesmo quando posta vagas aparentes: vende curso e
+# publica compilados/gancho sem link útil para candidatura.
+BLOCKED_AUTHOR = [r"\bgabriel vaz\b", r"\bvaz10k\b"]
+BLOCKED_AUTHOR_RE = re.compile("|".join(f"({rx})" for rx in BLOCKED_AUTHOR), re.I)
+BLOCKED_AUTHOR_URL = [r"/in/vaz10k(?:[/?#]|$)"]
+BLOCKED_AUTHOR_URL_RE = re.compile("|".join(f"({rx})" for rx in BLOCKED_AUTHOR_URL), re.I)
 # O dono do site (configuração "self_author": nomes e perfis): o post diário no LinkedIn
 # (linkedin_post.py) cita as vagas e voltaria na busca de publicações. O site não se
 # auto-coleta. Recalculados em _configure().
@@ -464,6 +470,12 @@ def is_aggregator_author(author: str | None, author_url: str | None = None) -> b
                 or (author_url and AGGREGATOR_AUTHOR_URL_RE.search(author_url.split("?")[0])))
 
 
+def is_blocked_author(author: str | None, author_url: str | None = None) -> bool:
+    """Quem publicou é um perfil bloqueado explicitamente (nome ou URL)."""
+    return bool((author and BLOCKED_AUTHOR_RE.search(_plain_name(author)))
+                or (author_url and BLOCKED_AUTHOR_URL_RE.search(author_url.split("?")[0])))
+
+
 def is_self_author(author: str | None, author_url: str | None = None) -> bool:
     """Quem publicou é o dono do site (SELF_AUTHOR), pelo nome ou pelo perfil."""
     return bool((author and SELF_AUTHOR_RE.search(_plain_name(author)))
@@ -490,8 +502,10 @@ def post_verdict(text: str | None, author: str | None = None,
                  author_url: str | None = None) -> str:
     """Por que um post do LinkedIn entra ou não: um id de RULES. Entram os de POST_OK.
     O autor (nome de quem publicou) barra os posts do próprio site e os de agregadores."""
-    if is_self_author(author):
+    if is_self_author(author, author_url):
         return "self_author"
+    if is_blocked_author(author, author_url):
+        return "blocked_author"
     # Perfil de curadoria/republicação: barra cedo, antes da heurística do texto, para não
     # depender de quantas vezes a vaga cita a linguagem.
     if is_aggregator_author(author, author_url):

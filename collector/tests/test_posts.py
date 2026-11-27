@@ -101,7 +101,7 @@ def test_vaz10k_page_is_rejected_by_author_url():
     )
     author = "Gabriel Vaz"
     author_url = "https://br.linkedin.com/in/vaz10k?trk=public_post_feed-actor-image"
-    assert classify.post_verdict(text, author, author_url) == "aggregator_author"
+    assert classify.post_verdict(text, author, author_url) == "blocked_author"
     assert not classify.is_hiring_post(text, author, author_url)
 
 
