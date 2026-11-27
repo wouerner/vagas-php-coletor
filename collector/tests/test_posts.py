@@ -105,6 +105,18 @@ def test_vaz10k_page_is_rejected_by_author_url():
     assert not classify.is_hiring_post(text, author, author_url)
 
 
+def test_isis_post_is_rejected_by_author_url():
+    text = (
+        "🚀 Em busca de uma nova oportunidade na área de tecnologia! "
+        "Olá, pessoal! Tudo bem? Meu nome é Isis e sou desenvolvedora web... "
+        "#OpenToWork #DesenvolvimentoDeSoftware #VagasRemotas"
+    )
+    author = "Isis Souza Guimarães"
+    author_url = "https://br.linkedin.com/in/isis-souza-guimar%C3%A3es-979163295?trk=public_post_feed-actor-image"
+    assert classify.post_verdict(text, author, author_url) == "blocked_author"
+    assert not classify.is_hiring_post(text, author, author_url)
+
+
 @pytest.mark.parametrize("text", [
     # Full stack com PHP e JavaScript: uma menção, mas JavaScript não conta como outra linguagem.
     "Estamos contratando Desenvolvedor Full Stack Pleno, remoto. Stack: PHP e JavaScript.",

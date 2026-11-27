@@ -217,9 +217,9 @@ AGGREGATOR_AUTHOR_URL = [
 AGGREGATOR_AUTHOR_URL_RE = re.compile("|".join(f"({rx})" for rx in AGGREGATOR_AUTHOR_URL), re.I)
 # Perfil que queremos bloquear totalmente, mesmo quando posta vagas aparentes: vende curso e
 # publica compilados/gancho sem link útil para candidatura.
-BLOCKED_AUTHOR = [r"\bgabriel vaz\b", r"\bvaz10k\b"]
+BLOCKED_AUTHOR = [r"\bgabriel vaz\b", r"\bvaz10k\b", r"\bisis souza guimar\w*\b"]
 BLOCKED_AUTHOR_RE = re.compile("|".join(f"({rx})" for rx in BLOCKED_AUTHOR), re.I)
-BLOCKED_AUTHOR_URL = [r"/in/vaz10k(?:[/?#]|$)"]
+BLOCKED_AUTHOR_URL = [r"/in/vaz10k(?:[/?#]|$)", r"/in/isis-souza-guimar[^/?#]*(?:[/?#]|$)"]
 BLOCKED_AUTHOR_URL_RE = re.compile("|".join(f"({rx})" for rx in BLOCKED_AUTHOR_URL), re.I)
 # O dono do site (configuração "self_author": nomes e perfis): o post diário no LinkedIn
 # (linkedin_post.py) cita as vagas e voltaria na busca de publicações. O site não se
